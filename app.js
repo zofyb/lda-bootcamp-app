@@ -41,6 +41,7 @@ function videoEmbed(url){
   if (!url) return `<div class="video empty">Das Lehrvideo kommt bald.</div>`;
   const m = url.match(/(?:youtu\.be\/|v=|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/);
   if (m) return `<div class="video"><iframe src="https://www.youtube-nocookie.com/embed/${m[1]}?rel=0&modestbranding=1&playsinline=1" title="Lehrvideo" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
+  if (!/^https?:\/\//.test(url)) return `<div class="video"><video data-video="${esc(url)}" controls playsinline preload="metadata"></video></div>`;
   if (/^https:\/\//.test(url)) return `<div class="video"><video src="${esc(url)}" controls playsinline preload="metadata"></video></div>`;
   return `<div class="video empty">Video-Link ungültig.</div>`;
 }
@@ -48,11 +49,17 @@ function fileLinks(files){
   return `<div class="files">${list(files).map(f=>`<a data-path="${esc(f.path)}" target="_blank" rel="noopener">${esc(f.name)}</a>`).join("") || '<span>Keine Dateien</span>'}</div>`;
 }
 async function hydrateLinks(){
-  const els=[...document.querySelectorAll("a[data-path]:not([href])")]; if(!els.length) return;
-  const paths=[...new Set(els.map(e=>e.dataset.path))];
-  const { data } = await sb.storage.from("nachweise").createSignedUrls(paths, 3600);
-  const map = Object.fromEntries((data||[]).filter(d=>d.signedUrl).map(d=>[d.path,d.signedUrl]));
-  els.forEach(e => { if (map[e.dataset.path]) e.href = map[e.dataset.path]; });
+  const els=[...document.querySelectorAll("a[data-path]:not([href])")];
+  if (els.length){
+    const paths=[...new Set(els.map(e=>e.dataset.path))];
+    const { data } = await sb.storage.from("nachweise").createSignedUrls(paths, 3600);
+    const map = Object.fromEntries((data||[]).filter(d=>d.signedUrl).map(d=>[d.path,d.signedUrl]));
+    els.forEach(e => { if (map[e.dataset.path]) e.href = map[e.dataset.path]; });
+  }
+  for (const v of document.querySelectorAll("video[data-video]:not([src])")) {
+    const { data:d } = await sb.storage.from("unterlagen").createSignedUrl(v.dataset.video, 6*3600);
+    if (d?.signedUrl) v.src = d.signedUrl;
+  }
   for (const e of document.querySelectorAll("a[data-handout]:not([href])")) {
     const { data:d } = await sb.storage.from("unterlagen").createSignedUrl(e.dataset.handout, 3600);
     if (d?.signedUrl) e.href = d.signedUrl;
@@ -294,13 +301,15 @@ function areaEditor(){
     <label class="f" for="ae-title">Titel<input id="ae-title" type="text" value="${esc(a.title)}"></label>
     <label class="f" for="ae-week">Woche<input id="ae-week" type="text" inputmode="numeric" value="${a.week}"></label>
     <label class="f" for="ae-deadline">Abgabe bis<input id="ae-deadline" type="date" value="${esc(a.deadline||"")}"></label>
-    <label class="f" for="ae-video">Lehrvideo (YouTube-Link)<input id="ae-video" type="url" value="${esc(a.video_url||"")}"></label>
+    <label class="f" for="ae-video">Lehrvideo (YouTube-Link oder hochgeladen)<input id="ae-video" type="text" value="${esc(a.video_url||"")}"></label>
   </div>
   <label class="f" for="ae-intro">Kurze Einleitung<textarea id="ae-intro">${esc(a.intro||"")}</textarea></label>
   <label class="f" for="ae-pre">Zuerst (eine Zeile pro Punkt, darf leer sein)<textarea id="ae-pre">${lines(a.pre)}</textarea></label>
   <label class="f" for="ae-p1">Für 1 Punkt (eine Zeile pro Punkt)<textarea id="ae-p1">${lines(a.p1)}</textarea></label>
   <label class="f" for="ae-p2">Für 2 Punkte zusätzlich<textarea id="ae-p2">${lines(a.p2)}</textarea></label>
   <label class="f" for="ae-proof">Nachweis<input id="ae-proof" type="text" value="${esc(a.proof||"")}"></label>
+  ${a.video_url && !/^https?:/.test(a.video_url) ? videoEmbed(a.video_url) : ""}
+  <label class="f" for="ae-vfile">Lehrvideo hochladen (MP4, max. 50 MB)<input id="ae-vfile" type="file" accept="video/mp4,video/*"></label>
   <label class="f" for="ae-handout">Handout (PDF) ${a.handout_path?`· <a data-handout="${esc(a.handout_path)}" target="_blank" rel="noopener">aktuelles öffnen</a>`:"· noch keins"}<input id="ae-handout" type="file" accept="application/pdf"></label>
   <button class="btn" id="ae-save">Thema speichern</button>`;
 }
@@ -308,12 +317,15 @@ async function saveArea(){
   const n=+$("#ae-n").value, split=id=>$(id).value.split("\n").map(s=>s.trim()).filter(Boolean);
   const row={ title:$("#ae-title").value.trim(), week:parseInt($("#ae-week").value,10)||1, deadline:$("#ae-deadline").value||null, video_url:$("#ae-video").value.trim()||null,
     intro:$("#ae-intro").value.trim()||null, pre:split("#ae-pre"), p1:split("#ae-p1"), p2:split("#ae-p2"), proof:$("#ae-proof").value.trim()||null };
-  const f=$("#ae-handout").files[0];
+  const f=$("#ae-handout").files[0], vf=$("#ae-vfile").files[0];
+  if (vf && vf.size>MAX_FILE) return toast("Das Video ist größer als 50 MB.");
   try{
+    if (vf){ $("#ae-save").disabled=true; $("#ae-save").textContent="Video wird hochgeladen …";
+      const path=`video-${n}-${Date.now()}.mp4`; const {error}=await sb.storage.from("unterlagen").upload(path,vf,{contentType:vf.type||"video/mp4"}); if(error) throw error; row.video_url=path; }
     if (f){ const path=`handout-${n}-${Date.now()}.pdf`; const {error}=await sb.storage.from("unterlagen").upload(path,f,{contentType:"application/pdf"}); if(error) throw error; row.handout_path=path; }
     const {error}=await sb.from("areas").update(row).eq("n",n); if(error) throw error;
     await refresh(); render(); toast("Thema gespeichert.");
-  } catch(e){ fail(e); }
+  } catch(e){ fail(e); render(); }
 }
 
 /* ---------- Ereignisse ---------- */

@@ -133,7 +133,7 @@ create policy subs_delete_lead on public.submissions for delete to authenticated
 -- ---------- Dateiablage ----------
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('nachweise','nachweise', false, 52428800),
-       ('unterlagen','unterlagen', false, 20971520)
+       ('unterlagen','unterlagen', false, 52428800)
 on conflict (id) do nothing;
 
 drop policy if exists nachweise_insert on storage.objects;
@@ -209,3 +209,6 @@ on conflict (n) do nothing;
 insert into public.members (email, role, name)
 values (lower('DEINE@EMAIL.DE'), 'lead', 'Zofy')
 on conflict (email) do update set role = 'lead';
+
+-- Größere Dateien (Lehrvideos bis 50 MB) in "unterlagen" erlauben
+update storage.buckets set file_size_limit = 52428800 where id = 'unterlagen';
