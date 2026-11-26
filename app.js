@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), tabsEl = $("#tabs");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{},
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false,
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -139,6 +139,10 @@ async function hydrate(){
     const { data:d } = await sb.storage.from("unterlagen").createSignedUrl(v.dataset.video, 6*3600);
     if (d?.signedUrl) v.src = d.signedUrl;
   }
+  for (const i of document.querySelectorAll("img[data-cimg]:not([src])")) {
+    const { data:d } = await sb.storage.from("unterlagen").createSignedUrl(i.dataset.cimg, 3600);
+    if (d?.signedUrl){ i.src = d.signedUrl; const a=i.closest("a[data-chref]"); if (a) a.href=d.signedUrl; }
+  }
   for (const e of document.querySelectorAll("a[data-handout]:not([href])")) {
     const { data:d } = await sb.storage.from("unterlagen").createSignedUrl(e.dataset.handout, 3600);
     if (d?.signedUrl) e.href = d.signedUrl;
@@ -248,6 +252,8 @@ async function refresh(){
   const [sn,qu,sv,tp] = await Promise.all([ sb.from("snapshots").select("*"), sb.from("questions").select("*").order("created_at",{ascending:false}), sb.from("survey").select("*"), sb.rpc("top5") ]);
   S.noUpd5 = !!(sn.error || qu.error || sv.error);
   if (S.real?.role==="lead" || S.me?.role==="lead"){ const ro=await sb.from("roster").select("*").order("handle"); S.noRoster=!!ro.error; S.roster=ro.data||[]; }
+  const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
+  if (!S.noUpd7 && S.real?.role==="lead"){ const tk=await sb.from("tasks").select("*").order("created_at"); S.tasks=tk.data||[]; }
   S.snaps = sn.data||[]; S.questions = qu.data||[]; S.survey = sv.data||[]; S.top = tp.error ? [] : (tp.data||[]);
   S.needsUpdate = !!(p.error || ac.error || st.error);
   S.progress = p.data||[]; S.activity = ac.data||[];
@@ -324,8 +330,8 @@ async function verifyCode(){
 /* ---------- Rahmen ---------- */
 const TABS = {
   creator: [["themen","Meine Themen"]],
-  manager: [["bewerten","Zu bewerten"],["creator","Meine Creator"],["fragen","Fragenbox"]],
-  lead:    [["uebersicht","Übersicht"],["bewerten","Zu bewerten"],["fragen","Fragen & Umfrage"],["personen","Teilnehmer"],["themenedit","Themen & Start"]]
+  manager: [["bewerten","Zu bewerten"],["creator","Meine Creator"],["fragen","Sag's uns"],["kalender","Kalender"]],
+  lead:    [["uebersicht","Übersicht"],["fuehrung","Führung"],["bewerten","Zu bewerten"],["kalender","Kalender"],["fragen","Sag's uns & Umfrage"],["personen","Teilnehmer"],["themenedit","Themen & Start"]]
 };
 const ROLE_NAME = { lead:"Agenturleitung", manager:"Manager", creator:"Creator" };
 function applyView(){
@@ -353,19 +359,22 @@ function render(keepScroll){
   const sw=$("#switch"); sw.innerHTML = switcher(); sw.hidden = !sw.innerHTML.trim();
   const st = me.role==="creator" && !me.preview ? streakInfo(me.email).cur : 0;
   who.innerHTML = `${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}<span class="chip">${esc(me.role==="creator"?firstName(me):S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
-  const t = me.role==="creator" ? (inBootcamp(me) ? [["themen","Bootcamp"],["akademie","Akademie"]] : [["akademie","Akademie"]]) : [...TABS[me.role], ["akademie","Akademie"]];
-  if (me.role==="creator" && !inBootcamp(me)) S.tab="akademie";
+  const t = me.role==="creator" ? [...(inBootcamp(me) ? [["themen","Bootcamp"]] : []), ["akademie","Akademie"], ["kalender","Kalender"]] : [...TABS[me.role], ["akademie","Akademie"]];
+  if (me.role==="creator" && !inBootcamp(me) && S.tab==="themen") S.tab="akademie";
+  if (S.real.role!=="lead" && S.tab==="fuehrung") S.tab=t[0][0];
   tabsEl.hidden = t.length < 2 || !!S.openArea;
   tabsEl.innerHTML = t.map(([k,l]) => `<button data-tab="${k}" aria-pressed="${S.tab===k}">${l}</button>`).join("");
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
   if (S.tab==="akademie" && !S.creator) html = academyView();
+  else if (S.tab==="kalender" && !S.creator) html = calendarView();
+  else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
   else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : needIntro() ? introView() : creatorHome();
   else if (S.creator) html = creatorDetail(S.creator);
   else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor }[S.tab] || pendingView)();
   view.innerHTML = html;
   if (!keepScroll) window.scrollTo(0,0);
-  afterRender();
+  afterRender(); fab();
   hydrate().catch(console.error);
 }
 function afterRender(){
@@ -558,17 +567,7 @@ function topBlock(){
 }
 function questionBlock(){
   if (S.noUpd5) return "";
-  const pub=S.questions.filter(q=>q.published), ro=readOnly()||S.me.preview;
-  return `<div class="panel stack"><div class="sh"><span class="eyebrow">Anonym</span><h2>Fragen<em>box</em></h2></div>
-    <p class="muted">Frag, was du dich sonst nicht traust. Dein Name wird nicht gespeichert. Die Antworten kommen hier oder in einem Live.</p>
-    <textarea id="qbox" maxlength="1000" placeholder="Deine Frage …"></textarea>
-    <button class="btn ghost" id="qsend" ${ro?"disabled":""}>Anonym abschicken</button>
-    ${pub.length?`<div class="list">${pub.map(q=>`<div class="row"><b>${esc(q.body)}</b>${q.answer?`<p class="feedback">${esc(q.answer)}</p>`:""}</div>`).join("")}</div>`:""}</div>`;
-}
-async function sendQuestion(){
-  const body=($("#qbox").value||"").trim(); if (body.length<3) return toast("Schreib bitte eine Frage.");
-  const r=await sb.from("questions").insert({ body }); if (r.error) return fail(r.error);
-  $("#qbox").value=""; toast("Danke! Deine Frage ist anonym angekommen.");
+  return `<button class="panel kkcard" id="kk-open"><span class="ic" aria-hidden="true">✉️</span><span><b>Sag's uns</b><small class="muted">Frage, Kritik oder Wunsch. Anonym, ohne Namen.</small></span><span class="go">Schreiben</span></button>`;
 }
 function surveyBlock(e){
   if (S.noUpd5 || S.me.role!=="creator") return "";
@@ -819,12 +818,12 @@ function exportCsv(){
 function feedbackView(){
   const lead=S.me.role==="lead";
   if (S.noUpd5) return `<div class="panel"><p class="err">Zuerst update-5.sql in Supabase ausführen.</p></div>`;
-  let h=`<div class="stack"><span class="eyebrow">Anonym</span><h1>Frage<em>nbox</em></h1><p class="muted">${lead?"Antworte und veröffentliche, dann sehen alle Creator Frage und Antwort. Oder beantworte sie gesammelt im Live.":"Die anonymen Fragen der Creator. Antworten veröffentlicht die Agenturleitung."}</p></div>`;
-  h += S.questions.length ? `<div class="list">${S.questions.map(q=>`<div class="row"><div class="head"><b>${esc(q.body)}</b><span class="tag ${q.published?"ok":""}">${q.published?"veröffentlicht":"neu"}</span></div>
+  let h=`<div class="stack"><span class="eyebrow">Anonym</span><h1>Sag's <em>uns</em></h1><p class="muted">${lead?"Antworte und veröffentliche, dann sehen alle Creator Frage und Antwort. Oder beantworte sie gesammelt im Live.":"Die anonymen Nachrichten der Creator: Fragen, Kritik und Wünsche. Antworten veröffentlicht die Agenturleitung."}</p></div>`;
+  h += S.questions.length ? `<div class="list">${S.questions.map(q=>`<div class="row"><div class="head"><b>${esc(q.body)}</b><span class="actions"><span class="tag ${q.kind==="kritik"?"err":q.kind==="wunsch"?"gold":""}">${kkLabel(q.kind)}</span><span class="tag ${q.published?"ok":""}">${q.published?"veröffentlicht":"neu"}</span></span></div>
       <small class="muted">${fmtAgo(q.created_at)}</small>
       ${lead?`<textarea id="qa-${q.id}" placeholder="Antwort (optional)">${esc(q.answer||"")}</textarea>
       <div class="actions"><button class="btn small" data-qpub="${q.id}">${q.published?"Antwort speichern":"Veröffentlichen"}</button>${q.published?`<button class="btn small ghost" data-qsave="${q.id}">Verstecken</button>`:""}<button class="btn small danger" data-qdel="${q.id}">${S.confirmDelete===q.id?"Wirklich löschen?":"Löschen"}</button></div>`
-      : q.answer?`<p class="feedback">${esc(q.answer)}</p>`:""}</div>`).join("")}</div>` : `<div class="panel"><p class="muted">Noch keine Fragen.</p></div>`;
+      : q.answer?`<p class="feedback">${esc(q.answer)}</p>`:""}</div>`).join("")}</div>` : `<div class="panel"><p class="muted">Noch keine Nachrichten.</p></div>`;
   if (lead){
     const sv=S.survey, n=sv.length, avg=n?(sv.reduce((a,x)=>a+x.rating,0)/n).toFixed(1):"–";
     const cnt={}; sv.forEach(x=>{ if(x.helped) cnt[x.helped]=(cnt[x.helped]||0)+1; });
@@ -871,6 +870,242 @@ function academyView(){
       : extraCard(x,seen)).join("")}</div>`;
   }
   return h;
+}
+
+/* ---------- Sag's uns (anonym) ---------- */
+const KK_KINDS = [["frage","❓ Frage"],["kritik","💬 Kritik"],["wunsch","✨ Wunsch"]];
+const kkLabel = k => (KK_KINDS.find(x=>x[0]===(k||"frage"))||KK_KINDS[0])[1];
+function fab(){
+  let b=$("#kk-fab");
+  if (!b){ b=document.createElement("button"); b.id="kk-fab"; b.className="fab"; b.setAttribute("aria-label","Anonyme Nachricht schreiben");
+    b.innerHTML=`<span class="ic" aria-hidden="true">✉️</span><span class="tx">Anonym</span>`; document.body.appendChild(b); }
+  b.hidden = !(S.me && S.me.role==="creator" && !S.noUpd5) || !!S.openArea;
+}
+function openKK(){
+  const ro=readOnly()||S.me.preview, k=S.kkKind||"frage", pub=S.questions.filter(q=>q.published);
+  sheet(`<div class="sh"><span class="eyebrow">Anonym</span><h2>Sag's <em>uns</em></h2></div>
+    <p class="kk-safe">🔒 Dein Name wird nicht gespeichert. Niemand sieht, von wem die Nachricht ist.</p>
+    <div class="seg" role="group" aria-label="Art der Nachricht">${KK_KINDS.map(([v,l])=>`<button data-kk="${v}" aria-pressed="${k===v}">${l}</button>`).join("")}</div>
+    <textarea id="qbox" maxlength="1000" placeholder="${k==="kritik"?"Was stört dich? Sag es ehrlich.":k==="wunsch"?"Was wünschst du dir von der Agentur?":"Was willst du wissen?"}">${esc(S.kkDraft||"")}</textarea>
+    <button class="btn" id="qsend" ${ro?"disabled":""}>Anonym abschicken</button>
+    ${pub.length?`<div class="wkh"><span>ANTWORTEN</span><small class="muted">Fragen, die schon beantwortet sind</small></div><div class="list">${pub.map(q=>`<div class="row"><b>${esc(q.body)}</b>${q.answer?`<p class="feedback">${esc(q.answer)}</p>`:""}</div>`).join("")}</div>`:""}`);
+}
+async function sendQuestion(){
+  const body=($("#qbox").value||"").trim(); if (body.length<3) return toast("Schreib bitte ein paar Worte.");
+  const row={ body }; if (!S.noUpd7) row.kind=S.kkKind||"frage";
+  const r=await sb.from("questions").insert(row); if (r.error) return fail(r.error);
+  S.kkDraft=""; closeSheet(); toast("Danke! Deine Nachricht ist anonym angekommen. 💜");
+}
+
+/* ---------- Fenster (Sheet) ---------- */
+function sheet(html){
+  let w=$("#sheet");
+  if (!w){ w=document.createElement("div"); w.id="sheet"; w.className="sheetwrap"; document.body.appendChild(w); }
+  w.innerHTML=`<div class="sheet panel stack" role="dialog" aria-modal="true"><button class="x" id="sheet-x" aria-label="Schließen">✕</button>${html}</div>`;
+  requestAnimationFrame(()=>w.classList.add("show")); document.body.classList.add("noscroll");
+  hydrate().catch(console.error);
+}
+function closeSheet(){ const w=$("#sheet"); if (w){ w.classList.remove("show"); document.body.classList.remove("noscroll"); } }
+
+/* ---------- Kalender ---------- */
+const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const KIND = { tiktok:"TikTok-Kampagne", livedream:"LIVEdream-Kampagne", termin:"Termin" };
+const pd = s => { const [y,m,d]=String(s).slice(0,10).split("-").map(Number); return new Date(y,m-1,d); };
+const fmtDate = s => { const d=pd(s); return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`; };
+const fmtRange = c => c.starts===c.ends ? fmtDate(c.starts) : `${fmtDate(c.starts)} bis ${fmtDate(c.ends)}`;
+const linkify = t => esc(t).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/\n/g,"<br>");
+function calItems(scope){
+  if (scope==="lead") return S.cal.filter(c=>c.audience==="lead" || (S.calShowCamp!==false && c.audience==="all"));
+  return S.cal.filter(c=>c.audience==="all");
+}
+function calMonth(){ if (!S.calMonth){ const n=new Date(); S.calMonth=new Date(n.getFullYear(), n.getMonth(), 1); } return S.calMonth; }
+function calGrid(items){
+  const m0=calMonth(), y=m0.getFullYear(), mo=m0.getMonth();
+  const first=new Date(y,mo,1), start=new Date(first); start.setDate(1-((first.getDay()+6)%7));
+  const today=isoDay(new Date());
+  let h=`<div class="cal"><div class="calhead"><button class="chip" data-calnav="-1" aria-label="Vorheriger Monat">‹</button><b>${MONTHS[mo]} ${y}</b><button class="chip" data-calnav="1" aria-label="Nächster Monat">›</button></div>
+    <div class="caldow">${["Mo","Di","Mi","Do","Fr","Sa","So"].map(d=>`<span>${d}</span>`).join("")}</div>`;
+  for (let w=0; w<6; w++){
+    const ws=new Date(start); ws.setDate(start.getDate()+w*7);
+    if (w>3 && ws.getMonth()!==mo) break;
+    const we=new Date(ws); we.setDate(ws.getDate()+6);
+    const segs=items.filter(c=>pd(c.starts)<=we && pd(c.ends)>=ws).sort((a,b)=>a.starts.localeCompare(b.starts)||b.ends.localeCompare(a.ends));
+    const lanes=[]; const placed=segs.map(c=>{
+      const s=Math.max(0,Math.round((pd(c.starts)-ws)/DAY)), e=Math.min(6,Math.round((pd(c.ends)-ws)/DAY));
+      let l=lanes.findIndex(end=>end<s); if (l<0){ l=lanes.length; lanes.push(e); } else lanes[l]=e;
+      return { c, s, e, l };
+    });
+    const shown=placed.filter(p=>p.l<3), more=Array(7).fill(0); placed.filter(p=>p.l>=3).forEach(p=>{ for(let i=p.s;i<=p.e;i++) more[i]++; });
+    h += `<div class="calweek" style="--lanes:${Math.min(3,lanes.length)}">`;
+    for (let i=0;i<7;i++){ const d=new Date(ws); d.setDate(ws.getDate()+i);
+      h += `<span class="calday ${d.getMonth()!==mo?"out":""} ${isoDay(d)===today?"today":""}" style="grid-column:${i+1}">${d.getDate()}${more[i]?`<small>+${more[i]}</small>`:""}</span>`; }
+    h += shown.map(p=>`<button class="calbar k-${p.c.kind} ${pd(p.c.starts)<ws?"cont":""} ${pd(p.c.ends)>we?"goes":""}" style="grid-column:${p.s+1}/${p.e+2};grid-row:${p.l+2}" data-cal="${esc(p.c.id)}" title="${esc(p.c.title)}">${esc(p.c.title)}</button>`).join("");
+    h += `</div>`;
+  }
+  return h + `</div>`;
+}
+function calCard(c){
+  return `<button class="doc calitem" data-cal="${esc(c.id)}">${c.image?`<img class="thumb" data-cimg="${esc(c.image)}" alt="">`:`<span class="thumb k-${c.kind}"></span>`}
+    <span><b>${esc(c.title)}</b><small class="muted">${KIND[c.kind]||""} · ${esc(fmtRange(c))}${c.at_time?" · "+esc(c.at_time):""}</small></span></button>`;
+}
+function calLists(items){
+  const t=isoDay(new Date()), now=items.filter(c=>c.starts<=t && c.ends>=t), soon=items.filter(c=>c.starts>t).sort((a,b)=>a.starts.localeCompare(b.starts)), past=items.filter(c=>c.ends<t).sort((a,b)=>b.ends.localeCompare(a.ends));
+  const blk=(l,xs,sub)=>xs.length?`<div class="wkh"><span>${l}</span><small class="muted">${sub}</small></div><div class="extras">${xs.map(calCard).join("")}</div>`:"";
+  return blk("LÄUFT GERADE",now,`${now.length}`) + blk("KOMMT BALD",soon,`${soon.length}`)
+    + (past.length?`<details class="past"><summary>Vorbei (${past.length})</summary><div class="extras">${past.slice(0,30).map(calCard).join("")}</div></details>`:"")
+    + (!items.length?`<div class="panel"><p class="muted">Noch keine Einträge.</p></div>`:"");
+}
+function calForm(scope){
+  const e=S.calEdit && S.cal.find(c=>c.id===S.calEdit), d=e||S.calDraft||{}, termin=scope==="lead";
+  if (!S.calOpen && !e) return `<button class="btn small" id="cal-new">${termin?"＋ Termin eintragen":"＋ Kampagne eintragen"}</button>`;
+  return `<div class="panel stack calform"><h2>${e?"Eintrag bearbeiten":termin?"Neuer Termin":"Neue Kampagne"}</h2>
+    ${!e&&!termin?`<label class="f" for="cf-paste">Nachricht aus Lark einfügen (optional)<textarea id="cf-paste" placeholder="Einfach die ganze Nachricht hier reinkopieren. Titel, Daten und Link werden erkannt."></textarea></label>
+    <button class="btn small ghost" id="cf-parse">Erkennen</button>`:""}
+    <div class="grid2"><label class="f" for="cf-title">Titel<input id="cf-title" type="text" maxlength="200" value="${esc(d.title||"")}"></label>
+    <label class="f" for="cf-kind">Art<select id="cf-kind">${(termin?["termin","tiktok","livedream"]:["tiktok","livedream"]).map(k=>`<option value="${k}" ${(d.kind||(termin?"termin":"tiktok"))===k?"selected":""}>${KIND[k]}</option>`).join("")}</select></label>
+    <label class="f" for="cf-start">Von<input id="cf-start" type="date" value="${esc(d.starts||"")}"></label>
+    <label class="f" for="cf-end">Bis<input id="cf-end" type="date" value="${esc(d.ends||"")}"></label>
+    ${termin?`<label class="f" for="cf-time">Uhrzeit (optional)<input id="cf-time" type="text" placeholder="z. B. 14:00" value="${esc(d.at_time||"")}"></label>`:""}
+    <label class="f" for="cf-link">Link (optional)<input id="cf-link" type="url" value="${esc(d.link||"")}"></label></div>
+    <label class="f" for="cf-body">Infos${termin?"":" für die Creator"}<textarea id="cf-body" maxlength="8000">${esc(d.body||"")}</textarea></label>
+    <label class="f" for="cf-img">Bild (optional)${e?.image?" · ein Bild ist schon da":""}<input id="cf-img" type="file" accept="image/*"></label>
+    <input type="hidden" id="cf-aud" value="${termin?(e?.audience||"lead"):"all"}">
+    ${termin?`<label class="qopt" style="font-size:13px;color:var(--soft)"><input type="checkbox" id="cf-public" ${(e?.audience||"lead")==="all"?"checked":""}> Auch für alle Creator im Kalender zeigen</label>`:""}
+    <div class="actions"><button class="btn small gold" id="cf-save">Speichern</button><button class="btn small ghost" id="cf-cancel">Abbrechen</button>
+    ${e?`<button class="btn small danger" id="cf-del">${S.confirmDelete==="cal:"+e.id?"Wirklich löschen?":"Löschen"}</button>`:""}</div></div>`;
+}
+function calendarView(){
+  const lead=S.me.role==="lead", items=calItems("all");
+  let h=`<div class="stack"><span class="eyebrow">LIVEdream Academy</span><h1>Kampagnen-<em>Kalender</em></h1>
+    <p class="muted">Alle TikTok- und LIVEdream-Kampagnen auf einen Blick. Tipp auf eine Kampagne für alle Infos.</p></div>`;
+  if (S.noUpd7) return h + `<div class="panel"><p class="err">${lead?"Zuerst update-7.sql in Supabase ausführen.":"Der Kalender kommt bald."}</p></div>`;
+  h += `<div class="legend"><span><i class="k-tiktok"></i>TikTok</span><span><i class="k-livedream"></i>LIVEdream</span></div>`;
+  if (lead) h += calForm("all");
+  return h + calGrid(items) + calLists(items);
+}
+function openCal(id){
+  const c=S.cal.find(x=>x.id===id); if (!c) return;
+  const lead=S.me.role==="lead" && !S.viewAs;
+  sheet(`${c.image?`<a data-chref="${esc(c.image)}" target="_blank" rel="noopener"><img class="calimg" data-cimg="${esc(c.image)}" alt=""></a>`:""}
+    <div class="sh"><span class="eyebrow">${KIND[c.kind]||""}${c.audience==="lead"?" · nur Führung":""}</span><h2>${esc(c.title)}</h2></div>
+    <p class="caldates">📅 ${esc(fmtRange(c))}${c.at_time?` · ${esc(c.at_time)}`:""}</p>
+    ${c.body?`<div class="legaltext">${linkify(c.body)}</div>`:""}
+    ${c.link?`<a class="btn" href="${esc(c.link)}" target="_blank" rel="noopener">Zur Kampagne</a>`:""}
+    ${lead?`<button class="btn small ghost" data-caledit="${esc(c.id)}">Bearbeiten</button>`:""}`);
+}
+const MONTH_RX = { jan:0, januar:0, feb:1, februar:1, "mär":2, maerz:2, "märz":2, mar:2, march:2, apr:3, april:3, mai:4, may:4, jun:5, juni:5, june:5, jul:6, juli:6, july:6, aug:7, august:7, sep:8, sept:8, september:8, okt:9, oct:9, oktober:9, october:9, nov:10, november:10, dez:11, dec:11, dezember:11, december:11 };
+function parseLark(text){
+  const t=String(text||""), out={ body:t.trim() };
+  const link=t.match(/https?:\/\/[^\s)\]>]+/); if (link) out.link=link[0];
+  const lines=t.split(/\n/).map(l=>l.replace(/[*#_`【】\[\]]/g,"").replace(/^[^\p{L}\p{N}]+/u,"").trim()).filter(l=>l && !/^https?:/.test(l));
+  if (lines[0]) out.title=lines[0].replace(/\s*[:：]\s*$/,"").slice(0,120);
+  const now=new Date(), ds=[];
+  const add=(y,m,d)=>{ if (m<0||m>11||d<1||d>31) return; let yy=y?(y<100?2000+y:y):now.getFullYear(); let dt=new Date(yy,m,d); if (!y && dt<new Date(now.getFullYear(),now.getMonth()-2,1)) dt=new Date(yy+1,m,d); ds.push({ dt, i:ds.length }); };
+  let mm; const rx=/(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\.\s?(\d{1,2})\.(\d{2,4})?|(\d{1,2})\.?\s+([A-Za-zÄÖÜäöü]{3,9})\.?(?:\s+(\d{4}))?|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?|(\d{4})\/(\d{1,2})\/(\d{1,2})/g;
+  while ((mm=rx.exec(t))){
+    if (mm[1]) add(+mm[1],+mm[2]-1,+mm[3]);
+    else if (mm[4]) add(mm[6]?+mm[6]:0,+mm[5]-1,+mm[4]);
+    else if (mm[7]){ const k=MONTH_RX[mm[8].toLowerCase()]; if (k!==undefined) add(mm[9]?+mm[9]:0,k,+mm[7]); }
+    else if (mm[10]){ const k=MONTH_RX[mm[10].toLowerCase()]; if (k!==undefined) add(mm[12]?+mm[12]:0,k,+mm[11]); }
+    else if (mm[13]) add(+mm[13],+mm[14]-1,+mm[15]);
+  }
+  if (ds.length){ const s=ds.map(x=>x.dt).sort((a,b)=>a-b); out.starts=isoDay(s[0]); out.ends=isoDay(s[s.length-1]); }
+  out.kind=/livedream|agentur intern|unsere eigene/i.test(t)?"livedream":"tiktok";
+  return out;
+}
+function calRead(){
+  const g=id=>($("#"+id)?.value||"").trim();
+  return { title:g("cf-title"), kind:g("cf-kind"), starts:g("cf-start"), ends:g("cf-end")||g("cf-start"), at_time:g("cf-time")||null, link:g("cf-link")||null, body:g("cf-body")||null,
+    audience: $("#cf-public") ? ($("#cf-public").checked?"all":"lead") : g("cf-aud") };
+}
+async function calSave(){
+  const row=calRead(), f=$("#cf-img")?.files?.[0];
+  if (!row.title) return toast("Bitte einen Titel eingeben.");
+  if (!row.starts) return toast("Bitte das Startdatum eintragen.");
+  if (row.ends<row.starts) return toast("„Bis“ liegt vor „Von“.");
+  if (row.link && !/^https?:\/\//.test(row.link)) row.link="https://"+row.link;
+  try{
+    $("#cf-save").disabled=true;
+    if (f){ if (f.size>MAX_FILE) throw new Error("Das Bild ist größer als 50 MB.");
+      const p=`kalender-${Date.now()}-${f.name.normalize("NFKD").replace(/[^\w.\-]+/g,"_").slice(-50)}`;
+      const u=await sb.storage.from("unterlagen").upload(p,f,{ contentType:f.type||undefined }); if (u.error) throw u.error; row.image=p; }
+    const r = S.calEdit ? await sb.from("calendar").update(row).eq("id",S.calEdit) : await sb.from("calendar").insert({ ...row, created_by:S.real.email });
+    if (r.error) throw r.error;
+    S.calEdit=null; S.calOpen=false; S.calDraft=null; S.calMonth=new Date(pd(row.starts).getFullYear(), pd(row.starts).getMonth(), 1);
+    await refresh(); render(true); toast("Gespeichert.");
+  } catch(err){ const b=$("#cf-save"); if(b) b.disabled=false; fail(err); }
+}
+async function calDelete(){
+  const id=S.calEdit, k="cal:"+id; if (S.confirmDelete!==k){ S.calDraft=calRead(); S.confirmDelete=k; return render(true); }
+  S.confirmDelete=null; const c=S.cal.find(x=>x.id===id);
+  const r=await sb.from("calendar").delete().eq("id",id); if (r.error) return fail(r.error);
+  if (c?.image) sb.storage.from("unterlagen").remove([c.image]).catch(()=>{});
+  S.calEdit=null; S.calDraft=null; await refresh(); render(true); toast("Gelöscht.");
+}
+
+/* ---------- Führung: To-dos + Kalender ---------- */
+const PRIO = { 1:["Hoch","err"], 2:["Mittel","gold"], 3:["Niedrig",""] };
+const leads = () => S.members.filter(m=>m.role==="lead");
+function taskRow(t){
+  const today=isoDay(new Date()), late=t.due && !t.done_at && t.due<today, o=member(t.owner_email);
+  return `<div class="row task ${t.done_at?"done":""}"><div class="head"><button class="tick" data-tdone="${esc(t.id)}" aria-pressed="${!!t.done_at}" aria-label="Erledigt">${t.done_at?"✓":""}</button>
+    <b>${esc(t.title)}</b><span class="tag ${PRIO[t.priority]?.[1]||""}">${PRIO[t.priority]?.[0]||""}</span></div>
+    <small class="muted">${o?"👤 "+esc(firstName(o)):"👤 offen"}${t.due?` · <span class="${late?"late":""}">📅 ${esc(fmtDate(t.due))}${late?" (überfällig)":""}</span>`:""}${t.done_at?` · erledigt ${fmtAgo(t.done_at)}`:""}</small>
+    ${t.note?`<p class="feedback">${linkify(t.note)}</p>`:""}
+    <div class="actions"><button class="chip" data-tedit="${esc(t.id)}">Bearbeiten</button><button class="chip" data-tdel="${esc(t.id)}">${S.confirmDelete==="t:"+t.id?"Wirklich löschen?":"Löschen"}</button></div></div>`;
+}
+function taskForm(){
+  const e=S.taskEdit && S.tasks.find(t=>t.id===S.taskEdit), d=e||{};
+  if (!S.taskOpen && !e) return `<button class="btn small" id="t-new">＋ Aufgabe</button>`;
+  const areas=[...new Set(S.tasks.map(t=>t.area).concat(["Allgemein","Creator","Manager","Kampagnen","Finanzen","Website","Academy"]))];
+  return `<div class="panel stack"><h2>${e?"Aufgabe bearbeiten":"Neue Aufgabe"}</h2>
+    <label class="f" for="t-title">Was ist zu tun?<input id="t-title" type="text" maxlength="300" value="${esc(d.title||"")}"></label>
+    <div class="grid2"><label class="f" for="t-area">Themenbereich<input id="t-area" type="text" list="t-areas" value="${esc(d.area||S.taskArea||"Allgemein")}"><datalist id="t-areas">${areas.map(a=>`<option value="${esc(a)}">`).join("")}</datalist></label>
+    <label class="f" for="t-owner">Verantwortlich<select id="t-owner"><option value="">–</option>${leads().map(m=>`<option value="${esc(m.email)}" ${(d.owner_email||(!e?S.real.email:""))===m.email?"selected":""}>${esc(m.name||m.email)}</option>`).join("")}</select></label>
+    <label class="f" for="t-due">Bis wann?<input id="t-due" type="date" value="${esc(d.due||"")}"></label>
+    <label class="f" for="t-prio">Priorität<select id="t-prio">${[1,2,3].map(p=>`<option value="${p}" ${(d.priority||2)===p?"selected":""}>${PRIO[p][0]}</option>`).join("")}</select></label></div>
+    <label class="f" for="t-note">Notiz (optional)<textarea id="t-note" maxlength="4000">${esc(d.note||"")}</textarea></label>
+    <div class="actions"><button class="btn small gold" id="t-save">Speichern</button><button class="btn small ghost" id="t-cancel">Abbrechen</button></div></div>`;
+}
+function leadView(){
+  let h=`<div class="stack"><span class="eyebrow">Nur Geschäftsführung</span><h1><em>Führung</em></h1><p class="muted">Eure Aufgaben und Termine. Sehen nur Zofy, Schlauchi und Nik.</p></div>`;
+  if (S.noUpd7) return h + `<div class="panel"><p class="err">Zuerst update-7.sql in Supabase ausführen.</p></div>`;
+  const f=S.taskFilter||"offen", me=S.real.email, today=isoDay(new Date());
+  const open=S.tasks.filter(t=>!t.done_at);
+  const xs=S.tasks.filter(t=> f==="erledigt" ? t.done_at : !t.done_at && (f!=="meine" || t.owner_email===me))
+    .sort((a,b)=> f==="erledigt" ? String(b.done_at).localeCompare(String(a.done_at)) : (a.priority-b.priority) || String(a.due||"9").localeCompare(String(b.due||"9")));
+  h += `<div class="score"><div class="panel stat"><b>${open.length}</b><small>offen</small></div><div class="panel stat"><b>${open.filter(t=>t.owner_email===me).length}</b><small>für mich</small></div><div class="panel stat"><b class="${open.some(t=>t.due&&t.due<today)?"late":""}">${open.filter(t=>t.due&&t.due<today).length}</b><small>überfällig</small></div></div>
+    <div class="sh"><span class="eyebrow">To-dos</span><h2>Aufgaben</h2></div>
+    <div class="seg" role="group">${[["offen","Alle offenen"],["meine","Meine"],["erledigt","Erledigt"]].map(([v,l])=>`<button data-tfilter="${v}" aria-pressed="${f===v}">${l}</button>`).join("")}</div>
+    ${taskForm()}`;
+  const groups={}; xs.forEach(t=>{ (groups[t.area||"Allgemein"] ||= []).push(t); });
+  const keys=Object.keys(groups).sort((a,b)=>a.localeCompare(b));
+  h += keys.length ? keys.map(k=>`<div class="wkh"><span>${esc(k.toUpperCase())}</span><small class="muted">${groups[k].length}</small></div><div class="list">${groups[k].map(taskRow).join("")}</div>`).join("")
+    : `<div class="panel"><p class="muted">${f==="erledigt"?"Noch nichts erledigt.":"Keine offenen Aufgaben. 🎉"}</p></div>`;
+  const items=calItems("lead");
+  h += `<div class="sh" style="margin-top:12px"><span class="eyebrow">Nur Führung</span><h2>Termine</h2></div>
+    <label class="qopt" style="font-size:13px;color:var(--soft)"><input type="checkbox" id="cal-showcamp" ${S.calShowCamp!==false?"checked":""}> Kampagnen mit anzeigen</label>
+    <div class="legend"><span><i class="k-termin"></i>Termin</span><span><i class="k-tiktok"></i>TikTok</span><span><i class="k-livedream"></i>LIVEdream</span></div>
+    ${calForm("lead")}${calGrid(items)}${calLists(items.filter(c=>c.audience==="lead"))}`;
+  return h;
+}
+async function taskSave(){
+  const g=id=>($("#"+id)?.value||"").trim();
+  const row={ title:g("t-title"), area:g("t-area")||"Allgemein", owner_email:g("t-owner")||null, due:g("t-due")||null, priority:+g("t-prio")||2, note:g("t-note")||null };
+  if (!row.title) return toast("Bitte die Aufgabe eintragen.");
+  const r = S.taskEdit ? await sb.from("tasks").update(row).eq("id",S.taskEdit) : await sb.from("tasks").insert({ ...row, created_by:S.real.email });
+  if (r.error) return fail(r.error);
+  S.taskEdit=null; S.taskOpen=false; S.taskArea=row.area; await refresh(); render(true); toast("Gespeichert.");
+}
+async function taskToggle(id){
+  const t=S.tasks.find(x=>x.id===id); if (!t) return;
+  const r=await sb.from("tasks").update({ done_at: t.done_at?null:new Date().toISOString() }).eq("id",id); if (r.error) return fail(r.error);
+  await refresh(); render(true); if (!t.done_at) toast("Erledigt ✓");
+}
+async function taskDelete(id){
+  const k="t:"+id; if (S.confirmDelete!==k){ S.confirmDelete=k; return render(true); }
+  S.confirmDelete=null; const r=await sb.from("tasks").delete().eq("id",id); if (r.error) return fail(r.error);
+  await refresh(); render(true); toast("Gelöscht.");
 }
 
 /* ---------- TikTok-Liste (Zugang) ---------- */
@@ -1113,6 +1348,7 @@ document.addEventListener("click", async e => {
   if (e.target.closest("#cert-png")) { dl(S._cert.url, S._cert.base+".png"); return; }
   if (e.target.closest("#cert-pdf")) { certPdf(); return; }
   if (e.target.closest("#win")) { $("#win").classList.remove("show","keep"); return; }
+  if (e.target.id==="sheet" || e.target.closest("#sheet-x")) { closeSheet(); return; }
   const t = e.target.closest("button,a"); if (!t) return;
   if (t.id==="legal-back"){ history.replaceState(null,"",location.pathname+location.search); return showLegal(); }
   if (t.id==="send-link") return sendLink();
@@ -1133,6 +1369,25 @@ document.addEventListener("click", async e => {
   if (t.id==="intro-go") return introFinish();
   if (t.id==="intro-again"){ S.showIntro=true; return render(); }
   if (t.id==="qsend") return sendQuestion();
+  if (t.id==="kk-fab" || t.id==="kk-open") return openKK();
+  if (t.dataset.kk){ S.kkDraft=$("#qbox")?.value||""; S.kkKind=t.dataset.kk; return openKK(); }
+  if (t.dataset.cal){ return openCal(t.dataset.cal); }
+  if (t.dataset.calnav){ const m=calMonth(); S.calMonth=new Date(m.getFullYear(), m.getMonth()+ +t.dataset.calnav, 1); return render(true); }
+  if (t.dataset.caledit){ closeSheet(); S.calEdit=t.dataset.caledit; S.calDraft=null; render(true); $(".calform")?.scrollIntoView({behavior:"smooth",block:"start"}); return; }
+  if (t.id==="cal-new"){ S.calOpen=true; S.calEdit=null; S.calDraft=null; return render(true); }
+  if (t.id==="cf-cancel"){ S.calOpen=false; S.calEdit=null; S.calDraft=null; S.confirmDelete=null; return render(true); }
+  if (t.id==="cf-parse"){ const p=parseLark($("#cf-paste").value); if (!p.body) return toast("Bitte zuerst die Nachricht einfügen.");
+    const keep=calRead(); S.calDraft={ ...keep, ...Object.fromEntries(Object.entries(p).filter(([,v])=>v)) }; if (!p.ends && p.starts) S.calDraft.ends=p.starts; render(true);
+    toast(p.starts?"Erkannt. Bitte kurz prüfen und speichern.":"Titel übernommen. Daten bitte selbst eintragen."); return; }
+  if (t.id==="cf-save") return calSave();
+  if (t.id==="cf-del") return calDelete();
+  if (t.id==="t-new"){ S.taskOpen=true; S.taskEdit=null; return render(true); }
+  if (t.id==="t-cancel"){ S.taskOpen=false; S.taskEdit=null; return render(true); }
+  if (t.id==="t-save") return taskSave();
+  if (t.dataset.tedit){ S.taskEdit=t.dataset.tedit; render(true); return; }
+  if (t.dataset.tdone) return taskToggle(t.dataset.tdone);
+  if (t.dataset.tdel) return taskDelete(t.dataset.tdel);
+  if (t.dataset.tfilter){ S.taskFilter=t.dataset.tfilter; return render(true); }
   if (t.dataset.star){ keepSurveyDraft(); S.survDraft.rating=+t.dataset.star; return render(true); }
   if (t.id==="sv-send") return sendSurvey();
   if (t.dataset.qpub) return answerQ(t.dataset.qpub, true);
@@ -1184,11 +1439,12 @@ document.addEventListener("change", e => {
   if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?(inBootcamp(S.me)?"themen":"akademie"):S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
   if (e.target.id==="ro-file"){ const f=e.target.files[0]; if(f) f.text().then(tx=>{ $("#ro-text").value=tx; toast("Datei eingelesen. Jetzt „Vorschau“ tippen."); }); return; }
   if (e.target.dataset.snap) return uploadSnap(e.target.dataset.snap, e.target.files[0]);
+  if (e.target.id==="cal-showcamp"){ S.calShowCamp=e.target.checked; return render(true); }
   if (e.target.id==="ae-n"){ S.editArea=+e.target.value; render(true); }
 });
 document.addEventListener("input", e => { if (e.target.id==="note"){ const c=$("#cnt"); if(c) c.textContent=`${e.target.value.length} / 1000`; } });
 document.addEventListener("keydown", e => {
-  if (e.key==="Escape") $("#win").classList.remove("show");
+  if (e.key==="Escape"){ $("#win").classList.remove("show"); closeSheet(); }
   if (e.key!=="Enter") return;
   if (e.target.id==="email") (S._loginMode==="register" ? register() : sendLink());
   if (e.target.id==="code") verifyCode();
