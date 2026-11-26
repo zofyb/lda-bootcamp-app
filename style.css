@@ -213,3 +213,10 @@ fieldset.qedit{border:1px solid var(--line2);border-radius:14px;padding:12px;mar
 fieldset.qedit legend{font-size:12px;font-weight:600;color:var(--lilac);padding:0 6px}
 .qopt{display:flex;gap:10px;align-items:center}
 .qopt input[type=radio]{accent-color:var(--gold);width:18px;height:18px;flex:0 0 auto}
+.extras{display:flex;flex-direction:column;gap:8px}
+.extras .doc{padding:10px 12px}
+.extras .paper{width:34px;height:44px}
+.extras .tag{font-size:10px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+.row .actions{gap:6px;flex-wrap:nowrap}
+.paper.vid{background:linear-gradient(160deg,#3a1250,#12051a)}
+.paper.vid::after{content:"▶";background:none;inset:0;left:0;right:0;top:0;height:auto;display:grid;place-items:center;color:var(--gold);font-size:16px}

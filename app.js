@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), tabsEl = $("#tabs");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{},
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, extras:[], noExtras:false,
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -210,7 +210,8 @@ async function refresh(){
   ]);
   for (const r of [a,m,s]) if (r.error) throw r.error;
   S.areas=a.data||[]; S.members=m.data||[]; S.subs=s.data||[];
-  const [p,ac,st] = await Promise.all([ sb.from("progress").select("*"), sb.from("activity").select("*"), sb.from("settings").select("*") ]);
+  const [p,ac,st,ex] = await Promise.all([ sb.from("progress").select("*"), sb.from("activity").select("*"), sb.from("settings").select("*"), sb.from("extras").select("*").order("sort").order("created_at") ]);
+  S.noExtras = !!ex.error; S.extras = ex.data || [];
   S.needsUpdate = !!(p.error || ac.error || st.error);
   S.progress = p.data||[]; S.activity = ac.data||[];
   S.settings = Object.fromEntries((st.data||[]).map(r=>[r.key,r.value]));
@@ -348,6 +349,7 @@ function creatorHome(){
   let h = `<div class="stack"><span class="eyebrow">LIVEdream Creator Bootcamp</span><h1>${hello}, <em>${esc(firstName(S.me))}</em></h1></div>
   <div class="panel"><div class="hero">${ringSvg(pts, maxPts())}<div><p><b>${esc(ht)}</b>${esc(hp)}</p>
     <div class="badges">${bs.map(b=>`<span class="${b.on?"on":""} ${fresh.has(b.k)?"new":""}" title="${esc(b.t)}${b.on?"":" (noch offen)"}" aria-label="${esc(b.t)}">${b.ic}</span>`).join("")}</div></div></div></div>`;
+  h += extrasBlock(e);
   // Weg
   const states=S.areas.map(a=>areaState(e,a));
   const curIdx=states.findIndex(s=>s==="open");
@@ -374,6 +376,17 @@ function creatorHome(){
   h += `</div>`;
   if (!S.areas.length) h += `<p class="muted">Noch keine Themen angelegt.</p>`;
   return h;
+}
+
+const isVid = p => /\.(mp4|mov|webm|m4v)$/i.test(p||"");
+function extraCard(x, seen){
+  return `<a class="doc" data-handout="${esc(x.path)}" data-extra="${esc(x.id)}" target="_blank" rel="noopener"><span class="paper ${isVid(x.path)?"vid":""}"></span><span><b>${esc(x.title)}${seen && !seen.includes(x.id)?' <span class="tag gold">Neu</span>':""}</b><small class="muted">${isVid(x.path)?"Video":"PDF"}${x.note?" · "+esc(x.note):""}</small></span></a>`;
+}
+function extrasBlock(e){
+  if (!S.extras.length) return "";
+  const seen = storeGet("ldb-extras-"+e) || [];
+  return `<div class="stack"><div class="wkh"><span>EXTRAS</span><small class="muted">Zusatz-Infos, ohne Punkte</small></div>
+    <div class="extras">${S.extras.map(x=>extraCard(x,seen)).join("")}</div></div>`;
 }
 
 /* ---------- Creator: Thema ---------- */
@@ -418,7 +431,8 @@ function topicView(a){
   h += `<section class="panel step ${l2?"locked":""} ${ju==="handout"?"unlocked":""}"><div class="sh"><span class="eyebrow">Schritt ${no++}</span><h2>Handout</h2>${l2?`<span class="lk">🔒 ${l2txt}</span>`:hOk&&a.handout_path?`<span class="lk tag ok">gelesen</span>`:""}</div>
     ${a.handout_path ? (l2 ? `<div class="doc" aria-disabled="true"><span class="paper"></span><span><b>Handout Thema ${a.n}</b><small class="muted">PDF zum Nachlesen</small></span></div>`
       : `<a class="doc" data-handout="${esc(a.handout_path)}" data-n="${a.n}" target="_blank" rel="noopener"><span class="paper"></span><span><b>Handout Thema ${a.n} öffnen</b><small class="muted">PDF zum Nachlesen${!hOk?", danach ist deine Aufgabe frei":""}</small></span></a>`)
-      : `<p class="muted">Für dieses Thema gibt es kein Handout.</p>`}</section>`;
+      : `<p class="muted">Für dieses Thema gibt es kein Handout.</p>`}
+    ${!l2 && S.extras.some(x=>x.area===a.n) ? `<small class="muted">Zusätzlich zu diesem Thema</small><div class="extras">${S.extras.filter(x=>x.area===a.n).map(x=>extraCard(x,storeGet("ldb-extras-"+e)||[])).join("")}</div>`:""}</section>`;
   const l3=!hOk;
   h += `<section class="panel step ${l3?"locked":""} ${ju==="task"?"unlocked":""}"><div class="sh"><span class="eyebrow">Schritt ${no}</span><h2>Deine Aufgabe</h2>${l3?`<span class="lk">🔒 nach dem Handout</span>`:""}</div>`;
   if (l3) h += `<p class="muted">Hier siehst du gleich, was du für 1 und 2 Punkte machst, und gibst deinen Nachweis ab.</p>`;
@@ -596,6 +610,14 @@ function areaEditor(){
     <p class="muted">Immer ein Montag. Woche 1 öffnet an diesem Tag um 0 Uhr, jede weitere Woche 7 Tage später.${s0?` Aktuell: Woche 1 ab ${fmtD(s0)}${s0.getFullYear()}, Woche ${weeks().length} bis ${fmtD(weekEnds(weeks().length))}`:" Noch nicht festgelegt: Bis dahin sind alle Wochen offen."}</p>
     ${S.needsUpdate?`<p class="err">Zuerst muss update-2.sql in Supabase laufen.</p>`:""}
     <div class="actions"><input id="st-date" type="date" value="${esc(S.settings.start||"")}" style="max-width:220px"><button class="btn small" id="st-save" ${S.needsUpdate?"disabled":""}>Start speichern</button></div></div>`;
+  h += `<div class="panel stack"><h2>Extras</h2><p class="muted">Zusatz-Infos als PDF oder Video. Sind immer offen, geben keine Punkte und erscheinen bei den Creatorn mit „Neu“-Zeichen.</p>
+    ${S.noExtras ? `<p class="err">Zuerst update-4.sql in Supabase ausführen.</p>` : `
+    ${S.extras.length?`<div class="list">${S.extras.map(x=>`<div class="row"><div class="head"><b>${isVid(x.path)?"🎬":"📄"} ${esc(x.title)}${x.area?` <span class="muted">· Thema ${x.area}</span>`:""}</b><span class="actions"><a class="chip" data-handout="${esc(x.path)}" target="_blank" rel="noopener" style="text-decoration:none">Öffnen</a><button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></span></div>${x.note?`<span class="muted">${esc(x.note)}</span>`:""}</div>`).join("")}</div>`:""}
+    <div class="grid2"><label class="f" for="ex-title">Titel<input id="ex-title" type="text" placeholder="z. B. Richtlinien & Tabus"></label>
+    <label class="f" for="ex-note">Kurzbeschreibung (optional)<input id="ex-note" type="text" placeholder="z. B. Was im Live erlaubt ist"></label></div>
+    <div class="grid2"><label class="f" for="ex-file">PDF oder Video (max. 50 MB)<input id="ex-file" type="file" accept="application/pdf,video/mp4,video/*"></label>
+    <label class="f" for="ex-area">Auch bei Thema zeigen (optional)<select id="ex-area"><option value="">–</option>${S.areas.map(y=>`<option value="${y.n}">${y.n} · ${esc(y.title)}</option>`).join("")}</select></label></div>
+    <button class="btn small" id="ex-add">Extra hinzufügen</button>`}</div>`;
   if (!a) return h + `<p class="muted">Keine Themen gefunden.</p>`;
   h += `<div class="panel stack"><h2>Thema bearbeiten</h2>
   <label class="f" for="ae-n">Thema<select id="ae-n">${S.areas.map(x=>`<option value="${x.n}" ${x.n===a.n?"selected":""}>${x.n} · ${esc(x.title)}</option>`).join("")}</select></label>
@@ -620,6 +642,25 @@ function areaEditor(){
   <label class="f" for="ae-handout">Handout (PDF) ${a.handout_path?`· <a data-handout="${esc(a.handout_path)}" target="_blank" rel="noopener">aktuelles öffnen</a>`:"· noch keins"}<input id="ae-handout" type="file" accept="application/pdf"></label>
   <button class="btn" id="ae-save">Thema speichern</button></div>`;
   return h;
+}
+async function addExtra(){
+  const title=$("#ex-title").value.trim(), note=$("#ex-note").value.trim()||null, f=$("#ex-file").files[0];
+  if (!title || !f) return toast("Bitte Titel und Datei auswählen.");
+  const vid=/^video\//.test(f.type)||isVid(f.name), ext=vid?(f.name.match(/\.(mp4|mov|webm|m4v)$/i)?.[1]||"mp4").toLowerCase():"pdf", area=+$("#ex-area").value||null;
+  if (f.size>MAX_FILE) return toast("Die Datei ist größer als 50 MB.");
+  try{
+    $("#ex-add").disabled=true; $("#ex-add").textContent="Wird hochgeladen …";
+    const path=`extra-${Date.now()}.${ext}`; let r=await sb.storage.from("unterlagen").upload(path,f,{contentType:f.type||(vid?"video/mp4":"application/pdf")}); if(r.error) throw r.error;
+    r=await sb.from("extras").insert({ title, note, path, area, sort:S.extras.length }); if(r.error) throw r.error;
+    await refresh(); render(true); toast("Extra hinzugefügt.");
+  } catch(e){ fail(e); render(true); }
+}
+async function delExtra(id){
+  if (S.confirmDelete!==id){ S.confirmDelete=id; return render(true); }
+  const x=S.extras.find(y=>y.id===id); S.confirmDelete=null;
+  const r=await sb.from("extras").delete().eq("id",id); if(r.error) return fail(r.error);
+  if (x) await sb.storage.from("unterlagen").remove([x.path]).catch(()=>{});
+  await refresh(); render(true); toast("Gelöscht.");
 }
 async function saveStart(){
   const v=$("#st-date").value;
@@ -668,6 +709,8 @@ document.addEventListener("click", async e => {
   if (t.id==="home"){ S.openArea=null; return render(); }
   if (t.dataset.quiz) return answerQuiz(+t.dataset.quiz, +t.dataset.j);
   if (t.dataset.seen) return markStep(+t.dataset.seen,"video_at");
+  if (t.dataset.extra){ if (!t.href) { e.preventDefault(); toast("Lädt noch, bitte gleich nochmal tippen."); return; }
+    if (!S.viewAs){ const k="ldb-extras-"+S.me.email, seen=storeGet(k)||[]; if(!seen.includes(t.dataset.extra)){ seen.push(t.dataset.extra); storeSet(k,seen); setTimeout(()=>render(true),400); } } return; }
   if (t.dataset.handout && t.dataset.n){ if (!t.href) { e.preventDefault(); toast("Handout lädt noch, bitte gleich nochmal tippen."); return; } setTimeout(()=>markStep(+t.dataset.n,"handout_at"),300); return; }
   if (t.dataset.unpend){ const n=+t.dataset.unpend; (S.pending[n]||[]).splice(+t.dataset.i,1); $("#pend").innerHTML=pendList(n); return; }
   if (t.id==="submit") return submitArea(+t.dataset.n);
@@ -689,6 +732,8 @@ document.addEventListener("click", async e => {
     S.editMember=null; S.confirmDelete=null; await refresh(); render(); return toast("Gelöscht.");
   }
   if (t.id==="st-save") return saveStart();
+  if (t.id==="ex-add") return addExtra();
+  if (t.dataset.delextra) return delExtra(t.dataset.delextra);
   if (t.id==="ae-save") return saveArea();
 });
 document.addEventListener("change", e => {
