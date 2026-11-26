@@ -1446,9 +1446,22 @@ const pd = s => { const [y,m,d]=String(s).slice(0,10).split("-").map(Number); re
 const fmtDate = s => { const d=pd(s); return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`; };
 const fmtRange = c => c.starts===c.ends ? fmtDate(c.starts) : `${fmtDate(c.starts)} bis ${fmtDate(c.ends)}`;
 const linkify = t => esc(t).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/\n/g,"<br>");
+const isDraft = c => c.status==="draft";
 function calItems(scope){
-  if (scope==="lead") return S.cal.filter(c=>c.audience==="lead" || (S.calShowCamp!==false && c.audience==="all"));
-  return S.cal.filter(c=>c.audience==="all");
+  const live=S.cal.filter(c=>!isDraft(c));
+  if (scope==="lead") return live.filter(c=>c.audience==="lead" || (S.calShowCamp!==false && c.audience==="all"));
+  return live.filter(c=>c.audience==="all");
+}
+function calDrafts(){
+  const ds=S.cal.filter(isDraft).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+  if (!ds.length) return "";
+  return `<div class="panel stack drafts"><div class="wkh"><span>NEU AUS LARK · ZUR FREIGABE</span><small class="muted">${ds.length}</small></div>
+    <p class="muted" style="margin:0">Der Lark-Bot hat diese Kampagnen erkannt. Kurz prüfen, dann freigeben. Erst danach sehen die Creator sie.</p>
+    ${ds.map(c=>`<div class="draft">${calCard(c)}<div class="actions"><button class="btn small gold" data-calok="${esc(c.id)}">Freigeben</button><button class="btn small ghost" data-caledit="${esc(c.id)}">Bearbeiten</button></div></div>`).join("")}</div>`;
+}
+async function calApprove(id){
+  const r=await sb.from("calendar").update({ status:"live" }).eq("id",id); if (r.error) return fail(r.error);
+  closeSheet(); await refresh(); render(true); toast("Freigegeben. Die Creator sehen die Kampagne jetzt.");
 }
 function calMonth(){ if (!S.calMonth){ const n=new Date(); S.calMonth=new Date(n.getFullYear(), n.getMonth(), 1); } return S.calMonth; }
 function calGrid(items){
@@ -1503,7 +1516,7 @@ function calForm(scope){
     <label class="f" for="cf-img">Bild (optional)${e?.image?" · ein Bild ist schon da":""}<input id="cf-img" type="file" accept="image/*"></label>
     <input type="hidden" id="cf-aud" value="${termin?(e?.audience||"lead"):"all"}">
     ${termin?`<label class="qopt" style="font-size:13px;color:var(--soft)"><input type="checkbox" id="cf-public" ${(e?.audience||"lead")==="all"?"checked":""}> Auch für alle Creator im Kalender zeigen</label>`:""}
-    <div class="actions"><button class="btn small gold" id="cf-save">Speichern</button><button class="btn small ghost" id="cf-cancel">Abbrechen</button>
+    <div class="actions">${e&&isDraft(e)?`<button class="btn small gold" id="cf-saveok">Speichern + freigeben</button>`:""}<button class="btn small ${e&&isDraft(e)?"ghost":"gold"}" id="cf-save">Speichern</button><button class="btn small ghost" id="cf-cancel">Abbrechen</button>
     ${e?`<button class="btn small danger" id="cf-del">${S.confirmDelete==="cal:"+e.id?"Wirklich löschen?":"Löschen"}</button>`:""}</div></div>`;
 }
 function calendarView(){
@@ -1512,18 +1525,19 @@ function calendarView(){
     <p class="muted">Alle TikTok- und LIVEdream-Kampagnen auf einen Blick. Tipp auf eine Kampagne für alle Infos.</p></div>`;
   if (S.noUpd7) return h + `<div class="panel"><p class="err">${lead?"Zuerst update-7.sql in Supabase ausführen.":"Der Kalender kommt bald."}</p></div>`;
   h += `<div class="legend"><span><i class="k-tiktok"></i>TikTok</span><span><i class="k-livedream"></i>LIVEdream</span></div>`;
-  if (lead) h += calForm("all");
+  if (lead) h += calDrafts() + calForm("all");
   return h + calGrid(items) + calLists(items);
 }
 function openCal(id){
   const c=S.cal.find(x=>x.id===id); if (!c) return;
-  if (c.audience==="all") award("camp", String(c.id)).then(n=>{ if(n) render(true); });
+  if (c.audience==="all" && !isDraft(c)) award("camp", String(c.id)).then(n=>{ if(n) render(true); });
   const lead=S.me.role==="lead" && !S.viewAs;
   sheet(`${c.image?`<a data-chref="${esc(c.image)}" target="_blank" rel="noopener"><img class="calimg" data-cimg="${esc(c.image)}" alt=""></a>`:""}
-    <div class="sh"><span class="eyebrow">${KIND[c.kind]||""}${c.audience==="lead"?" · nur Führung":""}</span><h2>${esc(c.title)}</h2></div>
+    <div class="sh"><span class="eyebrow">${KIND[c.kind]||""}${c.audience==="lead"?" · nur Führung":""}${isDraft(c)?" · Entwurf aus Lark":""}</span><h2>${esc(c.title)}</h2></div>
     <p class="caldates">📅 ${esc(fmtRange(c))}${c.at_time?` · ${esc(c.at_time)}`:""}</p>
     ${c.body?`<div class="legaltext">${linkify(c.body)}</div>`:""}
     ${c.link?`<a class="btn" href="${esc(c.link)}" target="_blank" rel="noopener">Zur Kampagne</a>`:""}
+    ${lead&&isDraft(c)?`<button class="btn small gold" data-calok="${esc(c.id)}">Freigeben</button>`:""}
     ${lead?`<button class="btn small ghost" data-caledit="${esc(c.id)}">Bearbeiten</button>`:""}`);
 }
 const MONTH_RX = { jan:0, januar:0, feb:1, februar:1, "mär":2, maerz:2, "märz":2, mar:2, march:2, apr:3, april:3, mai:4, may:4, jun:5, juni:5, june:5, jul:6, juli:6, july:6, aug:7, august:7, sep:8, sept:8, september:8, okt:9, oct:9, oktober:9, october:9, nov:10, november:10, dez:11, dec:11, dezember:11, december:11 };
@@ -1551,8 +1565,8 @@ function calRead(){
   return { title:g("cf-title"), kind:g("cf-kind"), starts:g("cf-start"), ends:g("cf-end")||g("cf-start"), at_time:g("cf-time")||null, link:g("cf-link")||null, body:g("cf-body")||null,
     audience: $("#cf-public") ? ($("#cf-public").checked?"all":"lead") : g("cf-aud") };
 }
-async function calSave(){
-  const row=calRead(), f=$("#cf-img")?.files?.[0];
+async function calSave(approve){
+  const row=calRead(), f=$("#cf-img")?.files?.[0]; if (approve) row.status="live";
   if (!row.title) return toast("Bitte einen Titel eingeben.");
   if (!row.starts) return toast("Bitte das Startdatum eintragen.");
   if (row.ends<row.starts) return toast("„Bis“ liegt vor „Von“.");
@@ -1565,7 +1579,7 @@ async function calSave(){
     const r = S.calEdit ? await sb.from("calendar").update(row).eq("id",S.calEdit) : await sb.from("calendar").insert({ ...row, created_by:S.real.email });
     if (r.error) throw r.error;
     S.calEdit=null; S.calOpen=false; S.calDraft=null; S.calMonth=new Date(pd(row.starts).getFullYear(), pd(row.starts).getMonth(), 1);
-    await refresh(); render(true); toast("Gespeichert.");
+    await refresh(); render(true); toast(approve?"Gespeichert und freigegeben.":"Gespeichert.");
   } catch(err){ const b=$("#cf-save"); if(b) b.disabled=false; fail(err); }
 }
 async function calDelete(){
@@ -1934,12 +1948,14 @@ document.addEventListener("click", async e => {
   if (t.dataset.cal){ return openCal(t.dataset.cal); }
   if (t.dataset.calnav){ const m=calMonth(); S.calMonth=new Date(m.getFullYear(), m.getMonth()+ +t.dataset.calnav, 1); return render(true); }
   if (t.dataset.caledit){ closeSheet(); S.calEdit=t.dataset.caledit; S.calDraft=null; render(true); $(".calform")?.scrollIntoView({behavior:"smooth",block:"start"}); return; }
+  if (t.dataset.calok){ t.disabled=true; return calApprove(t.dataset.calok); }
   if (t.id==="cal-new"){ S.calOpen=true; S.calEdit=null; S.calDraft=null; return render(true); }
   if (t.id==="cf-cancel"){ S.calOpen=false; S.calEdit=null; S.calDraft=null; S.confirmDelete=null; return render(true); }
   if (t.id==="cf-parse"){ const p=parseLark($("#cf-paste").value); if (!p.body) return toast("Bitte zuerst die Nachricht einfügen.");
     const keep=calRead(); S.calDraft={ ...keep, ...Object.fromEntries(Object.entries(p).filter(([,v])=>v)) }; if (!p.ends && p.starts) S.calDraft.ends=p.starts; render(true);
     toast(p.starts?"Erkannt. Bitte kurz prüfen und speichern.":"Titel übernommen. Daten bitte selbst eintragen."); return; }
   if (t.id==="cf-save") return calSave();
+  if (t.id==="cf-saveok") return calSave(true);
   if (t.id==="cf-del") return calDelete();
   if (t.id==="t-new"){ S.taskOpen=true; S.taskEdit=null; return render(true); }
   if (t.id==="t-cancel"){ S.taskOpen=false; S.taskEdit=null; return render(true); }

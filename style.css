@@ -553,3 +553,5 @@ button.panel{border:0}
 .lst em{font:600 10px var(--body);font-style:normal;letter-spacing:.05em;padding:2px 7px;border-radius:99px;background:var(--lb);color:#fff;vertical-align:2px;margin-left:6px}
 @media (max-width:380px){ .ways{grid-template-columns:1fr} }
 @media (prefers-reduced-motion:reduce){ .lring .lshine{animation:none} }
+.drafts .draft{display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)}
+.drafts .draft .calitem{background:none;border:0;padding:0}

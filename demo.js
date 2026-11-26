@@ -55,6 +55,7 @@ const db = {
     {id:"k2", audience:"all", kind:"livedream", title:"LIVEdream Adventskalender", starts:dd(4), ends:dd(27), body:"Jeden Tag ein Türchen im Live öffnen. Wer an 10 Tagen dabei ist, bekommt einen Platz im Agentur-Special."},
     {id:"k3", audience:"all", kind:"tiktok", title:"Duett-Battle-Woche", starts:dd(12), ends:dd(18), body:"Matches mit Creatorn aus anderen Agenturen. Gewinner bekommen ein Banner auf der LIVE-Startseite."},
     {id:"k4", audience:"all", kind:"tiktok", title:"Herbst-Talente", starts:dd(-30), ends:dd(-12), body:"Vorbei."},
+    {id:"k6", audience:"all", kind:"tiktok", status:"draft", source:"lark", title:"Gift Gallery Dezember", starts:dd(6), ends:dd(13), created_at:iso(now), body:"Gift Gallery Dezember\nZeitraum: aus der Lark-Nachricht erkannt\nSammle die neuen Galerie-Geschenke und schalte das Dezember-Abzeichen frei.", link:"https://www.tiktok.com/live"},
     {id:"k5", audience:"lead", kind:"termin", title:"Manager-Meeting", starts:dd(2), ends:dd(2), at_time:"19:00", body:"Wochenrückblick und Planung Dezember."}
   ],
   tasks: [
