@@ -52,7 +52,7 @@ async function reply(chatId: string, text: string) {
 
 // ---------- Inhalt einer Nachricht lesen ----------
 type Msg = { message_id: string; msg_type?: string; message_type?: string; content?: string; body?: { content: string } };
-type Got = { text: string[]; images: { msg: string; key: string }[] };
+type Got = { text: string[]; images: { msg: string; key: string }[]; trace: string[] };
 
 function readOne(m: Msg, got: Got) {
   const type = m.msg_type || m.message_type || "";
@@ -91,17 +91,26 @@ function readOne(m: Msg, got: Got) {
     };
     walk(c);
     got.text.push(out.join("\n"));
-  }
+  } else got.trace.push(`(nicht lesbar: ${type})`);
 }
 
 async function readMessage(ev: any): Promise<Got> {
-  const m = ev.message, got: Got = { text: [], images: [] };
-  if (m.message_type === "merge_forward") {
-    // Mehrere weitergeleitete Nachrichten: Unter-Nachrichten über die API holen
+  const got: Got = { text: [], images: [], trace: [] };
+  const seen = new Set<string>();
+  // Weitergeleitete Nachrichten (auch mehrfach weitergeleitet): Unter-Nachrichten über die API holen
+  const walk = async (m: Msg, depth: number) => {
+    const type = m.msg_type || m.message_type || "?";
+    if (type !== "merge_forward") { got.trace.push(type); return readOne(m, got); }
+    if (depth > 3 || seen.has(m.message_id)) return;
+    seen.add(m.message_id);
     const r = await lark(`/im/v1/messages/${m.message_id}`);
-    const j = await r.json();
-    for (const it of j?.data?.items || []) if (it.message_id !== m.message_id) readOne(it, got);
-  } else readOne(m, got);
+    const j = await r.json().catch(() => ({}));
+    if (j.code) { got.trace.push(`Fehler ${j.code} ${String(j.msg || "").slice(0, 60)}`); return; }
+    const items = (j?.data?.items || []).filter((it: any) => it.message_id !== m.message_id);
+    got.trace.push(`weitergeleitet (${items.length})`);
+    for (const it of items) await walk(it, depth + 1);
+  };
+  await walk(ev.message, 0);
   got.text = got.text.map((t) => t.trim()).filter(Boolean);
   return got;
 }
@@ -151,15 +160,17 @@ async function db(path: string, init: RequestInit = {}) {
 }
 async function saveImage(img: { msg: string; key: string }, name: string) {
   const r = await lark(`/im/v1/messages/${img.msg}/resources/${img.key}?type=image`);
-  if (!r.ok) return null;
+  if (!r.ok) { imgErr = `Bild ${r.status} ${(await r.text()).slice(0, 80)}`; return null; }
   const type = r.headers.get("content-type") || "image/jpeg";
   const ext = type.includes("png") ? "png" : type.includes("webp") ? "webp" : type.includes("gif") ? "gif" : "jpg";
   const path = `kalender-lark-${name}.${ext}`;
   const up = await fetch(`${SB}/storage/v1/object/${BUCKET}/${path}`, {
     method: "POST", headers: { apikey: SBKEY, authorization: `Bearer ${SBKEY}`, "content-type": type, "x-upsert": "true" }, body: await r.arrayBuffer(),
   });
-  return up.ok ? path : null;
+  if (!up.ok) { imgErr = `Bild-Upload ${up.status} ${(await up.text()).slice(0, 80)}`; return null; }
+  return path;
 }
+let imgErr = "";
 const safe = (s: string) => s.replace(/[^\w-]+/g, "_").slice(-60);
 
 async function handle(ev: any) {
@@ -169,7 +180,7 @@ async function handle(ev: any) {
 
   // Nur ein Bild: an den jüngsten Lark-Entwurf ohne Bild (letzte 15 Minuten) hängen
   if (!got.text.length) {
-    if (!got.images.length) return;
+    if (!got.images.length) return reply(chat, `⚠️ Kein Text gefunden. Gelesen: ${got.trace.join(", ") || "nichts"}`);
     const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
     const r = await db(`calendar?select=id,title&source=eq.lark&status=eq.draft&image=is.null&created_at=gte.${since}&order=created_at.desc&limit=1`);
     const last = (await r.json())?.[0];
@@ -182,7 +193,9 @@ async function handle(ev: any) {
   const p = parse(got.text.join("\n\n"));
   const row: any = { audience: "all", kind: p.kind, title: p.title, starts: p.starts, ends: p.ends, body: p.body, link: p.link || null,
     status: "draft", source: "lark", lark_msg_id: m.message_id, created_by: "Lark-Bot" };
+  imgErr = "";
   if (got.images.length) row.image = await saveImage(got.images[0], safe(m.message_id));
+  if (imgErr) got.trace.push(imgErr);
   const r = await db(`calendar?on_conflict=lark_msg_id`, {
     method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify(row),
   });
@@ -191,7 +204,8 @@ async function handle(ev: any) {
   if (!saved?.length) return; // schon verarbeitet (Lark schickt manchmal doppelt)
   const d = (s: string) => s.split("-").reverse().join(".");
   await reply(chat, `✅ Entwurf angelegt: „${p.title}“ · ${p.starts === p.ends ? d(p.starts) : `${d(p.starts)} bis ${d(p.ends)}`}` +
-    (p.dated ? "" : " (kein Datum erkannt, bitte prüfen)") + "\nIn der App unter Kalender > Neu aus Lark prüfen und freigeben.");
+    (p.dated ? "" : " (kein Datum erkannt, bitte prüfen)") + (row.image ? " · mit Bild" : "") + "\nIn der App unter Kalender > Neu aus Lark prüfen und freigeben." +
+    `\n(Gelesen: ${got.trace.join(", ")})`);
 }
 
 // ---------- Eingang ----------
