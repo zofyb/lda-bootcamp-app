@@ -1121,7 +1121,7 @@ function startView(){
     ${tile("i-play","Akademie",'data-tab="lernen" data-learn="akademie"',dot(newAk))}
     ${tile("i-quiz","Quizze",'data-tab="lernen" data-learn="quiz"',dot(openQz))}
     ${tile("i-cal","Kalender",'data-tab="kalender"',dot(now.length))}
-    ${S.noUpd16||S.me.preview?"":tile("i-sword","Match-Börse",'data-tab="match"',dot(matchDot()))+tile("i-trophy","Erfolge-Wand",'data-tab="erfolge"',dot(winDot()))}
+    ${S.noUpd16?"":tile("i-sword","Match-Börse",'data-tab="match"',dot(matchDot()))+tile("i-trophy","Erfolge-Wand",'data-tab="erfolge"',dot(winDot()))}
     ${S.noUpd14||S.me.preview?"":tile("i-clock","1:1-Termin",'data-tab="termine"',myBooking()?`<i class="dot">✓</i>`:"")}
     ${boot?tile("i-gift","Belohnungen",'id="rw-open"',ok?`<i class="dot">!</i>`:`<small class="tl">ab 10 P</small>`):""}
     ${tile("i-user","Profil",'data-tab="profil"')}
