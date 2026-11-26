@@ -567,6 +567,22 @@ async function savePoster(path, src){
   try{ const b=await grabFrame(src); const r=await sb.storage.from("unterlagen").upload(posterOf(path), b, { contentType:"image/jpeg", upsert:true }); if (r.error) throw r.error; return b; }
   catch(e){ console.warn("Vorschaubild", path, e); return null; }
 }
+/* Vorschaubild eines hochgeladenen Videos selbst austauschen (Leitung) */
+let vcSeq=0;
+const vCoverBtn = path => { const id="vc-"+(++vcSeq); return `<label class="chip" for="${id}" style="cursor:pointer">${ic("i-cam")} Vorschaubild<input id="${id}" data-vcover="${esc(path)}" type="file" accept="image/*" hidden></label>`; };
+async function setVideoCover(path, f){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  if (!f) return;
+  try{
+    toast("Vorschaubild wird hochgeladen …");
+    const url=URL.createObjectURL(f), img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("Bild konnte nicht gelesen werden.")); i.src=url; });
+    const sc=Math.min(1, 720/Math.max(img.naturalWidth,img.naturalHeight)), c=document.createElement("canvas");
+    c.width=Math.round(img.naturalWidth*sc); c.height=Math.round(img.naturalHeight*sc); c.getContext("2d").drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+    const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.85));
+    const u=await sb.storage.from("unterlagen").upload(posterOf(path), blob, { contentType:"image/jpeg", upsert:true }); if (u.error) throw u.error;
+    render(true); toast("Vorschaubild gespeichert ✓ (kann ein paar Minuten zwischengespeichert sein)");
+  } catch(e){ fail(e); }
+}
 const posterTried=new Set();
 function backfillPoster(path, url){
   if (S.me?.role!=="lead" || S.viewAs || window.__DEMO || posterTried.has(path)) return Promise.resolve(null);
@@ -940,7 +956,7 @@ function academyView(){
   if (!cats.length) h += `<div class="panel"><p class="muted">Hier kommen bald Schulungen und Infos rein.</p></div>`;
   for (const c of cats){
     h += `<div class="wkh"><span>${esc(c.toUpperCase())}</span></div><div class="extras">${groups[c].map(x=> lead
-      ? `<div class="row"><div class="head">${extraCard(x,seen)}</div><div class="actions"><span class="tag">${x.level!=null?"Freischaltung ab Stufe "+x.level:audOf(x)==="team"?"nur Team":"alle Creator"}</span><button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></div></div>`
+      ? `<div class="row"><div class="head">${extraCard(x,seen)}</div><div class="actions"><span class="tag">${x.level!=null?"Freischaltung ab Stufe "+x.level:audOf(x)==="team"?"nur Team":"alle Creator"}</span>${isVid(x.path)?vCoverBtn(x.path):""}<button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></div></div>`
       : extraCard(x,seen)).join("")}</div>`;
   }
   return h;
@@ -2335,7 +2351,7 @@ function areaEditor(){
     <div class="actions"><input id="st-date" type="date" value="${esc(S.settings.start||"")}" style="max-width:220px"><button class="btn small" id="st-save" ${S.needsUpdate?"disabled":""}>Start speichern</button></div></div>`;
   h += `<div class="panel stack"><h2>Extras & Belohnungen</h2><p class="muted">Extras sind immer offen, geben keine Punkte und erscheinen bei den Creatorn mit „Neu“-Zeichen. Belohnungen (z. B. Streamer-Rahmen, Overlay, Animation) sehen nur Creator ab 10 Punkten, zusammen mit ihrer Urkunde.</p>
     ${S.noExtras ? `<p class="err">Zuerst update-4.sql in Supabase ausführen.</p>` : `
-    ${S.extras.filter(x=>audOf(x)==="bootcamp").length?`<div class="list">${S.extras.filter(x=>audOf(x)==="bootcamp").map(x=>`<div class="row"><div class="head"><b>${x.kind==="reward"?"🎁":isVid(x.path)?"🎬":"📄"} ${esc(x.title)}${x.area?` <span class="muted">· Thema ${x.area}</span>`:""}</b><span class="actions"><a class="chip" data-handout="${esc(x.path)}" target="_blank" rel="noopener" style="text-decoration:none">Öffnen</a><button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></span></div>${x.note?`<span class="muted">${esc(x.note)}</span>`:""}</div>`).join("")}</div>`:""}
+    ${S.extras.filter(x=>audOf(x)==="bootcamp").length?`<div class="list">${S.extras.filter(x=>audOf(x)==="bootcamp").map(x=>`<div class="row"><div class="head"><b>${x.kind==="reward"?"🎁":isVid(x.path)?"🎬":"📄"} ${esc(x.title)}${x.area?` <span class="muted">· Thema ${x.area}</span>`:""}</b><span class="actions"><a class="chip" data-handout="${esc(x.path)}" target="_blank" rel="noopener" style="text-decoration:none">Öffnen</a>${isVid(x.path)?vCoverBtn(x.path):""}<button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></span></div>${x.note?`<span class="muted">${esc(x.note)}</span>`:""}</div>`).join("")}</div>`:""}
     <div class="grid2"><label class="f" for="ex-title">Titel<input id="ex-title" type="text" placeholder="z. B. Richtlinien & Tabus"></label>
     <label class="f" for="ex-note">Kurzbeschreibung (optional)<input id="ex-note" type="text" placeholder="z. B. Was im Live erlaubt ist"></label></div>
     <div class="grid2"><label class="f" for="ex-kind">Art<select id="ex-kind"><option value="extra">Extra (für alle, sofort)</option><option value="reward">Belohnung (ab 10 Punkten)</option></select></label>
@@ -2361,7 +2377,7 @@ function areaEditor(){
     ${[0,1,2].map(j=>`<label class="qopt"><input type="radio" name="qz-${i}-c" value="${j}" ${(+q.c||0)===j?"checked":""} aria-label="Antwort ${j+1} ist richtig"><input id="qz-${i}-a${j}" type="text" placeholder="Antwort ${j+1}" value="${esc(list(q.a)[j]||"")}"></label>`).join("")}
     <input id="qz-${i}-h" type="text" placeholder="Hinweis bei falscher Antwort" value="${esc(q.h||"")}"></fieldset>`; }).join("")}`
   : `<p class="muted">Quiz: Erst update-3.sql in Supabase ausführen, dann kannst du hier Quizfragen bearbeiten.</p>`}
-  ${a.video_url && !/^https?:/.test(a.video_url) ? `<div class="video"><video data-video="${esc(a.video_url)}" controls playsinline preload="metadata"></video></div>` : ""}
+  ${a.video_url && !/^https?:/.test(a.video_url) ? `<div class="video"><video data-video="${esc(a.video_url)}" controls playsinline preload="metadata"></video></div><div class="actions">${vCoverBtn(a.video_url)}</div>` : ""}
   <label class="f" for="ae-vfile">Lehrvideo hochladen (MP4, max. 50 MB)<input id="ae-vfile" type="file" accept="video/mp4,video/*"></label>
   <label class="f" for="ae-handout">Handout (PDF) ${a.handout_path?`· <a data-handout="${esc(a.handout_path)}" target="_blank" rel="noopener">aktuelles öffnen</a>`:"· noch keins"}<input id="ae-handout" type="file" accept="application/pdf"></label>
   <button class="btn" id="ae-save">Thema speichern</button></div>`;
@@ -2615,6 +2631,7 @@ document.addEventListener("click", async e => {
   if (t.id==="ae-save") return saveArea();
 });
 document.addEventListener("change", e => {
+  if (e.target.dataset.vcover) return setVideoCover(e.target.dataset.vcover, e.target.files[0]);
   if (e.target.dataset.ttcover) return ttSetCover(e.target.dataset.ttcover, e.target.files[0]);
   if (e.target.dataset.up){
     const n=+e.target.dataset.up, fs=[...e.target.files], big=fs.filter(f=>f.size>MAX_FILE);
