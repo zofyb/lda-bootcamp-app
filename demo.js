@@ -98,6 +98,7 @@ db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootc
     {id:"bk4", owner_email:"lena@demo", creator_email:"c1@demo", starts_at:(()=>{ const x=new Date(); x.setDate(x.getDate()+1); x.setHours(18,0,0,0); return x.toISOString(); })(), minutes:30, how:"WhatsApp-Anruf", topic:"Fragen zum Adventskalender"},
     {id:"bk3", owner_email:"max@demo", creator_email:"c3@demo", starts_at:nextDow(2,19,30), minutes:30, how:"WhatsApp-Anruf", topic:"Kampagne im Dezember"}];
   const hAgo=h=>new Date(Date.now()-h*36e5).toISOString(), hIn=h=>{ const x=new Date(Date.now()+h*36e5); x.setMinutes(0,0,0); return x.toISOString(); };
+  db.extras.push({ id:"yt1", kind:"extra", title:"Schulung Geschenke & Gifting (Aufzeichnung)", note:"Mit Präsentation", path:"youtube", link:"https://youtu.be/aqz-KE-bpKQ", audience:"all", category:"Schulungen", sort:99, created_at:hAgo(10) });
   db.match_posts=[
     {id:"mp1", author_email:"c3@demo", handle:"jenny.mama", live_at:hAgo(0.5), rules:"Best of 3, wer verliert, singt ein Lied", note:"Bin gerade live, komm rein!", created_at:hAgo(1)},
     {id:"mp2", author_email:"c5@demo", handle:"sofia.sings", live_at:hIn(3), rules:"5 Runden, Verlierer macht eine Strafe", note:null, created_at:hAgo(2)},

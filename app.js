@@ -590,7 +590,10 @@ function backfillPoster(path, url){
   if (S.me?.role!=="lead" || S.viewAs || window.__DEMO || posterTried.has(path)) return Promise.resolve(null);
   posterTried.add(path); return savePoster(path, url);
 }
+const ytId = u => (String(u||"").match(/(?:youtu\.be\/|v=|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/)||[])[1];
 function extraCard(x, seen){
+  const yt=ytId(x.link);
+  if (yt) return `<button class="doc ytdoc" data-yt="${esc(yt)}" data-ytx="${esc(x.id)}"><span class="paper vid yt"><img src="https://i.ytimg.com/vi/${esc(yt)}/mqdefault.jpg" alt="" loading="lazy">${ic("i-play")}</span><span><b>${esc(x.title)}${seen && !seen.includes(x.id)?' <span class="tag gold">Neu</span>':""}</b><small class="muted">Video${x.path && x.path!=="youtube"?" + Präsentation":""}${x.note?" · "+esc(x.note):""}</small></span></button>`;
   return `<a class="doc" data-handout="${esc(x.path)}" data-extra="${esc(x.id)}" target="_blank" rel="noopener"><span class="paper ${isVid(x.path)?"vid":""}">${isVid(x.path)?`<img class="vth" data-vposter="${esc(x.path)}" alt="">`:""}</span><span><b>${esc(x.title)}${seen && !seen.includes(x.id)?' <span class="tag gold">Neu</span>':""}</b><small class="muted">${fileKind(x.path)}${x.note?" · "+esc(x.note):""}</small></span></a>`;
 }
 function extrasBlock(e){
@@ -952,7 +955,8 @@ function academyView(){
     <label class="f" for="ak-note">Kurzbeschreibung (optional)<input id="ak-note" type="text"></label>
     <label class="f" for="ak-aud">Wer sieht es?<select id="ak-aud"><option value="all">Alle Creator der Agentur</option><option value="team">Nur Manager und Leitung</option></select></label>
     <label class="f" for="ak-level">Freischaltung (Overlay, Animation …)<select id="ak-level"><option value="">Nein, normaler Inhalt</option>${LEVELS.slice(1).map(([,n],i)=>`<option value="${i+2}">Ab Stufe ${i+2} · ${n}</option>`).join("")}</select></label></div>
-    <label class="f" for="ak-file">Datei (PDF, Video, Bild oder ZIP, max. 50 MB)<input id="ak-file" type="file"></label>
+    <label class="f" for="ak-yt">YouTube-Link (optional, Video auf „Nicht gelistet“ stellen)<input id="ak-yt" type="url" placeholder="https://youtu.be/…"></label>
+    <label class="f" for="ak-file">Datei, z. B. Präsentation als PDF (max. 50 MB, optional, wenn ein YouTube-Link da ist)<input id="ak-file" type="file"></label>
     <button class="btn small" id="ak-add">Hinzufügen</button></div>`;
   const cats=Object.keys(groups).sort((a,b)=>a.localeCompare(b));
   if (!cats.length) h += `<div class="panel"><p class="muted">Hier kommen bald Schulungen und Infos rein.</p></div>`;
@@ -2468,7 +2472,15 @@ function areaEditor(){
 }
 async function addExtra(pre="ex"){
   const q=id=>$(`#${pre}-${id}`);
-  const title=q("title").value.trim(), note=q("note").value.trim()||null, f=q("file").files[0];
+  const title=q("title").value.trim(), note=q("note").value.trim()||null, f=q("file").files[0], ytRaw=q("yt")?.value.trim()||"";
+  if (ytRaw && !ytId(ytRaw)) return toast("Das ist kein gültiger YouTube-Link.");
+  if (ytRaw && !f){
+    const audience=q("aud")?.value||null, category=q("cat")?.value.trim()||null, level=+(q("level")?.value)||null;
+    if (!title) return toast("Bitte einen Titel eingeben.");
+    const r=await sb.from("extras").insert(Object.assign({ title, note, path:"youtube", link:ytRaw, sort:S.extras.length }, audience?{audience, category}:{}, level?{level, category:"Freischaltungen"}:{}));
+    if (r.error) return fail(r.error);
+    await refresh(); render(true); return toast("Video hinzugefügt.");
+  }
   if (!title || !f) return toast("Bitte Titel und Datei auswählen.");
   const vid=/^video\//.test(f.type)||isVid(f.name), ext=(f.name.match(/\.([a-z0-9]{2,5})$/i)?.[1]||(vid?"mp4":"pdf")).toLowerCase(), area=+(q("area")?.value)||null, kind=q("kind")?.value||"extra", audience=q("aud")?.value||null, category=q("cat")?.value.trim()||null, level=+(q("level")?.value)||null;
   if (f.size>MAX_FILE) return toast("Die Datei ist größer als 50 MB.");
@@ -2476,7 +2488,7 @@ async function addExtra(pre="ex"){
     q("add").disabled=true; q("add").textContent="Wird hochgeladen …";
     const path=`extra-${Date.now()}.${ext}`; let r=await sb.storage.from("unterlagen").upload(path,f,{contentType:f.type||"application/octet-stream"}); if(r.error) throw r.error;
     if (vid){ q("add").textContent="Vorschaubild …"; const ou=URL.createObjectURL(f); await savePoster(path, ou); URL.revokeObjectURL(ou); }
-    r=await sb.from("extras").insert(Object.assign({ title, note, path, area, sort:S.extras.length }, kind==="reward"?{kind}:{}, audience?{audience, category}:{}, level?{level, category:"Freischaltungen"}:{})); if(r.error) throw r.error;
+    r=await sb.from("extras").insert(Object.assign({ title, note, path, area, sort:S.extras.length }, ytRaw?{ link:ytRaw }:{}, kind==="reward"?{kind}:{}, audience?{audience, category}:{}, level?{level, category:"Freischaltungen"}:{})); if(r.error) throw r.error;
     await refresh(); render(true); toast("Extra hinzugefügt.");
   } catch(e){ fail(e); render(true); }
 }
@@ -2550,9 +2562,10 @@ datenschutz: `<h1>Datenschutz&shy;erklärung</h1>
 <li><b>Sag's uns:</b> Nachrichten werden ohne Namen und ohne E-Mail-Adresse gespeichert.</li>
 <li><b>Umfrage:</b> deine Antworten. Sie sieht nur die Agenturleitung.</li>
 <li><b>Ranglisten:</b> In den Top 5 (Bootcamp, Diamanten, Fleißigste) erscheint nur dein TikTok-Name mit Platz, ohne Zahlen.</li>
+<li><b>Match-Börse und Erfolge-Wand (freiwillig):</b> Wenn du ein Inserat erstellst, „Bin dabei“ tippst, einen Erfolg teilst oder mit einem Emoji reagierst, speichern wir das mit deinem TikTok-Namen und Namen. Inserate verschwinden nach Ablauf aus der Liste. Du kannst deine Beiträge jederzeit löschen.</li>
 </ul>
 <h2>4. Wer sieht was?</h2>
-<p>Du siehst deine eigenen Daten. Dein Manager sieht die Daten seiner Creator. Die Agenturleitung sieht alle Daten. Andere Creator sehen deine Daten nicht, nur deinen TikTok-Namen mit Platz, wenn du in einer Top-5-Liste stehst.</p>
+<p>Du siehst deine eigenen Daten. Dein Manager sieht die Daten seiner Creator. Die Agenturleitung sieht alle Daten. Andere Creator sehen deine Daten nicht, nur deinen TikTok-Namen mit Platz, wenn du in einer Top-5-Liste stehst. Was du selbst in der Match-Börse oder auf der Erfolge-Wand teilst, sehen alle in der App mit deinem TikTok-Namen.</p>
 <h2>5. Rechtsgrundlagen</h2>
 <p>Wir verarbeiten deine Daten, um dir die Schulung im Rahmen deiner Zusammenarbeit mit der LIVEdream Agency anzubieten (Art. 6 Abs. 1 lit. b DSGVO). Level-System, Live-Daten aus dem Backstage, Ranglisten, Streak-Anzeige und Umfrage dienen unserem berechtigten Interesse, die Schulung motivierend zu gestalten und zu verbessern (Art. 6 Abs. 1 lit. f DSGVO).</p>
 <h2>6. Dienstleister</h2>
@@ -2561,7 +2574,7 @@ datenschutz: `<h1>Datenschutz&shy;erklärung</h1>
 <li><b>Netlify</b> (Netlify Inc., USA) stellt die Webseite bereit. Beim Aufruf werden technisch nötige Daten wie IP-Adresse und Zeitpunkt verarbeitet. Eine Übermittlung in die USA ist möglich. Sie ist durch EU-Standardvertragsklauseln bzw. das EU-US Data Privacy Framework abgesichert.</li>
 <li><b>Login-E-Mails</b> werden über den E-Mail-Dienst WEB.DE (1&amp;1 Mail &amp; Media GmbH, Deutschland) verschickt.</li>
 </ul>
-<p>Schriften und Programmbibliotheken liegen direkt auf unserem Server. Es werden keine Daten an Google oder andere Anbieter geschickt. Wir nutzen keine Werbe- oder Analyse-Cookies und kein Tracking. Links zu TikTok-Videos und zum Merch-Shop und zu unseren Partnern öffnen die Seiten dieser Anbieter. Erst dann gelten deren Datenschutzbestimmungen.</p>
+<p>Schriften und Programmbibliotheken liegen direkt auf unserem Server. Ausnahme sind Schulungsvideos, die wir über <b>YouTube</b> (Google Ireland Ltd.) im erweiterten Datenschutzmodus einbinden: Beim Anzeigen des Vorschaubilds und beim Abspielen werden technische Daten wie deine IP-Adresse an YouTube übertragen. Wir nutzen keine Werbe- oder Analyse-Cookies und kein Tracking. Links zu TikTok-Videos und zum Merch-Shop und zu unseren Partnern öffnen die Seiten dieser Anbieter. Erst dann gelten deren Datenschutzbestimmungen.</p>
 <h2>7. Speicher in deinem Browser</h2>
 <p>Die App speichert in deinem Browser deine Anmeldung und kleine Merkhilfen, etwa welche Abzeichen und Extras du schon gesehen hast. Das ist technisch nötig (§ 25 Abs. 2 TDDDG). Du kannst es jederzeit über die Browser-Einstellungen löschen.</p>
 <h2>8. Wie lange wir speichern</h2>
@@ -2858,6 +2871,10 @@ document.addEventListener("click", async e => {
   if (t.id==="home"){ S.openArea=null; return render(); }
   if (t.dataset.quiz) return answerQuiz(+t.dataset.quiz, +t.dataset.j);
   if (t.dataset.seen) return markStep(+t.dataset.seen,"video_at");
+  if (t.dataset.yt){ const x=S.extras.find(y=>y.id===t.dataset.ytx);
+    sheet(`<h2>${esc(x?.title||"Video")}</h2><div class="yt169"><iframe src="https://www.youtube-nocookie.com/embed/${esc(t.dataset.yt)}?rel=0&modestbranding=1&playsinline=1" title="${esc(x?.title||"Video")}" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>${x?.note?`<p class="muted">${esc(x.note)}</p>`:""}${x?.path && x.path!=="youtube"?`<a class="btn ghost" data-handout="${esc(x.path)}" target="_blank" rel="noopener">Präsentation öffnen</a>`:""}`);
+    hydrate().catch(console.error); award("extra", t.dataset.ytx);
+    if (!S.viewAs){ const k="ldb-extras-"+S.me.email, seen=storeGet(k)||[]; if(!seen.includes(t.dataset.ytx)){ seen.push(t.dataset.ytx); storeSet(k,seen); } } return; }
   if (t.dataset.extra){ if (!t.href) { e.preventDefault(); toast("Lädt noch, bitte gleich nochmal tippen."); return; }
     award("extra", t.dataset.extra);
     if (!S.viewAs){ const k="ldb-extras-"+S.me.email, seen=storeGet(k)||[]; if(!seen.includes(t.dataset.extra)){ seen.push(t.dataset.extra); storeSet(k,seen); setTimeout(()=>render(true),400); } } return; }
