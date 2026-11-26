@@ -406,6 +406,7 @@ function render(keepScroll){
   if (S.qz && !S.creator) html = quizView();
   else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : ({ lernen:learnView, kalender:calendarView, profil:()=>profileView(me.email), anim:animView, termine:termView, match:matchView, erfolge:winsView }[S.tab] || startView)();
   else if (S.creator) html = creatorDetail(S.creator);
+  else if (S.pend) html = pendingDetail(S.pend);
   else if (S.tab==="akademie") html = academyView();
   else if (S.tab==="kalender") html = calendarView();
   else if (S.tab==="termine") html = termView();
@@ -885,9 +886,16 @@ function managerList(){
     <p class="muted">${cs.length} in der App${pend.length?` · ${pend.length} noch nicht registriert`:""}</p></div>${cs.length?LEGEND:""}
     ${cs.length?`<div class="list">${cs.map(creatorRow).join("")}</div>`:""}
     ${pend.length?`<div class="sec"><span>Noch nicht in der App</span><small>${pend.length}</small></div>
-      <p class="muted" style="margin:0 0 8px">Stehen auf der Liste, haben sich aber noch nicht registriert. Schick ihnen den Link zur App.</p>
-      <div class="pendl">${pend.map(r=>`<span class="chip">@${esc(r.handle)}${r.name?` · ${esc(r.name)}`:""}</span>`).join("")}</div>`:""}
+      <p class="muted" style="margin:0 0 8px">Stehen auf der Liste, haben sich aber noch nicht registriert. Den Betreuungsleitfaden kannst du trotzdem schon führen. Schick ihnen den Link zur App.</p>
+      <div class="list">${pend.map(r=>`<button class="row" data-pend="${esc(normH(r.handle))}"><div class="head"><b>@${esc(normH(r.handle))}</b><span class="tag">nicht in der App</span></div>${r.name||(!S.noUpd13&&GUIDE().length)?`<div class="mini">${r.name?`<span class="chip">${esc(r.name)}</span>`:""}${guideChip("h:"+normH(r.handle))}</div>`:""}</button>`).join("")}</div>`:""}
     ${!cs.length&&!pend.length?`<div class="panel"><p class="muted" style="margin:0">Dir sind noch keine Creator zugeordnet.</p></div>`:""}`;
+}
+function pendingDetail(h){
+  const r=(S.roster||[]).find(x=>normH(x.handle)===h); if (!r){ S.pend=null; return managerList(); }
+  return `<button class="btn ghost small back" id="back">← Zurück</button>
+    <div class="stack"><span class="eyebrow">${esc(member(r.manager_email)?.name?"Manager: "+member(r.manager_email).name:"ohne Manager")}</span><h1>@${esc(h)}</h1>
+    <p class="muted">${r.name?esc(r.name)+" · ":""}Steht auf der Liste, ist aber noch nicht in der App. Alles, was du hier abhakst und notierst, wird übernommen, sobald sich der Creator registriert.</p></div>
+    ${guideBlock("h:"+h)}`;
 }
 function creatorDetail(email){
   const c=member(email); if(!c){ S.creator=null; return ""; }
@@ -2787,7 +2795,7 @@ document.addEventListener("click", async e => {
   if (t.id==="to-register"){ S._loginMode="register"; return loginView($("#email")?.value||""); }
   if (t.id==="to-login"){ S._loginMode="login"; return loginView($("#email")?.value||""); }
   if (t.id==="logout"){ await sb.auth.signOut({ scope:"local" }); Object.assign(S,{me:null,real:null,viewAs:"",tab:null,creator:null,openArea:null,ringShown:false,localProg:{}}); return loginView(); }
-  if (t.dataset.tab){ closeSheet(); S.qz=null; S.tab=t.dataset.tab; if (t.dataset.learn) S.learn=t.dataset.learn; S.creator=null; S.editMember=null; return render(); }
+  if (t.dataset.tab){ closeSheet(); S.qz=null; S.tab=t.dataset.tab; if (t.dataset.learn) S.learn=t.dataset.learn; S.creator=null; S.pend=null; S.editMember=null; return render(); }
   if (t.dataset.area){
     const st=t.dataset.state;
     if (st==="lock") return toast("Gib zuerst das Thema davor ab.");
@@ -2902,7 +2910,8 @@ document.addEventListener("click", async e => {
   if (t.dataset.unpend){ const n=+t.dataset.unpend; (S.pending[n]||[]).splice(+t.dataset.i,1); $("#pend").innerHTML=pendList(n); return; }
   if (t.id==="submit") return submitArea(+t.dataset.n);
   if (t.dataset.creator){ S.creator=t.dataset.creator; return render(); }
-  if (t.id==="back"){ S.creator=null; return render(); }
+  if (t.id==="back"){ S.creator=null; S.pend=null; return render(); }
+  if (t.dataset.pend){ S.pend=t.dataset.pend; S.creator=null; return render(); }
   if (t.dataset.rate){
     const id=t.dataset.rate, fb=$(`#fb-${id}`)?.value||"";
     const { error } = await sb.rpc("rate_submission", { sub_id:id, pts:+t.dataset.p, fb });
@@ -2942,7 +2951,7 @@ document.addEventListener("change", e => {
   if (e.target.dataset.gnote) return guideNote(e.target.dataset.who, e.target.dataset.gnote, e.target.value);
   if (e.target.dataset.refgun) return refGun(e.target.dataset.refgun, e.target.checked);
   if (e.target.id==="av-file"){ const f=e.target.files[0]; e.target.value=""; return avatarUpload(f); }
-  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"start":"uebersicht"; return render(); }
+  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.pend=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"start":"uebersicht"; return render(); }
   if (e.target.id==="ro-file"){ const f=e.target.files[0]; if(f) f.text().then(tx=>{ $("#ro-text").value=tx; toast("Datei eingelesen. Jetzt „Vorschau“ tippen."); }); return; }
   if (e.target.dataset.snap) return uploadSnap(e.target.dataset.snap, e.target.files[0]);
   if (e.target.id==="cal-showcamp"){ S.calShowCamp=e.target.checked; return render(true); }

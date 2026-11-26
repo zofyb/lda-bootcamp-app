@@ -45,7 +45,7 @@ const db = {
     {id:"t2", title:"So bekommst du mehr Geschenke", path:"demo-tt-2", link:"https://www.tiktok.com/@zofyb", kind:"tiktok", audience:"all", category:"TikTok-Tipps", created_at:iso(now-3*D)},
     {id:"t3", title:"Hook-Regel in 30 Sekunden", path:"demo-tt-3", link:"https://www.tiktok.com/@zofyb", kind:"tiktok", audience:"all", category:"TikTok-Tipps", created_at:iso(now-6*D)}
   ],
-  roster: ["luna.live","gamer_kevin","jenny.mama","tim.talks","sofia.sings","mia.vibes","neu.creator"].map(h=>({ handle:h, bootcamp:h!=="mia.vibes"&&h!=="neu.creator", manager_email:{"luna.live":"lena@demo","gamer_kevin":"lena@demo","jenny.mama":"max@demo","tim.talks":"max@demo","mia.vibes":"max@demo"}[h]||null })),
+  roster: ["luna.live","gamer_kevin","jenny.mama","tim.talks","sofia.sings","mia.vibes","neu.creator"].map(h=>({ handle:h, bootcamp:h!=="mia.vibes"&&h!=="neu.creator", manager_email:{"luna.live":"lena@demo","gamer_kevin":"lena@demo","jenny.mama":"max@demo","tim.talks":"max@demo","mia.vibes":"max@demo","neu.creator":"lena@demo"}[h]||null })),
   activity: ["c1@demo","c1@demo","c1@demo","c3@demo","c5@demo"].map((e,i)=>({creator_email:e, day:day(i<3?i:0)})),
   settings: [{key:"start", value:start}, {key:"anim_whatsapp", value:"0170 0000000"}, {key:"partner_papaya", value:JSON.stringify({ info:"Beispieltext: Was Papaya Given anbietet. Kontakt läuft über uns.", link:"", label:"" })}],
   questions: [
