@@ -40,7 +40,10 @@ const db = {
     {id:"e2", title:"Geschenke mit Extra-Wirkung", note:"Beschützer, Superfan, Schatzkiste", path:"demo-2.pdf", audience:"all", category:"Infos", kind:"extra"},
     {id:"e3", title:"Schulung Videoproduktion", note:"Aufzeichnung der Agentur-Schulung", path:"demo-3.mp4", audience:"all", category:"Schulungen", kind:"extra"},
     {id:"e4", title:"Leitfaden für Manager", path:"demo-4.pdf", audience:"team", category:"Team", kind:"extra"},
-    {id:"e5", title:"Untertitel erstellen", path:"demo-5.mp4", audience:"bootcamp", area:2, kind:"extra"}
+    {id:"e5", title:"Untertitel erstellen", path:"demo-5.mp4", audience:"bootcamp", area:2, kind:"extra"},
+    {id:"t1", title:"3 Fehler beim ersten Live", path:"demo-tt-1", link:"https://www.tiktok.com/@zofyb", kind:"tiktok", audience:"all", category:"TikTok-Tipps", created_at:iso(now-D)},
+    {id:"t2", title:"So bekommst du mehr Geschenke", path:"demo-tt-2", link:"https://www.tiktok.com/@zofyb", kind:"tiktok", audience:"all", category:"TikTok-Tipps", created_at:iso(now-3*D)},
+    {id:"t3", title:"Hook-Regel in 30 Sekunden", path:"demo-tt-3", link:"https://www.tiktok.com/@zofyb", kind:"tiktok", audience:"all", category:"TikTok-Tipps", created_at:iso(now-6*D)}
   ],
   roster: ["luna.live","gamer_kevin","jenny.mama","tim.talks","sofia.sings","mia.vibes","neu.creator"].map(h=>({ handle:h, bootcamp:h!=="mia.vibes"&&h!=="neu.creator", manager_email:{"luna.live":"lena@demo","gamer_kevin":"lena@demo","jenny.mama":"max@demo","tim.talks":"max@demo","mia.vibes":"max@demo"}[h]||null })),
   activity: ["c1@demo","c1@demo","c1@demo","c3@demo","c5@demo"].map((e,i)=>({creator_email:e, day:day(i<3?i:0)})),
@@ -69,11 +72,14 @@ const db = {
     {creator_email:"c1@demo", kind:"camp", ref:"k1", xp:15},{creator_email:"c1@demo", kind:"extra", ref:"e1", xp:15}]),
   backstage: [["luna.live",22,61.5,48210,1,1],["sofia.sings",18,40.2,30550,2,3],["gamer_kevin",20,55,21800,3,2],["tim.talks",9,14,12040,4,6],["jenny.mama",15,22.5,9800,5,4],["mia.vibes",12,18,4100,6,5]]
     .map(([h,dy,hr,dm,rd,rt])=>({ month:BSM, handle:h, days:dy, hours:hr, diamonds:dm, rank_d:rd, rank_t:rt })),
+  referrals: [{recruit_handle:"neu.creator", recruiter_email:"c1@demo", status:"ok", gun_sent:true, source:"registrierung", created_at:iso(now-12*D)},
+    {recruit_handle:"lisa.sparkle", recruiter_email:"c1@demo", status:"offen", gun_sent:false, source:"creator", created_at:iso(now-D)},
+    {recruit_handle:"ben.gaming", recruiter_email:"c2@demo", status:"offen", gun_sent:false, source:"registrierung", created_at:iso(now-2*D)}],
   goals: [{creator_email:"c1@demo", month:YM, title:"50.000 Diamanten", target:50000, unit:"Diamanten", current:31200, done:false, set_by:"lena@demo"},
           {creator_email:"c3@demo", month:YM, title:"15 Lives im Monat", target:15, unit:"Lives", current:15, done:true, set_by:"max@demo"}]
 };
 db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootcamp=true; });
-const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"], goals:["creator_email","month"] };
+const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"], goals:["creator_email","month"], referrals:["recruit_handle"] };
 function q(t){
   let rows = db[t] || (db[t]=[]), op = null, payload = null; const flt = [];
   const o = {
@@ -97,12 +103,13 @@ function top5(){
   return Object.keys(tot).filter(e=>tot[e]>0).sort((a,b)=>tot[b]-tot[a]||last[a]-last[b]).slice(0,5)
     .map((e,i)=>({ place:i+1, handle:db.members.find(m=>m.email===e)?.handle }));
 }
+const TTCOVER = x => "data:image/svg+xml,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 160"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${["#d6409f","#7b2fc9","#c24fe0"][+x.slice(-1)%3]}"/><stop offset="1" stop-color="#14061a"/></linearGradient></defs><rect width="90" height="160" fill="url(#g)"/><circle cx="45" cy="62" r="20" fill="#fff" fill-opacity=".25"/><rect x="18" y="104" width="54" height="7" rx="3" fill="#fff" fill-opacity=".8"/><rect x="26" y="116" width="38" height="5" rx="2" fill="#fff" fill-opacity=".5"/></svg>`);
 window.supabase = { createClient(){ return {
   auth:{ onAuthStateChange(){}, getSession:async()=>({ data:{ session:{ user:{ email:"demo@demo" } } } }), signOut:async()=>{ location.reload(); return {}; } },
   from:q,
   storage:{ from(){ return {
     upload:async()=>({ error:{ message:"In der Demo wird nichts hochgeladen." } }), remove:async()=>({}),
-    createSignedUrls:async p=>({ data:p.map(x=>({ path:x, signedUrl:/^demo-av/.test(x)?"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f7b2d9'/%3E%3Cstop offset='1' stop-color='%236a2a9a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3Ccircle cx='50' cy='40' r='18' fill='%23fff' fill-opacity='.85'/%3E%3Cpath d='M18 100c4-22 18-32 32-32s28 10 32 32z' fill='%23fff' fill-opacity='.85'/%3E%3C/svg%3E":null })) }), createSignedUrl:async()=>({ data:null })
+    createSignedUrls:async p=>({ data:p.map(x=>({ path:x, signedUrl:/^demo-tt/.test(x)?TTCOVER(x):/^demo-av/.test(x)?"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f7b2d9'/%3E%3Cstop offset='1' stop-color='%236a2a9a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3Ccircle cx='50' cy='40' r='18' fill='%23fff' fill-opacity='.85'/%3E%3Cpath d='M18 100c4-22 18-32 32-32s28 10 32 32z' fill='%23fff' fill-opacity='.85'/%3E%3C/svg%3E":null })) }), createSignedUrl:async()=>({ data:null })
   }; } },
   rpc:async(n,a)=>{
     if (n==="top5") return { data:top5(), error:null };
@@ -116,6 +123,7 @@ window.supabase = { createClient(){ return {
       ["d","t"].forEach(l=>db.backstage.filter(b=>b.month===mm&&b["rank_"+l]>=1&&b["rank_"+l]<=5).sort((x,y)=>x["rank_"+l]-y["rank_"+l]).forEach(b=>out.push({ month:mm, list:l, place:b["rank_"+l], handle:b.handle })));
       return { data:out, error:null }; }
     if (n==="award_xp") return { data:0, error:null };
+    if (n==="report_referral"){ const h=String(a.rh||"").replace(/^@/,"").toLowerCase(); if (db.referrals.some(r=>r.recruit_handle===h)) return { data:"exists", error:null }; db.referrals.unshift({ recruit_handle:h, recruiter_email:"c1@demo", status:"offen", gun_sent:false, source:"creator", created_at:new Date().toISOString() }); return { data:"ok", error:null }; }
     if (n==="goal_progress") return { data:null, error:null };
     return { data:true, error:null };
   }

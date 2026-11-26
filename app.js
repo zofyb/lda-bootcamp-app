@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), bnav = $("#bnav");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, impAns:null,
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, refs:[], noUpd11:false, impAns:null,
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -125,7 +125,7 @@ function fileLinks(files){
   return `<div class="files">${list(files).map(f=>`<a data-path="${esc(f.path)}" target="_blank" rel="noopener">${esc(f.name)}</a>`).join("") || '<span>Keine Dateien</span>'}</div>`;
 }
 async function hydrate(){
-  hydrateAvatars().catch(console.error);
+  hydrateAvatars().catch(console.error); hydrateCovers().catch(console.error);
   const els=[...document.querySelectorAll("a[data-path]:not([href])")];
   if (els.length){
     const paths=[...new Set(els.map(e=>e.dataset.path))];
@@ -221,6 +221,8 @@ async function load(){
         const { data: res, error: ce } = await sb.rpc("claim_member", { nm:name, h:handle });
         if (ce) throw ce;
         storeSet("ldb-register", null);
+        const ref = md.ref || (reg.email===email ? reg.ref : "");
+        if (res==="ok" && ref) { const rr=await sb.rpc("claim_referral",{ rh:ref }); if (rr.error) console.warn(rr.error); }
         if (res==="ok" || res==="exists") { ({ data: me } = await sb.from("members").select("*").eq("email", email).maybeSingle()); if (me) toast("Willkommen in der LIVEdream Academy! 💜"); }
         else return noAccess(res==="taken" ? `Der TikTok-Name @${esc(handle)} ist schon mit einer anderen E-Mail-Adresse registriert. Bitte melde dich bei deinem Manager.` : `Der TikTok-Name @${esc(handle)} steht nicht auf unserer Liste. Bitte melde dich bei deinem Manager.`);
       }
@@ -255,7 +257,8 @@ async function refresh(){
   S.noUpd5 = !!(sn.error || qu.error || sv.error);
   if (S.real?.role==="lead" || S.me?.role==="lead"){ const ro=await sb.from("roster").select("*").order("handle"); S.noRoster=!!ro.error; S.roster=ro.data||[]; }
   const qr=await sb.from("quiz_results").select("*"); S.noUpd8=!!qr.error; S.qres=qr.data||[];
-  const [xe,bs,gl,bt]=await Promise.all([ sb.from("xp_events").select("*"), sb.from("backstage").select("*"), sb.from("goals").select("*"), sb.rpc("backstage_top",{ m:null }) ]);
+  const [xe,bs,gl,bt,rf]=await Promise.all([ sb.from("xp_events").select("*"), sb.from("backstage").select("*"), sb.from("goals").select("*"), sb.rpc("backstage_top",{ m:null }), sb.from("referrals").select("*").order("created_at",{ ascending:false }) ]);
+  S.noUpd11=!!rf.error; S.refs=rf.data||[];
   S.noUpd9=!!(xe.error||bs.error||gl.error); S.xp=xe.data||[]; S.bs=bs.data||[]; S.goals=gl.data||[]; S.bsTop=bt.error?[]:(bt.data||[]);
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
   if (!S.noUpd7 && S.real?.role==="lead"){ const tk=await sb.from("tasks").select("*").order("created_at"); S.tasks=tk.data||[]; }
@@ -284,6 +287,7 @@ function loginView(email="", sent=false, err="", mode){
       <label class="f" for="rg-name">Dein Name<input id="rg-name" type="text" autocomplete="name" value="${esc(r.name||"")}"></label>
       <label class="f" for="rg-handle">Dein TikTok-Name<input id="rg-handle" type="text" autocapitalize="none" autocomplete="off" placeholder="@deinname" value="${esc(r.handle||"")}"></label>
       <label class="f" for="email">E-Mail-Adresse<input id="email" type="email" autocomplete="email" value="${esc(email)}"></label>
+      <label class="f" for="rg-ref">Wer hat dich zu uns eingeladen? (TikTok-Name, optional)<input id="rg-ref" type="text" autocapitalize="none" autocomplete="off" placeholder="@name" value="${esc(r.ref||"")}"></label>
       <button class="btn" id="register">Registrieren</button>
       <button class="btn ghost" id="to-login">Ich habe schon ein Konto</button>`
     : `<p class="soft">Melde dich mit deiner E-Mail-Adresse an. Du bekommst einen Anmelde-Link, ganz ohne Passwort.</p>
@@ -310,8 +314,8 @@ async function sendLink(){
   loginView(email,true);
 }
 async function register(){
-  const name=$("#rg-name").value.trim(), handle=$("#rg-handle").value.trim().replace(/^@/,"").toLowerCase(), email=lc($("#email").value);
-  S._reg={ name, handle };
+  const name=$("#rg-name").value.trim(), handle=$("#rg-handle").value.trim().replace(/^@/,"").toLowerCase(), email=lc($("#email").value), ref=($("#rg-ref")?.value||"").trim().replace(/^@/,"").toLowerCase();
+  S._reg={ name, handle, ref };
   if (!name || !handle) return loginView(email,false,"Bitte Name und TikTok-Namen eingeben.");
   if (!/^\S+@\S+\.\S+$/.test(email)) return loginView(email,false,"Bitte eine gültige E-Mail-Adresse eingeben.");
   $("#register").disabled = true;
@@ -322,8 +326,8 @@ async function register(){
     taken:`Der TikTok-Name <b>@${esc(handle)}</b> ist schon registriert. Wenn das nicht du warst, melde dich bitte bei deinem Manager.`,
     inactive:"Diese E-Mail-Adresse hat gerade keinen Zugang. Bitte melde dich bei deinem Manager.", missing:"Bitte alles ausfüllen." }[res];
   if (msg) return loginView(email,false,msg);
-  storeSet("ldb-register", { name, handle, email });
-  const er = await otp(email, { name, handle }); if (er) return loginView(email,false,er);
+  storeSet("ldb-register", { name, handle, email, ref });
+  const er = await otp(email, ref ? { name, handle, ref } : { name, handle }); if (er) return loginView(email,false,er);
   loginView(email,true);
 }
 async function verifyCode(){
@@ -334,7 +338,7 @@ async function verifyCode(){
 
 /* ---------- Rahmen ---------- */
 const ic = (n, cls="") => `<svg class="ico ${cls}" aria-hidden="true"><use href="#${n}"/></svg>`;
-const LEAD_MORE = ["fragen","personen","themenedit","akademie"];
+const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit"];
 function navItems(){
   const me=S.me;
   if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
@@ -372,8 +376,8 @@ function render(keepScroll){
   const sw=$("#switch"); sw.innerHTML = switcher(); sw.hidden = !sw.innerHTML.trim();
   const st = me.role==="creator" && !me.preview ? streakInfo(me.email).cur : 0;
   who.innerHTML = me.role==="creator"
-    ? `${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}${S.noUpd9?`<button class="avabtn" data-tab="profil" aria-label="Mein Profil">${esc(initialOf(me))}</button>`:`<button class="avabtn rg" data-tab="profil" aria-label="Mein Profil">${lvRing(me.email,46,{badge:false})}</button>`}`
-    : `<span class="chip">${esc(S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
+    ? `<button class="chip invchip" id="inv-open" aria-label="Streamer einladen">${ic("i-rocket")}<span>Einladen</span></button>${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}${S.noUpd9?`<button class="avabtn" data-tab="profil" aria-label="Mein Profil">${esc(initialOf(me))}</button>`:`<button class="avabtn rg" data-tab="profil" aria-label="Mein Profil">${lvRing(me.email,46,{badge:false})}</button>`}`
+    : `<button class="chip invchip" id="inv-open" aria-label="Streamer einladen">${ic("i-rocket")}<span>Einladen</span></button><span class="chip">${esc(S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
   if (me.role==="creator"){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
@@ -389,7 +393,7 @@ function render(keepScroll){
   else if (S.tab==="kalender") html = calendarView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
   else if (S.tab==="mehr") html = moreView();
-  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor }[S.tab] || pendingView)();
+  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView }[S.tab] || pendingView)();
   view.innerHTML = html;
   if (!keepScroll) window.scrollTo(0,0);
   afterRender(); fab();
@@ -803,7 +807,7 @@ function creatorDetail(email){
   let h=`<button class="btn ghost small back" id="back">← Zurück</button>
     <div class="stack"><span class="eyebrow">${esc(member(c.manager_email)?.name?"Manager: "+member(c.manager_email).name:"ohne Manager")}</span><h1>${esc(label(c))}</h1>
     <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p><div class="titles">${titleChips(email,false)}</div></div>
-    ${S.noUpd9?"":lvHero(email,false)}${liveStand(email)}${goalAdmin(email)}
+    ${S.noUpd9?"":lvHero(email,false)}${liveStand(email)}${recCard(email,false)}${goalAdmin(email)}
     <div class="hexes">${allBadges(email).map(hexBadge).join("")}</div>
     ${snapOf(email,"vorher")||snapOf(email,"nachher")?`<div class="panel stack"><h2>Vorher-Nachher</h2><div class="snaps">${["vorher","nachher"].map(k=>{const x=snapOf(email,k); return `<div class="snap">${x?`<a data-path="${esc(x.path)}" target="_blank" rel="noopener"><img data-img="${esc(x.path)}" alt="${k}"></a>`:`<div class="ph">–</div>`}<small>${k==="vorher"?"Vorher":"Nachher"}</small></div>`;}).join("")}</div></div>`:""}
     <div class="list">`;
@@ -873,11 +877,11 @@ async function delQ(id){
 /* ---------- Akademie ---------- */
 function academyView(){
   const me=S.me, staff=me.role!=="creator", lead=me.role==="lead";
-  const xs=S.extras.filter(x=>x.kind!=="reward" && (x.level==null || lead) && (audOf(x)==="all" || (audOf(x)==="team" && staff)));
+  const xs=S.extras.filter(x=>x.kind!=="reward" && x.kind!=="tiktok" && (x.level==null || lead) && (audOf(x)==="all" || (audOf(x)==="team" && staff)));
   const seen=storeGet("ldb-extras-"+me.email)||[];
   const groups={}; xs.forEach(x=>{ (groups[x.category||"Allgemein"] ||= []).push(x); });
   let h=`<div class="stack"><span class="eyebrow">LIVEdream Academy</span><h1>Die <em>Akademie</em></h1>
-    <p class="muted">Schulungen, Videos und Infos. Immer offen, ohne Punkte.</p></div>` + (staff ? quizCards() : "");
+    <p class="muted">Schulungen, Videos und Infos. Immer offen, ohne Punkte.</p></div>` + ttStrip(0) + (lead && !S.noUpd11 ? ttAdmin() : "") + (staff ? quizCards() : "");
   if (lead) h += S.noRoster ? `<div class="panel"><p class="err">Zuerst update-6.sql in Supabase ausführen, dann kannst du hier Inhalte hochladen.</p></div>` : `<div class="panel stack"><h2>Inhalt hinzufügen</h2>
     <div class="grid2"><label class="f" for="ak-title">Titel<input id="ak-title" type="text" placeholder="z. B. Schulung Videoproduktion"></label>
     <label class="f" for="ak-cat">Rubrik<input id="ak-cat" type="text" list="ak-cats" placeholder="z. B. Schulungen"><datalist id="ak-cats">${[...new Set(S.extras.map(x=>x.category).filter(Boolean).concat(["Schulungen","Infos","Videos"]))].map(c=>`<option value="${esc(c)}">`).join("")}</datalist></label>
@@ -1019,6 +1023,7 @@ function startView(){
   const hk=hookToday(), im=impulsNow(), hkDone=S.xp.some(x=>x.creator_email===e&&x.kind==="hook"&&x.ref===todayKey()), imDone=S.xp.some(x=>x.creator_email===e&&x.kind==="impuls"&&x.ref===weekKey());
   return `<div class="hi"><h1>${hello}, <em>${esc(firstName(me))}</em></h1><div class="hirow">${mt?`<button class="title" data-qzshow="${main.quiz}" data-who="${esc(e)}"><i>${ic(TYPE_IC[mt.key]||"i-star")}</i>${esc(mt.name)}</button>`:""}</div></div>
   ${S.noUpd9?"":lvHero(e,true)}
+  ${inviteBar()}
   ${nextCard(e)}
   ${hk||im?`<div class="daily">${hk?`<button class="dcard ${hkDone?"done":""}" id="hook-open"><span class="dic">${ic("i-spark")}</span><b>Hook des Tages</b><small>${hkDone?"Erledigt ✓":"+10 XP"}</small></button>`:""}${im?`<button class="dcard ${imDone?"done":""}" id="imp-open"><span class="dic">${ic("i-bulb")}</span><b>Impuls der Woche</b><small>${imDone?"Angesehen ✓":"bis +50 XP"}</small></button>`:""}</div>`:""}
   ${goalCard(e,true)}
@@ -1029,11 +1034,14 @@ function startView(){
     ${tile("i-cal","Kalender",'data-tab="kalender"',dot(now.length))}
     ${boot?tile("i-gift","Belohnungen",'id="rw-open"',ok?`<i class="dot">!</i>`:`<small class="tl">ab 10 P</small>`):""}
     ${tile("i-user","Profil",'data-tab="profil"')}
+    <a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>
   </div>
+  ${ttStrip(6)}
   ${boot?reminderBlock(e):""}
   ${camps.length?`<div class="sec"><span>${now.length?"Läuft gerade":"Kommt bald"}</span><button class="lnk" data-tab="kalender">Alle ansehen</button></div>
     <div class="camps">${camps.map(c=>`<button class="camp k-${c.kind}" data-cal="${esc(c.id)}"><b>${esc(c.title)}</b><small>${c.starts>t?"ab "+fmtDate(c.starts).replace(/\.\d{4}$/,"."):"bis "+fmtDate(c.ends).replace(/\.\d{4}$/,".")}</small></button>`).join("")}</div>`:""}
   ${topLists()}
+  ${recCard(e,true)}
   ${boot?surveyBlock(e)+topBlock():""}`;
 }
 function learnView(){
@@ -1058,6 +1066,7 @@ function profileView(email){
   <div class="stats"><div><b>${fmtN(xpOf(email))}</b><small>XP</small></div>${boot?`<div><b>${total(email)}</b><small>Bootcamp-Punkte</small></div>`:""}<div><b>${on}</b><small>Abzeichen</small></div></div>
   ${goalCard(email, own)}
   ${liveStand(email)}
+  ${recCard(email, own && S.me.role==="creator")}
   <div class="sec"><span>Abzeichen</span><small>${on} von ${bs.length}</small></div>
   <div class="hexes">${bs.map(hexBadge).join("")}</div>
   ${unlocksBlock(email)}
@@ -1065,9 +1074,9 @@ function profileView(email){
 }
 function moreView(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
-  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"]];
+  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"]];
   return `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Mehr</h1></div>
-  <div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}</div>`;
+  <div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a></div>`;
 }
 
 
@@ -1086,10 +1095,11 @@ const rankBonus = r => !r ? 0 : r===1 ? 300 : r===2 ? 200 : r===3 ? 150 : r<=5 ?
 const bsRows = email => { const h=hnorm(member(email)?.handle || (S.me?.email===email ? S.me.handle : "")); return h ? S.bs.filter(b=>hnorm(b.handle)===h).sort((a,b)=>b.month.localeCompare(a.month)) : []; };
 function xpParts(email){
   const ev=S.xp.filter(x=>x.creator_email===email), m=member(email)||S.me;
-  const parts={ app:ev.reduce((a,x)=>a+x.xp,0), lernen:0, live:0, ziel:0 };
+  const parts={ app:ev.reduce((a,x)=>a+x.xp,0), lernen:0, live:0, ziel:0, werben:0 };
   parts.lernen += S.subs.filter(s=>s.creator_email===email).length*50 + (inBootcamp(m) && passed(email) ? 200 : 0) + S.qres.filter(r=>r.creator_email===email).length*50;
   for (const b of bsRows(email)) parts.live += (b.days||0)*10 + Math.max(rankBonus(b.rank_d), rankBonus(b.rank_t));
   parts.ziel += S.goals.filter(g=>g.creator_email===email && g.done).length*250;
+  parts.werben = recOk(email)*REC_XP;
   return parts;
 }
 const xpOf = email => Object.values(xpParts(email)).reduce((a,b)=>a+b,0);
@@ -1127,8 +1137,8 @@ const LV_STYLE = [
   { c:["#ffe08a","#c24fe0"], ic:"i-crown",  rw:"Zweites Overlay und kleine Live-Einblendungen" },
   { c:["#fff3c4","#FFB017"], ic:"i-trophy", rw:"Persönliches Overlay und Shoutout" }
 ];
-const MIX = [["live","Live","#FFB017"],["lernen","Lernen","#ff5fb8"],["app","App","#c24fe0"],["ziel","Ziel","#5fe3a8"]];
-const MIX_SAY = { live:"deine Lives", lernen:"Lernen", app:"deine App-Aktivität", ziel:"deine Monatsziele" };
+const MIX = [["live","Live","#FFB017"],["lernen","Lernen","#ff5fb8"],["app","App","#c24fe0"],["ziel","Ziel","#5fe3a8"],["werben","Werben","#4fd1ff"]];
+const MIX_SAY = { live:"deine Lives", lernen:"Lernen", app:"deine App-Aktivität", ziel:"deine Monatsziele", werben:"das Werben neuer Streamer" };
 const AVURL = {};
 let rgid = 0;
 const lvVars = i => `--la:${LV_STYLE[i].c[0]};--lb:${LV_STYLE[i].c[1]}`;
@@ -1190,7 +1200,7 @@ function openLvSheet(email){
   const xp=xpOf(email), L=levelOf(xp);
   const ways=[["i-check","Täglich reinschauen","5 XP pro Tag"],["i-spark","Hook des Tages öffnen","10 XP pro Tag"],["i-bulb","Impuls der Woche","20 XP + 10 je richtige Antwort"],
     ["i-cal","Kampagne durchlesen","15 XP je Kampagne"],["i-play","Akademie-Inhalt ansehen","15 XP je Inhalt"],["i-quiz","Quiz machen","50 XP je Quiz"],
-    ["i-fire","Live gehen","10 XP je gültigem Live-Tag im Monat"],["i-trophy","Top 10 der Agentur","bis 300 XP im Monat"],["i-star","Monatsziel erreichen","250 XP"]];
+    ["i-fire","Live gehen","10 XP je gültigem Live-Tag im Monat"],["i-trophy","Top 10 der Agentur","bis 300 XP im Monat"],["i-star","Monatsziel erreichen","250 XP"],["i-rocket","Streamer einladen","300 XP + Money Gun je neuem Streamer"]];
   if (inBootcamp(m)) ways.push(["i-learn","Bootcamp","50 XP je Abgabe, 200 XP fürs Bestehen"]);
   sheet(`<div class="sh lvsh" style="${lvVars(L.i)}">${lvRing(email,92)}<div><span class="eyebrow">Stufe ${L.n} · ${esc(L.name)}</span><h2>${fmtN(xp)} XP</h2>
       <small class="muted">${L.next!=null?`noch ${fmtN(L.next-xp)} bis ${esc(L.nextName)}`:"höchste Stufe erreicht"}</small></div></div>
@@ -1230,6 +1240,140 @@ async function hydrateAvatars(){
   const need=[...new Set(imgs.map(i=>i.dataset.avatar))].filter(p=>!AVURL[p]);
   if (need.length){ const { data }=await sb.storage.from("profilbilder").createSignedUrls(need, 6*3600); (data||[]).forEach(d=>{ if (d.signedUrl) AVURL[d.path]=d.signedUrl; }); }
   imgs.forEach(i=>{ if (AVURL[i.dataset.avatar]) i.src=AVURL[i.dataset.avatar]; });
+}
+
+/* ---------- Streamer einladen, Recruiter-Programm, Merch ---------- */
+const INVITE_URL = () => S.settings.invite_link || "https://www.tiktok.com/t/ZMh3ga66v/";
+const MERCH_URL = () => S.settings.merch_link || "https://teamschlauchishapeshifter.myspreadshop.de";
+const REC_LEVELS = [[1,"Talent-Scout"],[3,"Recruiter"],[6,"Headhunter"],[10,"Star-Recruiter"]];
+const REC_XP = 300;
+const recOf = email => S.refs.filter(r=>r.recruiter_email===email);
+const recOk = email => recOf(email).filter(r=>r.status==="ok").length;
+function recLevel(n){
+  let cur=null, next=REC_LEVELS[0]; REC_LEVELS.forEach((l,i)=>{ if (n>=l[0]){ cur=l; next=REC_LEVELS[i+1]||null; } });
+  return { cur, next, idx: cur ? REC_LEVELS.indexOf(cur)+1 : 0 };
+}
+function inviteBar(){
+  return `<button class="invbar" id="inv-open"><span class="invic">${ic("i-rocket")}</span><span><b>Streamer einladen</b><small>Pro neuem Streamer: Money Gun + ${REC_XP} XP</small></span><span class="invgo">Link teilen</span></button>`;
+}
+function recCard(email, mine){
+  if (S.noUpd11) return "";
+  const list=recOf(email), n=recOk(email), open=list.filter(r=>r.status==="offen").length, L=recLevel(n), guns=list.filter(r=>r.status==="ok").length;
+  if (!mine && !list.length) return "";
+  const pct=L.next ? Math.round((n-(L.cur?.[0]||0))/(L.next[0]-(L.cur?.[0]||0))*100) : 100;
+  return `<div class="panel reccard">
+    <div class="rechead"><span class="rechx">${ic("i-people")}<b>${L.idx||"–"}</b></span>
+      <div><span class="eyebrow">Recruiter-Stufe</span><b class="recname">${L.cur?esc(L.cur[1]):"Noch kein Recruiter"}</b>
+      <small class="muted">${n} ${n===1?"Streamer":"Streamer"} geworben${open?` · ${open} wartet auf Bestätigung`:""}</small></div></div>
+    <span class="lvbar"><i style="width:${pct}%"></i></span>
+    <small class="muted">${L.next?`Noch ${L.next[0]-n} bis ${esc(L.next[1])}`:"Höchste Recruiter-Stufe erreicht"} · ${guns} Money ${guns===1?"Gun":"Guns"} verdient</small>
+    ${list.length?`<div class="reclist">${list.map(r=>`<span class="recp ${r.status}">@${esc(r.recruit_handle)}<i>${r.status==="ok"?(r.gun_sent?"Money Gun verschickt":"bestätigt"):r.status==="nein"?"nicht bestätigt":"wartet"}</i></span>`).join("")}</div>`:""}
+    ${mine?`<button class="btn small" id="inv-open2">${ic("i-rocket")} Streamer einladen</button>`:""}
+  </div>`;
+}
+function openInvite(){
+  const url=INVITE_URL(), creator=S.me.role==="creator";
+  sheet(`<div class="sh"><span class="eyebrow">LIVEdream Agency</span><h2>Streamer einladen</h2></div>
+    <p class="soft">Schick diesen Link an Streamer, die zu uns passen. Wer über dich zur Agentur kommt, bringt dir eine <b>Money Gun</b> und <b>${REC_XP} XP</b>, sobald wir es bestätigt haben.</p>
+    <div class="invlink"><code>${esc(url)}</code></div>
+    <div class="actions"><button class="btn" id="inv-share">${ic("i-rocket")} Link teilen</button><button class="btn ghost" id="inv-copy">Kopieren</button></div>
+    ${creator && !S.noUpd11 && !S.viewAs ? `<div class="sec"><span>Jemand ist über dich gekommen?</span></div>
+      <p class="muted" style="margin:0">Trag den TikTok-Namen ein. Die Agenturleitung bestätigt es.</p>
+      <div class="actions"><input id="ref-h" type="text" autocapitalize="none" autocomplete="off" placeholder="@tiktokname" style="flex:1;min-width:0"><button class="btn small" id="ref-send">Melden</button></div>` : ""}
+    ${creator?recCard(S.me.email,false):""}`);
+}
+async function shareInvite(){
+  const url=INVITE_URL(), text="Werde Teil der LIVEdream Agency! Hier kannst du dich bewerben:";
+  if (navigator.share){ try{ await navigator.share({ title:"LIVEdream Agency", text, url }); return; }catch(e){ if (e?.name==="AbortError") return; } }
+  copyInvite();
+}
+async function copyInvite(){
+  try{ await navigator.clipboard.writeText(INVITE_URL()); toast("Link kopiert."); }
+  catch{ const c=$(".invlink code"); if (c){ const r=document.createRange(); r.selectNodeContents(c); const s=getSelection(); s.removeAllRanges(); s.addRange(r); } toast("Link markiert. Jetzt kopieren."); }
+}
+async function reportRef(){
+  const h=($("#ref-h")?.value||"").trim(); if (!h) return toast("Bitte einen TikTok-Namen eintragen.");
+  const { data, error }=await sb.rpc("report_referral",{ rh:h }); if (error) return fail(error);
+  const msg={ ok:"Gemeldet. Die Agenturleitung bestätigt es.", exists:"Diesen Streamer hat schon jemand gemeldet.", self:"Das bist du selbst 😉", invalid:"Das ist kein gültiger TikTok-Name.", no_access:"Kein Zugang." }[data]||"Gemeldet.";
+  toast(msg); if (data==="ok"){ await refresh(); openInvite(); }
+}
+/* Leitung: Recruiting-Übersicht */
+function recruitView(){
+  if (S.noUpd11) return `<div class="panel"><p class="err">Für das Recruiter-Programm zuerst update-11.sql in Supabase ausführen.</p></div>`;
+  const open=S.refs.filter(r=>r.status==="offen"), ok=S.refs.filter(r=>r.status==="ok"), who=e=>{ const m=member(e); return m?esc(label(m)):esc(e); };
+  const creators=S.members.filter(m=>m.role==="creator").sort((a,b)=>label(a).localeCompare(label(b)));
+  const board=[...new Set(ok.map(r=>r.recruiter_email))].map(e=>[e,recOk(e)]).sort((a,b)=>b[1]-a[1]);
+  return `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Recruiting</h1><p class="muted">Gemeldete Streamer bestätigen, Money Guns abhaken.</p></div>
+  ${inviteBar()}
+  <div class="sec"><span>Wartet auf Bestätigung</span><small>${open.length}</small></div>
+  ${open.length?`<div class="list">${open.map(r=>`<div class="row"><div class="head"><b>@${esc(r.recruit_handle)}</b><span class="muted">${r.source==="registrierung"?"bei Registrierung":"gemeldet"} · ${fmtDate(r.created_at.slice(0,10))}</span></div>
+    <span class="muted">geworben von ${who(r.recruiter_email)}</span>
+    <div class="actions"><button class="btn small gold" data-refok="${esc(r.recruit_handle)}">Bestätigen</button><button class="btn small ghost" data-refno="${esc(r.recruit_handle)}">Ablehnen</button></div></div>`).join("")}</div>`:`<div class="panel"><p class="muted">Nichts offen.</p></div>`}
+  <div class="sec"><span>Bestätigt</span><small>${ok.length}</small></div>
+  ${ok.length?`<div class="list">${ok.map(r=>`<div class="row"><div class="head"><b>@${esc(r.recruit_handle)}</b><span class="muted">von ${who(r.recruiter_email)}</span></div>
+    <label class="qopt" style="font-size:13px"><input type="checkbox" data-refgun="${esc(r.recruit_handle)}" ${r.gun_sent?"checked":""}> Money Gun verschickt</label></div>`).join("")}</div>`:""}
+  ${board.length?`<div class="sec"><span>Recruiter-Bestenliste</span></div><div class="panel"><ol class="recboard">${board.map(([e,n],i)=>`<li><b>${i+1}. ${who(e)}</b><span>${n} · ${esc(recLevel(n).cur?.[1]||"")}</span></li>`).join("")}</ol></div>`:""}
+  <div class="sec"><span>Selbst eintragen</span></div>
+  <div class="panel stack"><label class="f" for="rf-rec">Geworben von<select id="rf-rec">${creators.map(c=>`<option value="${esc(c.email)}">${esc(label(c))}</option>`).join("")}</select></label>
+    <label class="f" for="rf-h">Neuer Streamer (TikTok-Name)<input id="rf-h" type="text" autocapitalize="none" placeholder="@tiktokname"></label>
+    <button class="btn small" id="rf-add">Als bestätigt eintragen</button></div>`;
+}
+async function refDecide(h, status){
+  const { error }=await sb.from("referrals").update({ status, decided_at:new Date().toISOString() }).eq("recruit_handle",h); if (error) return fail(error);
+  await refresh(); render(true); toast(status==="ok"?"Bestätigt. XP sind gutgeschrieben.":"Abgelehnt.");
+}
+async function refGun(h, v){ const { error }=await sb.from("referrals").update({ gun_sent:v }).eq("recruit_handle",h); if (error) return fail(error); const r=S.refs.find(x=>x.recruit_handle===h); if (r) r.gun_sent=v; toast(v?"Money Gun abgehakt.":"Haken entfernt."); }
+async function refAdd(){
+  const rec=$("#rf-rec").value, h=lc($("#rf-h").value.trim().replace(/^@/,""));
+  if (!rec || !/^[a-z0-9._]{1,40}$/.test(h)) return toast("Bitte Recruiter und gültigen TikTok-Namen angeben.");
+  const { error }=await sb.from("referrals").upsert({ recruit_handle:h, recruiter_email:rec, status:"ok", source:"leitung", decided_at:new Date().toISOString() }); if (error) return fail(error);
+  await refresh(); render(true); toast("Eingetragen.");
+}
+/* ---------- Zofys TikTok-Tippvideos (Vorschau, Klick führt zu TikTok) ---------- */
+const ttVideos = () => S.extras.filter(x=>x.kind==="tiktok" && x.link).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
+function ttCard(x){
+  const cover=x.path && x.path!=="tiktok";
+  return `<a class="ttcard" href="${esc(x.link)}" target="_blank" rel="noopener" data-tt="${esc(x.id)}">
+    <span class="ttimg">${cover?`<img data-tcover="${esc(x.path)}" alt="">`:""}<span class="ttplay">${ic("i-play")}</span></span>
+    <b>${esc(x.title)}</b><small>Auf TikTok ansehen ›</small></a>`;
+}
+function ttStrip(max, head="Tipps von Zofy auf TikTok"){
+  const xs=ttVideos().slice(0,max||99); if (!xs.length) return "";
+  return `<div class="sec"><span>${esc(head)}</span><small>+15 XP je Video</small></div><div class="ttrow">${xs.map(ttCard).join("")}</div>`;
+}
+function ttAdmin(){
+  return `<div class="panel stack"><h2>TikTok-Tippvideo hinzufügen</h2>
+    <p class="muted" style="margin:0">In der App erscheint nur das Vorschaubild. Wer tippt, landet beim echten Video auf TikTok.</p>
+    <label class="f" for="tt-link">Link zum TikTok-Video<input id="tt-link" type="url" placeholder="https://www.tiktok.com/@zofyb/video/…"></label>
+    <label class="f" for="tt-title">Titel<input id="tt-title" type="text" placeholder="z. B. 3 Fehler beim ersten Live"></label>
+    <label class="f" for="tt-cover">Vorschaubild (Screenshot vom Video, wird verkleinert)<input id="tt-cover" type="file" accept="image/*"></label>
+    <button class="btn small" id="tt-add">Hinzufügen</button></div>`;
+}
+async function shrinkCover(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("Bild konnte nicht gelesen werden.")); i.src=url; });
+    const W=360, H=640, sc=Math.max(W/img.naturalWidth, H/img.naturalHeight), w=img.naturalWidth*sc, h=img.naturalHeight*sc;
+    const c=document.createElement("canvas"); c.width=W; c.height=H; c.getContext("2d").drawImage(img,(W-w)/2,(H-h)/2,w,h);
+    return await new Promise(r=>c.toBlob(r,"image/jpeg",.82));
+  } finally { URL.revokeObjectURL(url); }
+}
+async function addTikTok(){
+  const link=$("#tt-link").value.trim(), title=$("#tt-title").value.trim(), f=$("#tt-cover").files[0];
+  if (!/^https:\/\/(www\.|vm\.|vt\.)?tiktok\.com\//.test(link)) return toast("Bitte einen TikTok-Link einfügen (https://www.tiktok.com/…).");
+  if (!title) return toast("Bitte einen Titel eingeben.");
+  try{
+    $("#tt-add").disabled=true; let path="tiktok";
+    if (f){ const blob=await shrinkCover(f); path=`tiktok-${Date.now()}.jpg`; const u=await sb.storage.from("unterlagen").upload(path,blob,{ contentType:"image/jpeg" }); if (u.error) throw u.error; }
+    const r=await sb.from("extras").insert({ title, path, link, kind:"tiktok", audience:"all", category:"TikTok-Tipps", sort:S.extras.length }); if (r.error) throw r.error;
+    await refresh(); render(true); toast("TikTok-Video hinzugefügt.");
+  } catch(e){ fail(e); render(true); }
+}
+async function hydrateCovers(){
+  const imgs=[...document.querySelectorAll("img[data-tcover]:not([src])")]; if (!imgs.length) return;
+  const need=[...new Set(imgs.map(i=>i.dataset.tcover))].filter(p=>!AVURL["u:"+p]);
+  if (need.length){ const { data }=await sb.storage.from("unterlagen").createSignedUrls(need, 6*3600); (data||[]).forEach(d=>{ if (d.signedUrl) AVURL["u:"+d.path]=d.signedUrl; }); }
+  imgs.forEach(i=>{ const u=AVURL["u:"+i.dataset.tcover]; if (u) i.src=u; });
 }
 
 /* Hook des Tages */
@@ -1850,6 +1994,7 @@ datenschutz: `<h1>Datenschutz&shy;erklärung</h1>
 <li><b>Level und XP:</b> welche Aktionen dir XP gebracht haben (z. B. Einloggen, Hook des Tages, Impuls der Woche, gelesene Kampagnen) und deine Stufe.</li>
 <li><b>Live-Daten aus dem TikTok-Backstage:</b> Die Agentur lädt monatlich die Backstage-Liste hoch. Daraus speichern wir zu deinem TikTok-Namen die gültigen Live-Tage, die Live-Stunden und die Diamanten der letzten 30 Tage sowie deine Plätze in den Agentur-Ranglisten.</li>
 <li><b>Monatsziel:</b> das Ziel, das du mit deinem Manager vereinbarst, und dein eingetragener Stand.</li>
+<li><b>Recruiter-Programm:</b> welche Streamer du geworben hast bzw. wer dich eingeladen hat, ob wir es bestätigt haben und ob deine Belohnung verschickt wurde.</li>
 <li><b>Sag's uns:</b> Nachrichten werden ohne Namen und ohne E-Mail-Adresse gespeichert.</li>
 <li><b>Umfrage:</b> deine Antworten. Sie sieht nur die Agenturleitung.</li>
 <li><b>Ranglisten:</b> In den Top 5 (Bootcamp, Diamanten, Fleißigste) erscheint nur dein TikTok-Name mit Platz, ohne Zahlen.</li>
@@ -1864,7 +2009,7 @@ datenschutz: `<h1>Datenschutz&shy;erklärung</h1>
 <li><b>Netlify</b> (Netlify Inc., USA) stellt die Webseite bereit. Beim Aufruf werden technisch nötige Daten wie IP-Adresse und Zeitpunkt verarbeitet. Eine Übermittlung in die USA ist möglich. Sie ist durch EU-Standardvertragsklauseln bzw. das EU-US Data Privacy Framework abgesichert.</li>
 <li><b>Login-E-Mails</b> werden über den E-Mail-Dienst WEB.DE (1&amp;1 Mail &amp; Media GmbH, Deutschland) verschickt.</li>
 </ul>
-<p>Schriften und Programmbibliotheken liegen direkt auf unserem Server. Es werden keine Daten an Google oder andere Anbieter geschickt. Wir nutzen keine Werbe- oder Analyse-Cookies und kein Tracking.</p>
+<p>Schriften und Programmbibliotheken liegen direkt auf unserem Server. Es werden keine Daten an Google oder andere Anbieter geschickt. Wir nutzen keine Werbe- oder Analyse-Cookies und kein Tracking. Links zu TikTok-Videos und zum Merch-Shop öffnen die Seiten dieser Anbieter. Erst dann gelten deren Datenschutzbestimmungen.</p>
 <h2>7. Speicher in deinem Browser</h2>
 <p>Die App speichert in deinem Browser deine Anmeldung und kleine Merkhilfen, etwa welche Abzeichen und Extras du schon gesehen hast. Das ist technisch nötig (§ 25 Abs. 2 TDDDG). Du kannst es jederzeit über die Browser-Einstellungen löschen.</p>
 <h2>8. Wie lange wir speichern</h2>
@@ -1912,6 +2057,15 @@ document.addEventListener("click", async e => {
   if (t.dataset.qz){ const r=S.me.role==="creator" && qzRes(S.me.email,t.dataset.qz); if (r){ const q=QZ().find(x=>x.id===t.dataset.qz); return sheet(quizResult(q, r.result, false, r.scores?._second)); } return quizStart(t.dataset.qz); }
   if (t.dataset.qzAgain){ closeSheet(); return quizStart(t.dataset.qzAgain); }
   if (t.dataset.lvsheet) return openLvSheet(t.dataset.lvsheet);
+  if (t.id==="inv-open" || t.id==="inv-open2") return openInvite();
+  if (t.id==="inv-share") return shareInvite();
+  if (t.id==="inv-copy") return copyInvite();
+  if (t.id==="ref-send") return reportRef();
+  if (t.dataset.refok) return refDecide(t.dataset.refok,"ok");
+  if (t.dataset.refno) return refDecide(t.dataset.refno,"nein");
+  if (t.id==="rf-add") return refAdd();
+  if (t.id==="tt-add") return addTikTok();
+  if (t.dataset.tt){ award("extra", t.dataset.tt); return; }
   if (t.dataset.qzshow){ const q=QZ().find(x=>x.id===t.dataset.qzshow), r=qzRes(t.dataset.who||S.me.email, q?.id); if (q&&r) return sheet(quizResult(q, r.result, false, r.scores?._second)); return; }
   if (t.dataset.learn){ S.learn=t.dataset.learn; S.qz=null; return render(); }
   if (t.id==="rw-open") return sheet(`<div class="stack">${rewardsBlock(S.me.email)}</div>`);
@@ -1998,6 +2152,7 @@ document.addEventListener("change", e => {
     e.target.value=""; $("#pend").innerHTML=pendList(n);
   }
   if (e.target.id==="bs-file") return backstageRead();
+  if (e.target.dataset.refgun) return refGun(e.target.dataset.refgun, e.target.checked);
   if (e.target.id==="av-file"){ const f=e.target.files[0]; e.target.value=""; return avatarUpload(f); }
   if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"start":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
   if (e.target.id==="ro-file"){ const f=e.target.files[0]; if(f) f.text().then(tx=>{ $("#ro-text").value=tx; toast("Datei eingelesen. Jetzt „Vorschau“ tippen."); }); return; }
