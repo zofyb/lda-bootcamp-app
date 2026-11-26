@@ -1778,7 +1778,7 @@ document.addEventListener("click", async e => {
   if (t.id==="register") return register();
   if (t.id==="to-register"){ S._loginMode="register"; return loginView($("#email")?.value||""); }
   if (t.id==="to-login"){ S._loginMode="login"; return loginView($("#email")?.value||""); }
-  if (t.id==="logout"){ await sb.auth.signOut(); Object.assign(S,{me:null,real:null,viewAs:"",tab:null,creator:null,openArea:null,ringShown:false,localProg:{}}); return loginView(); }
+  if (t.id==="logout"){ await sb.auth.signOut({ scope:"local" }); Object.assign(S,{me:null,real:null,viewAs:"",tab:null,creator:null,openArea:null,ringShown:false,localProg:{}}); return loginView(); }
   if (t.dataset.tab){ closeSheet(); S.qz=null; S.tab=t.dataset.tab; if (t.dataset.learn) S.learn=t.dataset.learn; S.creator=null; S.editMember=null; return render(); }
   if (t.dataset.area){
     const st=t.dataset.state;
