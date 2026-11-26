@@ -6,7 +6,7 @@ const MAX_FILE = 50 * 1024 * 1024;
 const DAY = 864e5;
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const view = $("#view"), who = $("#who"), tabsEl = $("#tabs");
+const view = $("#view"), who = $("#who"), bnav = $("#bnav");
 
 let sb = null;
 const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null,
@@ -235,7 +235,7 @@ async function load(){
       if (r?.error) console.warn(r.error);
     }
     await refresh();
-    S.tab = S.tab || (me.role === "creator" ? (me.bootcamp ? "themen" : "akademie") : me.role === "manager" ? "bewerten" : "uebersicht");
+    S.tab = S.tab || (me.role === "creator" ? "start" : me.role === "manager" ? "bewerten" : "uebersicht");
     render();
   } catch(e){ fail(e); }
 }
@@ -264,7 +264,7 @@ async function refresh(){
 /* ---------- Login ---------- */
 function loginView(email="", sent=false, err="", mode){
   mode = mode || S._loginMode || "login"; S._loginMode = mode;
-  tabsEl.hidden = true; who.innerHTML = ""; $("#switch").hidden=true; $("#toplogo").hidden=true;
+  bnav.hidden = true; who.innerHTML = ""; $("#switch").hidden=true; $("#toplogo").hidden=true;
   document.querySelector(".wrap").classList.remove("wide");
   const reg = mode==="register", r = S._reg || {};
   view.innerHTML = `<div class="login">
@@ -329,11 +329,19 @@ async function verifyCode(){
 }
 
 /* ---------- Rahmen ---------- */
-const TABS = {
-  creator: [["themen","Meine Themen"]],
-  manager: [["bewerten","Zu bewerten"],["creator","Meine Creator"],["fragen","Sag's uns"],["kalender","Kalender"]],
-  lead:    [["uebersicht","Übersicht"],["fuehrung","Führung"],["bewerten","Zu bewerten"],["kalender","Kalender"],["fragen","Sag's uns & Umfrage"],["personen","Teilnehmer"],["themenedit","Themen & Start"]]
-};
+const ic = (n, cls="") => `<svg class="ico ${cls}" aria-hidden="true"><use href="#${n}"/></svg>`;
+const LEAD_MORE = ["fragen","personen","themenedit","akademie"];
+function navItems(){
+  const me=S.me;
+  if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
+  const mine=new Set(myCreators().map(c=>c.email)), open=S.subs.filter(s=>s.points==null && mine.has(s.creator_email)).length;
+  if (me.role==="manager") return [["bewerten","i-check","Bewerten",open],["creator","i-people","Creator"],["kalender","i-cal","Kalender"],["akademie","i-learn","Lernen"],["fragen","i-mail","Sag's uns"]];
+  return [["uebersicht","i-home","Start"],["bewerten","i-check","Bewerten",open],["kalender","i-cal","Kalender"],...(S.real.role==="lead"?[["fuehrung","i-list","Führung"]]:[]),["mehr","i-grid","Mehr"]];
+}
+function navHtml(){
+  const items=navItems(), cur = S.me.role!=="creator" && LEAD_MORE.includes(S.tab) && items.some(x=>x[0]==="mehr") ? "mehr" : S.tab;
+  return `<div class="bn" style="--n:${items.length}">${items.map(([k,i,l,n])=>`<button ${k==="@kk"?'id="kk-open"':`data-tab="${k}"`} aria-current="${cur===k?"page":"false"}"><span class="bi">${ic(i)}${n?`<i class="dot">${n}</i>`:""}</span>${l}</button>`).join("")}</div>`;
+}
 const ROLE_NAME = { lead:"Agenturleitung", manager:"Manager", creator:"Creator" };
 function applyView(){
   const v=S.viewAs;
@@ -359,19 +367,24 @@ function render(keepScroll){
   const me=S.me;
   const sw=$("#switch"); sw.innerHTML = switcher(); sw.hidden = !sw.innerHTML.trim();
   const st = me.role==="creator" && !me.preview ? streakInfo(me.email).cur : 0;
-  who.innerHTML = `${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}<span class="chip">${esc(me.role==="creator"?firstName(me):S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
-  const t = me.role==="creator" ? [...(inBootcamp(me) ? [["themen","Bootcamp"]] : []), ["akademie","Akademie"], ["kalender","Kalender"]] : [...TABS[me.role], ["akademie","Akademie"]];
-  if (me.role==="creator" && !inBootcamp(me) && S.tab==="themen") S.tab="akademie";
-  if (S.real.role!=="lead" && S.tab==="fuehrung") S.tab=t[0][0];
-  tabsEl.hidden = t.length < 2 || !!S.openArea;
-  tabsEl.innerHTML = t.map(([k,l]) => `<button data-tab="${k}" aria-pressed="${S.tab===k}">${l}</button>`).join("");
+  who.innerHTML = me.role==="creator"
+    ? `${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}<button class="avabtn" data-tab="profil" aria-label="Mein Profil">${esc(initialOf(me))}</button>`
+    : `<span class="chip">${esc(S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
+  if (me.role==="creator"){
+    if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
+    if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
+    if (!["start","lernen","kalender","profil"].includes(S.tab)) S.tab="start";
+  } else if (["start","lernen","profil","themen"].includes(S.tab) || (S.tab==="fuehrung" && S.real.role!=="lead") || (S.tab==="mehr" && me.role!=="lead")) S.tab = me.role==="manager"?"bewerten":"uebersicht";
+  bnav.innerHTML = navHtml(); bnav.hidden = !!S.openArea || !!(S.qz && !S.qz.done);
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
-  if (S.tab==="akademie" && !S.creator) html = S.qz ? quizView() : academyView();
-  else if (S.tab==="kalender" && !S.creator) html = calendarView();
-  else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
-  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : needIntro() ? introView() : creatorHome();
+  if (S.qz && !S.creator) html = quizView();
+  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : ({ lernen:learnView, kalender:calendarView, profil:()=>profileView(me.email) }[S.tab] || startView)();
   else if (S.creator) html = creatorDetail(S.creator);
+  else if (S.tab==="akademie") html = academyView();
+  else if (S.tab==="kalender") html = calendarView();
+  else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
+  else if (S.tab==="mehr") html = moreView();
   else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor }[S.tab] || pendingView)();
   view.innerHTML = html;
   if (!keepScroll) window.scrollTo(0,0);
@@ -433,10 +446,9 @@ function creatorHome(){
   const fresh=newBadges(e), bs=badgesFor(e);
   if (fresh.size) setTimeout(()=>toast("Neues Abzeichen: "+bs.filter(b=>fresh.has(b.k)).map(b=>b.ic+" "+b.t).join(", ")),600);
   const [ht, hp]=heroText(e, pts, done), hello=new Date().getHours()<11?"Guten Morgen":new Date().getHours()<18?"Hey":"Guten Abend";
-  let h = `<div class="stack"><span class="eyebrow">LIVEdream Creator Bootcamp</span><h1>${hello}, <em>${esc(firstName(S.me))}</em></h1></div>
-  <div class="panel"><div class="hero">${ringSvg(pts, maxPts())}<div><p><b>${esc(ht)}</b>${esc(hp)}</p>
-    <div class="badges">${bs.map(b=>`<span class="${b.on?"on":""} ${fresh.has(b.k)?"new":""}" title="${esc(b.t)}${b.on?"":" (noch offen)"}" aria-label="${esc(b.t)}">${b.ic}</span>`).join("")}</div></div></div></div>`;
-  h += reminderBlock(e) + rewardsBlock(e);
+  let h = `<div class="panel"><div class="hero">${ringSvg(pts, maxPts())}<div><p><b>${esc(ht)}</b>${esc(hp)}</p>
+    <button class="chip" data-tab="profil">${ic("i-star")} ${bs.filter(b=>b.on).length} von ${bs.length} Abzeichen</button></div></div></div>`;
+  h += reminderBlock(e);
   if (!snapOf(e,"vorher") && !S.noUpd5) h += snapBlock(e);
   // Weg
   const states=S.areas.map(a=>areaState(e,a));
@@ -464,7 +476,7 @@ function creatorHome(){
   }
   h += `</div>`;
   if (!S.areas.length) h += `<p class="muted">Noch keine Themen angelegt.</p>`;
-  h += surveyBlock(e) + topBlock() + (snapOf(e,"vorher")||S.noUpd5 ? snapBlock(e) : "") + extrasBlock(e) + questionBlock();
+  h += (snapOf(e,"vorher")||S.noUpd5 ? snapBlock(e) : "") + extrasBlock(e);
   return h;
 }
 
@@ -475,7 +487,10 @@ function welcomeExtra(){
 }
 function introKey(){ return "ldb-intro-"+S.me.email; }
 function needIntro(){
-  if (S.tab!=="themen" || !welcomeExtra()) return false;
+  return S.tab==="lernen" && S.learn==="bootcamp" && introPending();
+}
+function introPending(){
+  if (!welcomeExtra()) return false;
   if (S.showIntro) return true;
   const e=S.me.email;
   if (S.viewAs ? S.introSeenView?.[e] : storeGet(introKey())) return false;
@@ -769,9 +784,9 @@ function pendingView(){
     ${open.length ? `<div class="list">${open.map(s=>subCard(s)).join("")}</div>` : `<div class="panel"><p class="muted">Gerade ist nichts offen. 🎉</p></div>`}`;
 }
 function creatorRow(c){
-  const t=total(c.email), st=streakInfo(c.email).cur, b=badgesFor(c.email).filter(x=>x.on);
+  const t=total(c.email), st=streakInfo(c.email).cur, b=badgesFor(c.email).filter(x=>x.on), qr=qzRes(c.email,"streamer"), qt=qr&&qzType("streamer",qr.result);
   return `<button class="row" data-creator="${esc(c.email)}"><div class="head"><b>${esc(label(c))}</b><span class="tag ${t>=10?"gold":""}">${t} / ${maxPts()}</span></div>${dots(c.email)}
-    ${st||b.length?`<div class="mini">${st?`<span class="chip">🔥 ${st}</span>`:""}${b.length?`<span class="chip">${b.map(x=>x.ic).join(" ")}</span>`:""}</div>`:""}</button>`;
+    ${st||b.length||qt?`<div class="mini">${qt?`<span class="chip gold">${ic(TYPE_IC[qt.key]||"i-star")} ${esc(qt.name)}</span>`:""}${st?`<span class="chip">${ic("i-fire")} ${st}</span>`:""}${b.length?`<span class="chip">${ic("i-star")} ${b.length} Abzeichen</span>`:""}</div>`:""}</button>`;
 }
 function managerList(){
   const cs=myCreators();
@@ -782,7 +797,8 @@ function creatorDetail(email){
   const c=member(email); if(!c){ S.creator=null; return ""; }
   let h=`<button class="btn ghost small back" id="back">← Zurück</button>
     <div class="stack"><span class="eyebrow">${esc(member(c.manager_email)?.name?"Manager: "+member(c.manager_email).name:"ohne Manager")}</span><h1>${esc(label(c))}</h1>
-    <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p>${quizBadges(email)}</div>
+    <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p><div class="titles">${titleChips(email,false)}</div></div>
+    <div class="hexes">${allBadges(email).map(hexBadge).join("")}</div>
     ${snapOf(email,"vorher")||snapOf(email,"nachher")?`<div class="panel stack"><h2>Vorher-Nachher</h2><div class="snaps">${["vorher","nachher"].map(k=>{const x=snapOf(email,k); return `<div class="snap">${x?`<a data-path="${esc(x.path)}" target="_blank" rel="noopener"><img data-img="${esc(x.path)}" alt="${k}"></a>`:`<div class="ph">–</div>`}<small>${k==="vorher"?"Vorher":"Nachher"}</small></div>`;}).join("")}</div></div>`:""}
     <div class="list">`;
   for (const a of S.areas){
@@ -855,7 +871,7 @@ function academyView(){
   const seen=storeGet("ldb-extras-"+me.email)||[];
   const groups={}; xs.forEach(x=>{ (groups[x.category||"Allgemein"] ||= []).push(x); });
   let h=`<div class="stack"><span class="eyebrow">LIVEdream Academy</span><h1>Die <em>Akademie</em></h1>
-    <p class="muted">Schulungen, Videos und Infos für alle Creator der LIVEdream Agency. Immer offen, ohne Punkte.</p></div>` + quizCards();
+    <p class="muted">Schulungen, Videos und Infos. Immer offen, ohne Punkte.</p></div>` + (staff ? quizCards() : "");
   if (lead) h += S.noRoster ? `<div class="panel"><p class="err">Zuerst update-6.sql in Supabase ausführen, dann kannst du hier Inhalte hochladen.</p></div>` : `<div class="panel stack"><h2>Inhalt hinzufügen</h2>
     <div class="grid2"><label class="f" for="ak-title">Titel<input id="ak-title" type="text" placeholder="z. B. Schulung Videoproduktion"></label>
     <label class="f" for="ak-cat">Rubrik<input id="ak-cat" type="text" list="ak-cats" placeholder="z. B. Schulungen"><datalist id="ak-cats">${[...new Set(S.extras.map(x=>x.category).filter(Boolean).concat(["Schulungen","Infos","Videos"]))].map(c=>`<option value="${esc(c)}">`).join("")}</datalist></label>
@@ -892,20 +908,29 @@ function quizStart(id){
 }
 function quizView(){
   const R=S.qz, q=QZ().find(x=>x.id===R.id);
-  if (R.done) return quizResult(q, R.result, true);
+  if (R.done) return quizResult(q, R.result, true, R.second);
   const Q=q.questions[R.i], n=q.questions.length;
   return `<button class="btn ghost small back" id="qz-quit">← Abbrechen</button>
   <div class="qzrun"><span class="eyebrow">${esc(q.title)}</span>
     <div class="qzbar"><i style="width:${Math.round(R.i/n*100)}%"></i></div><small class="muted">Frage ${R.i+1} von ${n}</small>
     <h2 class="qzq">${esc(Q.q)}</h2>
-    <div class="qzans">${R.order[R.i].map((j,k)=>`<button class="qzopt" style="--i:${k}" data-qza="${j}">${esc(Q.a[j])}</button>`).join("")}</div></div>`;
+    <div class="qzans">${R.order[R.i].map((j,k)=>`<button class="qzopt" style="--i:${k}" data-qza="${j}">${esc(Q.a[j].t)}</button>`).join("")}</div></div>`;
 }
-function quizResult(q, key, fresh){
+function quizScore(q, picks){
+  const keys=q.types.map(t=>t.key), max={}, sc={}, last={};
+  keys.forEach(k=>{ sc[k]=0; max[k]=q.questions.reduce((a,x)=>a+Math.max(0,...x.a.map(o=>o.w[k]||0)),0)||1; });
+  picks.forEach((a,i)=>{ for (const k in a.w){ sc[k]+=a.w[k]; if (a.w[k]>=2) last[k]=i; } });
+  const rank=keys.slice().sort((a,b)=> (sc[b]/max[b]-sc[a]/max[a]) || ((last[b]??-1)-(last[a]??-1)));
+  return { rank, pct:Object.fromEntries(keys.map(k=>[k,Math.round(sc[k]/max[k]*100)])) };
+}
+function quizResult(q, key, fresh, second){
   const t=q.types.find(x=>x.key===key); if (!t) return "";
+  const t2=second && q.types.find(x=>x.key===second);
   const nische=q.id==="nische";
   return `${fresh?`<button class="btn ghost small back" id="qz-quit">← Zurück</button>`:""}
   <div class="panel stack qzresult ${fresh?"fresh":""}"><span class="eyebrow">${fresh?"Dein Ergebnis":esc(q.title)}</span>
     <div class="qzbig">${t.emoji}</div><h1>${esc(t.name)}</h1><p class="lead"><b>${esc(t.short)}</b></p><p class="soft">${esc(t.text)}</p>
+    ${t2?`<div class="qzsecond"><span>${t2.emoji}</span><span><small class="muted">Dein Zweittyp</small><b>${esc(t2.name)}</b></span></div>`:""}
     <div class="wkh"><span>${nische?"DEINE 3 THEMEN":"DAS PASST ZU DIR"}</span></div>
     <ul class="qzlist">${t.mech.map(m=>`<li>${esc(m)}</li>`).join("")}</ul>
     ${t.ideas?`<div class="wkh"><span>5 VIDEOIDEEN</span></div><ol class="qzlist">${t.ideas.map(m=>`<li>${esc(m)}</li>`).join("")}</ol>`:""}
@@ -916,12 +941,11 @@ async function quizAnswer(j){
   const R=S.qz, q=QZ().find(x=>x.id===R.id); if (!R || R.done || R.busy) return;
   R.busy=true; const b=document.querySelector(`[data-qza="${j}"]`); if (b) b.classList.add("picked");
   await new Promise(r=>setTimeout(r,320)); R.busy=false;
-  R.picks.push(j);
+  R.picks.push(q.questions[R.i].a[j]);
   if (R.i < q.questions.length-1){ R.i++; return render(true); }
-  const sc=q.types.map(()=>0); R.picks.forEach(p=>sc[p]++);
-  const max=Math.max(...sc); let win=R.picks.slice().reverse().find(p=>sc[p]===max);
-  R.result=q.types[win].key; R.done=true;
-  const row={ creator_email:S.me.email, quiz:q.id, result:R.result, scores:Object.fromEntries(q.types.map((t,i)=>[t.key,sc[i]])), created_at:new Date().toISOString() };
+  const { rank, pct }=quizScore(q, R.picks);
+  R.result=rank[0]; R.second=rank[1]; R.done=true;
+  const row={ creator_email:S.me.email, quiz:q.id, result:R.result, scores:{ ...pct, _second:R.second }, created_at:new Date().toISOString() };
   if (!readOnly() && !S.me.preview && !S.noUpd8){
     const r=await sb.from("quiz_results").upsert(row,{ onConflict:"creator_email,quiz" });
     if (r.error) console.warn(r.error);
@@ -934,10 +958,105 @@ function quizBadges(email){
   return xs.length?`<div class="mini">${xs.join("")}</div>`:"";
 }
 
+/* ---------- Neuer Aufbau: Start, Lernen, Profil, Mehr ---------- */
+const initialOf = m => (String(m?.name || m?.handle || "?").trim()[0] || "?").toUpperCase();
+const TYPE_IC = { matcher:"i-sword", gastgeber:"i-heart", entertainer:"i-spark", gamer:"i-game", kuenstler:"i-palette", begleiter:"i-cup", ruhepol:"i-moon", experte:"i-bulb", talkmaster:"i-mic", abenteurer:"i-compass",
+  alltag:"i-home", humor:"i-smile", beauty:"i-gem", kreativ:"i-palette", gaming:"i-game", wissen:"i-bulb", fitness:"i-dumbbell", liebe:"i-heart", tiere:"i-paw", reisen:"i-plane" };
+const BADGE_IC = { first:"i-rocket", week1:"i-star", streak:"i-fire", half:"i-learn", pass:"i-crown", all:"i-trophy", snap:"i-cam" };
+const BADGE_SHORT = { first:"Erste Abgabe", week1:"Woche 1", streak:"3 Tage am Stück", half:"Halbzeit", pass:"Bestanden", all:"Alles abgegeben", snap:"Vorher-Nachher" };
+function titleChips(email, own){
+  return QZ().map(q=>{ const r=qzRes(email,q.id), t=r&&qzType(q.id,r.result);
+    if (t) return `<button class="title ${q.id==="streamer"?"":"alt"}" data-qzshow="${q.id}" data-who="${esc(email)}"><i>${ic(TYPE_IC[t.key]||"i-star")}</i>${esc(t.name)}</button>`;
+    return own ? `<button class="title off" data-qz="${q.id}"><i>${ic("i-quiz")}</i>${esc(q.title)}</button>` : "";
+  }).join("");
+}
+function allBadges(email){
+  const m=member(email)||S.me, out=[];
+  for (const q of QZ()){ const r=qzRes(email,q.id), t=r&&qzType(q.id,r.result);
+    out.push(t ? { ic:TYPE_IC[t.key]||"i-star", t:t.name, on:true, p:true, qz:q.id, who:email } : { ic:"i-quiz", t:q.title, on:false, qz:q.id, play:true }); }
+  if (inBootcamp(m)) for (const b of badgesFor(email)) out.push({ ic:BADGE_IC[b.k]||"i-star", t:BADGE_SHORT[b.k]||b.t, on:b.on, k:b.k });
+  return out;
+}
+function hexBadge(b){
+  const attr = b.qz ? (b.on ? `data-qzshow="${b.qz}" data-who="${esc(b.who||"")}"` : (S.me.role==="creator" ? `data-qz="${b.qz}"` : "disabled")) : "disabled";
+  return `<button class="bd ${b.p?"p":""} ${b.on?"":"off"}" ${attr} title="${esc(b.t)}${b.on?"":" (noch offen)"}"><span class="hx">${ic(b.on?b.ic:(b.play?"i-quiz":b.ic))}</span><small>${esc(b.t)}</small></button>`;
+}
+function nextCard(e){
+  const card=(i,t,sub,attr)=>`<button class="next" ${attr}><span class="nic">${ic(i)}</span><span class="nt"><b>${esc(t)}</b><small>${esc(sub)}</small></span><span class="ngo">${ic("i-chev")}</span></button>`;
+  if (inBootcamp(S.me) && S.areas.length){
+    if (introPending()) return card("i-play","Dein Bootcamp startet","Erst die Begrüßung ansehen",'data-tab="lernen" data-learn="bootcamp"');
+    const states=S.areas.map(a=>areaState(e,a)), i=states.findIndex(x=>x==="open");
+    if (i>=0){ const a=S.areas[i], p=progOf(e,a.n), go=p.video_at||p.quiz_at||p.handout_at||S.localProg?.[a.n];
+      return card("i-play",`Thema ${a.n} · ${a.title}`, go?"Weiter, wo du warst":"Jetzt starten", `data-area="${a.n}" data-state="open"`); }
+    const w=weeks().find(w=>{ const o=weekOpens(w); return o && Date.now()<o.getTime(); });
+    if (w && states.includes("time")) return card("i-lock",`Woche ${w} öffnet ${fmtD(weekOpens(w))}`,"Bis dahin: Akademie und Quizze",'data-tab="lernen" data-learn="akademie"');
+  }
+  const q=QZ().find(q=>!qzRes(e,q.id));
+  if (q) return card("i-quiz", q.title, "Finde heraus, was zu dir passt", `data-qz="${q.id}"`);
+  return card("i-learn","Akademie","Schulungen und Infos ansehen",'data-tab="lernen" data-learn="akademie"');
+}
+function startView(){
+  const e=S.me.email, me=S.me, boot=inBootcamp(me);
+  const fresh=newBadges(e); if (fresh.size){ const bs=badgesFor(e); setTimeout(()=>toast("Neues Abzeichen: "+bs.filter(b=>fresh.has(b.k)).map(b=>b.ic+" "+b.t).join(", ")),600); }
+  const hello=new Date().getHours()<11?"Guten Morgen":new Date().getHours()<18?"Hey":"Guten Abend";
+  const main=QZ()[0] && qzRes(e,QZ()[0].id), mt=main && qzType(main.quiz, main.result);
+  const done=S.areas.filter(a=>["done","wait"].includes(areaState(e,a))).length, fill=S.areas.length?Math.round(done/S.areas.length*100):0;
+  const seen=storeGet("ldb-extras-"+e)||[], newAk=S.extras.filter(x=>x.kind!=="reward" && audOf(x)==="all" && !seen.includes(x.id)).length;
+  const openQz=QZ().filter(q=>!qzRes(e,q.id)).length, t=isoDay(new Date()), now=calItems("all").filter(c=>c.starts<=t && c.ends>=t);
+  const soon=calItems("all").filter(c=>c.starts>t).sort((a,b)=>a.starts.localeCompare(b.starts));
+  const ok=passed(e)||me.preview;
+  const tile=(i,l,attr,extra="")=>`<button class="tile" ${attr}><span class="tic">${ic(i)}</span>${l}${extra}</button>`;
+  const dot=n=>n?`<i class="dot">${n>9?"9+":n}</i>`:"";
+  const camps=[...now,...soon].slice(0,4);
+  return `<div class="hi"><h1>${hello}, <em>${esc(firstName(me))}</em></h1>${mt?`<button class="title" data-qzshow="${main.quiz}" data-who="${esc(e)}"><i>${ic(TYPE_IC[mt.key]||"i-star")}</i>${esc(mt.name)}</button>`:""}</div>
+  ${nextCard(e)}
+  <div class="tiles">
+    ${boot?tile("i-learn","Bootcamp",'data-tab="lernen" data-learn="bootcamp"',`<span class="tbar"><i style="width:${fill}%"></i></span>`):""}
+    ${tile("i-play","Akademie",'data-tab="lernen" data-learn="akademie"',dot(newAk))}
+    ${tile("i-quiz","Quizze",'data-tab="lernen" data-learn="quiz"',dot(openQz))}
+    ${tile("i-cal","Kalender",'data-tab="kalender"',dot(now.length))}
+    ${boot?tile("i-gift","Belohnungen",'id="rw-open"',ok?`<i class="dot">!</i>`:`<small class="tl">ab 10 P</small>`):""}
+    ${tile("i-user","Profil",'data-tab="profil"')}
+  </div>
+  ${boot?reminderBlock(e):""}
+  ${camps.length?`<div class="sec"><span>${now.length?"Läuft gerade":"Kommt bald"}</span><button class="lnk" data-tab="kalender">Alle ansehen</button></div>
+    <div class="camps">${camps.map(c=>`<button class="camp k-${c.kind}" data-cal="${esc(c.id)}"><b>${esc(c.title)}</b><small>${c.starts>t?"ab "+fmtDate(c.starts).replace(/\.\d{4}$/,"."):"bis "+fmtDate(c.ends).replace(/\.\d{4}$/,".")}</small></button>`).join("")}</div>`:""}
+  ${boot?surveyBlock(e)+topBlock():""}`;
+}
+function learnView(){
+  const segs=[...(inBootcamp(S.me)?[["bootcamp","Bootcamp"]]:[]),["akademie","Akademie"],["quiz","Quizze"]];
+  if (!segs.some(x=>x[0]===S.learn)) S.learn=segs[0][0];
+  const top=`<div class="seg seg3" role="group" aria-label="Bereich">${segs.map(([k,l])=>`<button data-learn="${k}" aria-pressed="${S.learn===k}">${l}</button>`).join("")}</div>`;
+  const body = S.learn==="bootcamp" ? (needIntro()?introView():creatorHome()) : S.learn==="akademie" ? academyView() : quizPage();
+  return top + body;
+}
+function quizPage(){
+  return `<div class="stack"><span class="eyebrow">Quizze</span><h1>Wer bist <em>du live?</em></h1><p class="muted">Dein Ergebnis wird dein Titel im Profil.</p></div>` + quizCards().replace(/^<div class="wkh">.*?<\/div>/s,"");
+}
+function profileView(email){
+  const m=member(email)||S.me, mg=member(m.manager_email), boot=inBootcamp(m), own=email===S.me.email;
+  const bs=allBadges(email), on=bs.filter(b=>b.on).length;
+  return `<div class="prof"><span class="ava">${esc(initialOf(m))}</span><b>${esc(m.name||label(m))}</b>
+    <small class="muted">${m.handle?"@"+esc(String(m.handle).replace(/^@/,"")):""}${mg?` · Manager: ${esc(mg.name)}`:""}</small>
+    <div class="titles">${titleChips(email, own && S.me.role==="creator")}</div></div>
+  <div class="stats">${boot?`<div><b>${total(email)}</b><small>Punkte</small></div>`:""}<div><b>${streakInfo(email).cur}</b><small>Tage am Stück</small></div><div><b>${on}</b><small>Abzeichen</small></div></div>
+  <div class="sec"><span>Abzeichen</span><small>${on} von ${bs.length}</small></div>
+  <div class="hexes">${bs.map(hexBadge).join("")}</div>
+  ${own && !S.viewAs ? `<button class="btn ghost small" id="logout">${ic("i-out")} Abmelden</button>` : ""}`;
+}
+function moreView(){
+  const qn=S.questions.filter(q=>!q.answer && !q.published).length;
+  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"]];
+  return `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Mehr</h1></div>
+  <div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}</div>`;
+}
+
+
 /* ---------- Sag's uns (anonym) ---------- */
 const KK_KINDS = [["frage","❓ Frage"],["kritik","💬 Kritik"],["wunsch","✨ Wunsch"]];
 const kkLabel = k => (KK_KINDS.find(x=>x[0]===(k||"frage"))||KK_KINDS[0])[1];
-function fab(){
+function fab(){ $("#kk-fab")?.remove(); }
+function fabOld(){
   let b=$("#kk-fab");
   if (!b){ b=document.createElement("button"); b.id="kk-fab"; b.className="fab"; b.setAttribute("aria-label","Anonyme Nachricht schreiben");
     b.innerHTML=`<span class="ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></svg></span><span class="tx"><b>Sag's uns</b><small>anonym</small></span>`; document.body.appendChild(b); }
@@ -1424,20 +1543,24 @@ document.addEventListener("click", async e => {
   if (t.id==="to-register"){ S._loginMode="register"; return loginView($("#email")?.value||""); }
   if (t.id==="to-login"){ S._loginMode="login"; return loginView($("#email")?.value||""); }
   if (t.id==="logout"){ await sb.auth.signOut(); Object.assign(S,{me:null,real:null,viewAs:"",tab:null,creator:null,openArea:null,ringShown:false,localProg:{}}); return loginView(); }
-  if (t.dataset.tab){ S.qz=null; S.tab=t.dataset.tab; S.creator=null; S.editMember=null; return render(); }
+  if (t.dataset.tab){ closeSheet(); S.qz=null; S.tab=t.dataset.tab; if (t.dataset.learn) S.learn=t.dataset.learn; S.creator=null; S.editMember=null; return render(); }
   if (t.dataset.area){
     const st=t.dataset.state;
     if (st==="lock") return toast("Gib zuerst das Thema davor ab.");
     if (st==="time") return toast("Diese Woche öffnet am Montag um 0 Uhr.");
+    if (S.me.role==="creator"){ S.tab="lernen"; S.learn="bootcamp"; }
     S.openArea=+t.dataset.area; return render();
   }
   if (t.id==="cert") return certificate();
   if (t.id==="intro-go") return introFinish();
   if (t.id==="intro-again"){ S.showIntro=true; return render(); }
   if (t.id==="qsend") return sendQuestion();
-  if (t.id==="kk-fab" || t.id==="kk-open"){ $("#fab-tip")?.remove(); return openKK(); }
-  if (t.dataset.qz){ const r=S.me.role==="creator" && qzRes(S.me.email,t.dataset.qz); if (r){ const q=QZ().find(x=>x.id===t.dataset.qz); return sheet(quizResult(q, r.result, false)); } return quizStart(t.dataset.qz); }
-  if (t.dataset.qzAgain){ closeSheet(); S.tab="akademie"; return quizStart(t.dataset.qzAgain); }
+  if (t.id==="kk-fab" || t.id==="kk-open") return openKK();
+  if (t.dataset.qz){ const r=S.me.role==="creator" && qzRes(S.me.email,t.dataset.qz); if (r){ const q=QZ().find(x=>x.id===t.dataset.qz); return sheet(quizResult(q, r.result, false, r.scores?._second)); } return quizStart(t.dataset.qz); }
+  if (t.dataset.qzAgain){ closeSheet(); return quizStart(t.dataset.qzAgain); }
+  if (t.dataset.qzshow){ const q=QZ().find(x=>x.id===t.dataset.qzshow), r=qzRes(t.dataset.who||S.me.email, q?.id); if (q&&r) return sheet(quizResult(q, r.result, false, r.scores?._second)); return; }
+  if (t.dataset.learn){ S.learn=t.dataset.learn; S.qz=null; return render(); }
+  if (t.id==="rw-open") return sheet(`<div class="stack">${rewardsBlock(S.me.email)}</div>`);
   if (t.dataset.qza) return quizAnswer(+t.dataset.qza);
   if (t.id==="qz-quit"){ S.qz=null; return render(); }
   if (t.dataset.kk){ S.kkDraft=$("#qbox")?.value||""; S.kkKind=t.dataset.kk; return openKK(); }
@@ -1506,7 +1629,7 @@ document.addEventListener("change", e => {
     S.pending[n]=[...(S.pending[n]||[]), ...fs.filter(f=>f.size<=MAX_FILE)];
     e.target.value=""; $("#pend").innerHTML=pendList(n);
   }
-  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?(inBootcamp(S.me)?"themen":"akademie"):S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
+  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"start":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
   if (e.target.id==="ro-file"){ const f=e.target.files[0]; if(f) f.text().then(tx=>{ $("#ro-text").value=tx; toast("Datei eingelesen. Jetzt „Vorschau“ tippen."); }); return; }
   if (e.target.dataset.snap) return uploadSnap(e.target.dataset.snap, e.target.files[0]);
   if (e.target.id==="cal-showcamp"){ S.calShowCamp=e.target.checked; return render(true); }
