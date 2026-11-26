@@ -82,17 +82,19 @@ const db = {
           {creator_email:"c3@demo", month:YM, title:"15 Lives im Monat", target:15, unit:"Lives", current:15, done:true, set_by:"max@demo"}]
 };
 db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootcamp=true; });
-{ const at=(d,h,m=0)=>{ const x=new Date(); x.setDate(x.getDate()+d); x.setHours(h,m,0,0); return x.toISOString(); };
-  db.slots=[
-    {id:"sl1", owner_email:"lena@demo", starts_at:at(1,18), minutes:30, how:"WhatsApp-Anruf", booked_by:"c2@demo", topic:"Meine Lives laufen gerade schlecht, ich brauche Ideen."},
-    {id:"sl2", owner_email:"lena@demo", starts_at:at(1,18,30), minutes:30, how:"WhatsApp-Anruf"},
-    {id:"sl3", owner_email:"lena@demo", starts_at:at(2,17), minutes:30, how:"Videoanruf"},
-    {id:"sl4", owner_email:"lena@demo", starts_at:at(2,17,30), minutes:30, how:"Videoanruf"},
-    {id:"sl5", owner_email:"lena@demo", starts_at:at(4,12), minutes:45, how:"Telefon"},
-    {id:"sl6", owner_email:"demo@demo", starts_at:at(1,19), minutes:30, how:"WhatsApp-Anruf", booked_by:"c5@demo", topic:"Wie komme ich in die Top 5?"},
-    {id:"sl7", owner_email:"demo@demo", starts_at:at(3,19), minutes:30, how:"WhatsApp-Anruf"},
-    {id:"sl8", owner_email:"max@demo", starts_at:at(2,20), minutes:30, how:"WhatsApp-Anruf", booked_by:"c3@demo", topic:"Kampagne im Dezember"},
-    {id:"sl9", owner_email:"max@demo", starts_at:at(5,20), minutes:30, how:"WhatsApp-Anruf"}];
+{ const at=(d,h,m=0)=>{ const x=new Date(); x.setDate(x.getDate()+d); x.setHours(h,m,0,0); return x; };
+  const nextDow=(w,h,m=0)=>{ const x=new Date(); x.setHours(h,m,0,0); let k=((w-((x.getDay()+6)%7+1))+7)%7; if(k===0) k=7; x.setDate(x.getDate()+k); return x.toISOString(); };
+  db.avail=[
+    {id:"av1", owner_email:"lena@demo", weekday:1, t_from:"11:00", t_to:"13:00", minutes:30, how:"WhatsApp-Anruf"},
+    {id:"av2", owner_email:"lena@demo", weekday:4, t_from:"17:00", t_to:"19:00", minutes:30, how:"Videoanruf"},
+    {id:"av3", owner_email:"demo@demo", weekday:1, t_from:"11:00", t_to:"13:00", minutes:30, how:"WhatsApp-Anruf"},
+    {id:"av4", owner_email:"demo@demo", weekday:3, t_from:"18:00", t_to:"20:00", minutes:30, how:"WhatsApp-Anruf"},
+    {id:"av5", owner_email:"max@demo", weekday:2, t_from:"19:00", t_to:"21:00", minutes:30, how:"WhatsApp-Anruf"}];
+  db.avail_off=[];
+  db.bookings=[
+    {id:"bk1", owner_email:"lena@demo", creator_email:"c2@demo", starts_at:nextDow(1,11,30), minutes:30, how:"WhatsApp-Anruf", topic:"Meine Lives laufen gerade schlecht, ich brauche Ideen."},
+    {id:"bk2", owner_email:"demo@demo", creator_email:"c5@demo", starts_at:nextDow(3,18), minutes:30, how:"WhatsApp-Anruf", topic:"Wie komme ich in die Top 5?"},
+    {id:"bk3", owner_email:"max@demo", creator_email:"c3@demo", starts_at:nextDow(2,19,30), minutes:30, how:"WhatsApp-Anruf", topic:"Kampagne im Dezember"}];
 }
 const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"], goals:["creator_email","month"], referrals:["recruit_handle"], guide_checks:["creator_email","item"], guide_notes:["creator_email","chapter"] };
 function q(t){

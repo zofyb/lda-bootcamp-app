@@ -699,3 +699,37 @@ button.tslot:hover{border-color:var(--rose);box-shadow:0 0 0 1px var(--rose) ins
 .tmine{border-color:rgba(255,176,23,.4)}
 .tbig{font-family:var(--head);font-size:19px;line-height:1.25}
 .tsub{padding:10px 0 0;margin-top:10px;border-top:1px solid var(--line)}
+/* 1:1-Termine: Monatskalender + Tagesansicht */
+.tgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.tcd{position:relative;aspect-ratio:1/1;max-height:64px;border-radius:12px;border:1px solid transparent;background:transparent;color:var(--soft);font:500 14px var(--body);font-variant-numeric:tabular-nums;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0}
+.tcd.out{color:var(--lock)}
+.tcd.past{opacity:.45}
+.tcd.has{background:linear-gradient(160deg,rgba(214,64,159,.22),rgba(123,47,201,.16));border-color:rgba(214,64,159,.45);color:#fff;font-weight:700}
+.tcd.off{background:repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 4px,transparent 4px 8px);color:var(--muted);border-color:var(--line)}
+.tcd.today>span{color:var(--gold);font-weight:700}
+.tcd.sel{box-shadow:0 0 0 2px var(--gold) inset;border-color:transparent}
+.tcd:hover:not(.past){border-color:var(--line2)}
+.tdot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 6px var(--gold)}
+.tn{display:inline-grid;place-items:center;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--gold);color:#1b0d00;font:700 10.5px var(--body);font-style:normal}
+.tcd .tn{position:absolute;top:3px;right:3px}
+.tleg{display:flex;flex-wrap:wrap;gap:14px;padding:10px 6px 2px;font-size:11.5px;color:var(--muted)}
+.tleg span{display:inline-flex;align-items:center;gap:6px}
+.tl{width:14px;height:14px;border-radius:4px;display:inline-block}
+.tl.has{background:linear-gradient(160deg,rgba(214,64,159,.4),rgba(123,47,201,.3));border:1px solid rgba(214,64,159,.6)}
+.tl.off{background:repeating-linear-gradient(135deg,rgba(255,255,255,.2) 0 2px,transparent 2px 4px);border:1px solid var(--line2)}
+.tdhead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.tslot.gone{opacity:.4;cursor:default;text-decoration:line-through;text-decoration-thickness:1px}
+.tslot.gone small{text-decoration:none}
+.tlist{display:grid;gap:6px}
+.titem{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
+.titem>b{font-variant-numeric:tabular-nums;font-size:14px}
+.titem>div{display:grid;gap:2px;min-width:0}
+.titem small{color:var(--muted);font-size:12px}
+.titem.bk{border-color:rgba(255,176,23,.45);background:linear-gradient(135deg,rgba(255,176,23,.1),rgba(214,64,159,.06))}
+.titem.bk span{font-weight:600}
+.trules{display:grid;gap:6px}
+.trule{display:grid;grid-template-columns:96px 1fr auto;gap:10px;align-items:center;padding:8px 8px 8px 12px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.03)}
+.trule span{color:var(--soft);font-size:13px}
+.trule .tx,.titem .tx{width:26px;height:26px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--muted);font-size:15px;cursor:pointer}
+button.row.tnext{display:grid;gap:2px;text-align:left;width:100%;font:inherit;color:var(--fg);cursor:pointer}
+@media (max-width:420px){.trule{grid-template-columns:1fr auto}.trule span{grid-column:1}.trule .tx{grid-row:1/3;grid-column:2}}

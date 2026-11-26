@@ -271,7 +271,9 @@ async function refresh(){
   if (S.me?.role!=="creator"){ const [gc,gn]=await Promise.all([ sb.from("guide_checks").select("*"), sb.from("guide_notes").select("*") ]); S.noUpd13=!!(gc.error||gn.error); S.gchk=gc.data||[]; S.gnote=gn.data||[]; }
   S.noUpd11=!!rf.error; S.refs=rf.data||[];
   S.noUpd9=!!(xe.error||bs.error||gl.error); S.xp=xe.data||[]; S.bs=bs.data||[]; S.goals=gl.data||[]; S.bsTop=bt.error?[]:(bt.data||[]);
-  const sl=await sb.from("slots").select("*").gte("starts_at", new Date(Date.now()-DAY).toISOString()).order("starts_at"); S.noUpd14=!!sl.error; S.slots=sl.data||[];
+  const [av,ao,bk]=await Promise.all([ sb.from("avail").select("*").order("weekday"), sb.from("avail_off").select("*"), sb.from("bookings").select("*").gte("starts_at", new Date(Date.now()-DAY).toISOString()).order("starts_at") ]);
+  S.noUpd14=!!(av.error||ao.error||bk.error); S.av=av.data||[]; S.avOff=ao.data||[]; S.bk=bk.data||[];
+  if (!S.noUpd14 && S.real?.role==="creator"){ const bz=await sb.rpc("busy_times"); S.busy=new Set(Array.isArray(bz.data)?bz.data.map(x=>+new Date(x)):[]); }
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
   if (!S.noUpd7 && S.real?.role==="lead"){ const tk=await sb.from("tasks").select("*").order("created_at"); S.tasks=tk.data||[]; }
   S.snaps = sn.data||[]; S.questions = qu.data||[]; S.survey = sv.data||[]; S.top = tp.error ? [] : (tp.data||[]);
@@ -1212,34 +1214,66 @@ function leadDash(){
       ${k("i-rocket",rf,"Recruiting","recruit",1)}
       ${!S.noUpd7?k("i-cal",drafts,"Freigeben","kalender",1):""}
       ${lead&&!S.noUpd7?k("i-list",tasks,"Aufgaben fällig","fuehrung",1):""}
-      ${!S.noUpd14?k("i-clock",upSlots().filter(s=>s.booked_by && s.owner_email===S.me.email).length,"1:1 gebucht","termine"):""}
+      ${!S.noUpd14?k("i-clock",upBk().filter(b=>b.owner_email===S.me.email).length,"1:1 gebucht","termine"):""}
       ${k("i-people",regs,"Registriert","personen")}
       ${!S.noUpd7?k("i-fire",live,"Kampagnen live","kalender"):""}
     </div>`;
 }
 
-/* ---------- 1:1-Termine: Leitung und Manager tragen freie Zeiten ein, Creator buchen beim eigenen Manager ---------- */
+/* ---------- 1:1-Termine: feste Wochenzeiten (Leitung + Manager), Creator buchen im Kalender beim eigenen Manager ---------- */
 const HOW = ["WhatsApp-Anruf","Videoanruf","Telefon"];
-const slotDT = s => new Date(s.starts_at);
+const WDL = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
+const hm = t => String(t||"").slice(0,5);
+const toMin = t => { const [h,m]=String(t).split(":").map(Number); return h*60+(m||0); };
+const isoDow = d => (d.getDay()+6)%7+1;
 const fmtDay = d => d.toLocaleDateString("de-DE",{ weekday:"long", day:"numeric", month:"long" });
 const fmtDayS = d => d.toLocaleDateString("de-DE",{ weekday:"short", day:"numeric", month:"numeric" });
 const fmtTime = d => d.toLocaleTimeString("de-DE",{ hour:"2-digit", minute:"2-digit" });
-const upSlots = () => (S.slots||[]).filter(s=>+slotDT(s)+s.minutes*6e4 > Date.now()).sort((a,b)=>slotDT(a)-slotDT(b));
-const myBooking = () => S.me?.role==="creator" ? upSlots().find(s=>s.booked_by===S.me.email) : null;
-const soonBooked = () => S.noUpd14 ? 0 : upSlots().filter(s=>s.booked_by && s.owner_email===S.me.email && +slotDT(s) < Date.now()+7*DAY).length;
-function byDay(list, fn){
-  const g={}; list.forEach(s=>{ const k=isoDay(slotDT(s)); (g[k]=g[k]||[]).push(s); });
-  return `<div class="tdays">${Object.values(g).map(xs=>`<div class="tday"><b>${fmtDay(slotDT(xs[0]))}</b><div class="tslots">${xs.map(fn).join("")}</div></div>`).join("")}</div>`;
+const bkAt = b => new Date(b.starts_at);
+const upBk = () => (S.bk||[]).filter(b=>+bkAt(b)+b.minutes*6e4 > Date.now()).sort((a,b)=>bkAt(a)-bkAt(b));
+const myBooking = () => S.me?.role==="creator" ? upBk().find(b=>b.creator_email===S.me.email) : null;
+const soonBooked = () => S.noUpd14 ? 0 : upBk().filter(b=>b.owner_email===S.me.email && +bkAt(b) < Date.now()+7*DAY).length;
+const termOwner = () => S.me.role==="creator" ? S.me.manager_email : S.me.email;
+function busySet(owner){
+  if (S.real?.role==="creator") return S.busy || new Set();
+  return new Set((S.bk||[]).filter(b=>b.owner_email===owner).map(b=>+bkAt(b)));
+}
+const bookable = x => !x.busy && +x.at > Date.now()+36e5 && +x.at < Date.now()+56*DAY;
+function daySlots(owner, d){
+  const key=isoDay(d), off=(S.avOff||[]).some(o=>o.owner_email===owner && o.day===key), busy=busySet(owner), seen=new Set(), list=[];
+  if (!off) (S.av||[]).filter(a=>a.owner_email===owner && +a.weekday===isoDow(d)).forEach(a=>{
+    for (let m=toMin(a.t_from); m+a.minutes<=toMin(a.t_to); m+=a.minutes){
+      const at=new Date(d.getFullYear(),d.getMonth(),d.getDate(),Math.floor(m/60),m%60);
+      if (!seen.has(+at)){ seen.add(+at); list.push({ at, minutes:a.minutes, how:a.how }); } } });
+  const bks=(S.bk||[]).filter(b=>b.owner_email===owner && isoDay(bkAt(b))===key);
+  bks.forEach(b=>{ if (!seen.has(+bkAt(b))){ seen.add(+bkAt(b)); list.push({ at:bkAt(b), minutes:b.minutes, how:b.how }); } });
+  list.forEach(x=>{ x.booking=bks.find(b=>+bkAt(b)===+x.at)||null; x.busy=!!x.booking || busy.has(+x.at); });
+  return { off, list:list.sort((a,b)=>a.at-b.at) };
+}
+function tMonth(){ if (!S.tMonth){ const n=new Date(); S.tMonth=new Date(n.getFullYear(), n.getMonth(), 1); } return S.tMonth; }
+function termCal(owner, staff){
+  const m0=tMonth(), y=m0.getFullYear(), mo=m0.getMonth(), first=new Date(y,mo,1), start=new Date(first); start.setDate(1-((first.getDay()+6)%7));
+  const today=isoDay(new Date()), t0=new Date(); t0.setHours(0,0,0,0);
+  let h=`<div class="cal tcal"><div class="calhead"><button class="chip" data-tnav="-1" aria-label="Vorheriger Monat">‹</button><b>${MONTHS[mo]} ${y}</b><button class="chip" data-tnav="1" aria-label="Nächster Monat">›</button></div>
+    <div class="caldow">${["Mo","Di","Mi","Do","Fr","Sa","So"].map(d=>`<span>${d}</span>`).join("")}</div><div class="tgrid">`;
+  for (let i=0;i<42;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i); if (i>=35 && d.getMonth()!==mo) break;
+    const k=isoDay(d), past=d<t0, ds=daySlots(owner,d);
+    const n = staff ? ds.list.filter(x=>x.booking).length : ds.list.filter(bookable).length, has = staff ? ds.list.length>0 : n>0;
+    h+=`<button class="tcd ${d.getMonth()!==mo?"out":""} ${k===today?"today":""} ${past?"past":""} ${has&&!past?"has":""} ${ds.off?"off":""} ${S.tDay===k?"sel":""}" data-tday="${k}">
+      <span>${d.getDate()}</span>${staff ? (n?`<i class="tn">${n}</i>`:"") : (has&&!past?`<i class="tdot"></i>`:"")}</button>`;
+  }
+  return h+`</div><div class="tleg">${staff?`<span><i class="tl has"></i>Deine Zeiten</span><span><i class="tn">1</i>Gebucht</span><span><i class="tl off"></i>Gesperrt</span>`:`<span><i class="tl has"></i>Freie Termine</span>`}</div></div>`;
 }
 function termTeaser(){
   if (S.noUpd14 || S.me.preview) return "";
   const me=S.me;
   if (me.role==="creator"){
     const mg=member(me.manager_email), b=myBooking(); if (!mg) return "";
-    return `<button class="remind tteaser" data-tab="termine"><span class="kic">${ic("i-clock")}</span><div><b>1:1-Termin mit ${esc(firstName(mg))}</b><small>${b?`Gebucht: ${fmtDayS(slotDT(b))}, ${fmtTime(slotDT(b))} Uhr`:"Freie Zeit aussuchen und buchen"}</small></div><span class="rgo">${ic("i-chev")}</span></button>`;
+    return `<button class="remind tteaser" data-tab="termine"><span class="kic">${ic("i-clock")}</span><div><b>1:1-Termin mit ${esc(firstName(mg))}</b><small>${b?`Gebucht: ${fmtDayS(bkAt(b))}, ${fmtTime(bkAt(b))} Uhr`:"Tag aussuchen und Termin buchen"}</small></div><span class="rgo">${ic("i-chev")}</span></button>`;
   }
-  const mine=upSlots().filter(s=>s.owner_email===me.email), bk=mine.filter(s=>s.booked_by).length;
-  return `<button class="remind tteaser" data-tab="termine"><span class="kic">${ic("i-clock")}</span><div><b>Meine 1:1-Termine</b><small>${bk} gebucht · ${mine.length-bk} frei</small></div><span class="rgo">${ic("i-chev")}</span></button>`;
+  const bk=upBk().filter(b=>b.owner_email===me.email).length, rules=(S.av||[]).filter(a=>a.owner_email===me.email).length;
+  return `<button class="remind tteaser" data-tab="termine"><span class="kic">${ic("i-clock")}</span><div><b>Meine 1:1-Termine</b><small>${rules?`${bk} gebucht`:"Noch keine festen Zeiten eingestellt"}</small></div><span class="rgo">${ic("i-chev")}</span></button>`;
 }
 function termView(){
   if (S.noUpd14) return `<div class="stack"><span class="eyebrow">1:1-Termine</span><h1>Termin <em>buchen</em></h1></div><div class="panel"><p class="${S.real.role==="lead"?"err":"muted"}" style="margin:0">${S.real.role==="lead"?"Zuerst update-14-termine.sql in Supabase ausführen.":"Die Terminbuchung kommt bald."}</p></div>`;
@@ -1248,23 +1282,27 @@ function termView(){
 function termCreator(){
   const me=S.me, mg=member(me.manager_email), mine=myBooking();
   let h=`<div class="stack"><span class="eyebrow">1:1-Termin</span><h1>Termin mit <em>${esc(mg?firstName(mg):"deinem Manager")}</em></h1>
-    <p class="muted">Such dir eine freie Zeit aus und schreib kurz dazu, worüber ihr sprechen wollt.</p></div>`;
+    <p class="muted">Tipp auf einen markierten Tag und such dir eine freie Zeit aus.</p></div>`;
   if (!mg) return h+`<div class="panel"><p class="muted" style="margin:0">Dir ist gerade noch kein Manager zugeordnet. Sobald das passiert ist, kannst du hier einen Termin buchen.</p></div>`;
-  if (mine){ const d=slotDT(mine);
+  if (mine){ const d=bkAt(mine);
     h+=`<div class="panel stack tmine"><span class="eyebrow">Dein Termin</span><b class="tbig">${fmtDay(d)}, ${fmtTime(d)} Uhr</b>
       <small class="muted">${mine.minutes} Min. · ${esc(mine.how)} mit ${esc(firstName(mg))}</small>${mine.topic?`<p class="soft" style="margin:0">„${esc(mine.topic)}“</p>`:""}
-      <div class="actions"><button class="btn small ghost" data-slotcancel="${esc(mine.id)}">${S.confirmDelete==="sl"+mine.id?"Wirklich absagen?":"Termin absagen"}</button></div></div>
-      <p class="muted">Du kannst immer einen Termin offen haben. Ist er vorbei oder abgesagt, kannst du den nächsten buchen.</p>`;
-    return h; }
-  const free=upSlots().filter(s=>!s.booked_by && s.owner_email===me.manager_email && +slotDT(s) > Date.now()+36e5);
-  if (!free.length) return h+`<div class="panel"><p class="muted" style="margin:0">${esc(firstName(mg))} hat gerade keine freien Zeiten eingetragen. Schau bald wieder rein.</p></div>`;
-  return h+`<div class="sec"><span>Freie Zeiten</span><small>Tippen zum Buchen</small></div>`+byDay(free, s=>`<button class="tslot" data-slotbook="${esc(s.id)}">${fmtTime(slotDT(s))}<small>${s.minutes} Min.</small></button>`);
+      <div class="actions"><button class="btn small ghost" data-bkcancel="${esc(mine.id)}">${S.confirmDelete==="bk"+mine.id?"Wirklich absagen?":"Termin absagen"}</button></div>
+      <small class="muted">Ist der Termin vorbei oder abgesagt, kannst du den nächsten buchen.</small></div>`; }
+  if (!(S.av||[]).some(a=>a.owner_email===mg.email)) return h+`<div class="panel"><p class="muted" style="margin:0">${esc(firstName(mg))} hat noch keine Zeiten für Termine eingestellt. Schau bald wieder rein.</p></div>`;
+  h+=termCal(mg.email,false);
+  if (S.tDay){ const d=new Date(S.tDay+"T00:00"), ds=daySlots(mg.email,d), vis=ds.list.filter(x=>+x.at>Date.now());
+    h+=`<div class="panel stack tdayv"><b class="tbig">${fmtDay(d)}</b>
+      ${!vis.length?`<p class="muted" style="margin:0">An diesem Tag gibt es keine freien Zeiten.</p>`
+      :`<div class="tslots">${vis.map(x=>bookable(x)&&!mine?`<button class="tslot" data-tbook="${+x.at}">${fmtTime(x.at)}<small>${x.minutes} Min.</small></button>`:`<span class="tslot gone">${fmtTime(x.at)}<small>${x.busy?"vergeben":mine?"–":"zu kurzfristig"}</small></span>`).join("")}</div>
+       <small class="muted">${esc(vis[0].how)} mit ${esc(firstName(mg))}${mine?" · Du hast schon einen Termin.":""}</small>`}</div>`; }
+  return h;
 }
-function openBook(id){
-  const s=S.slots.find(x=>x.id===id); if (!s) return; const d=slotDT(s), mg=member(s.owner_email);
-  S._book=id;
+function openBook(ms){
+  const mg=member(S.me.manager_email), d=new Date(+ms), x=daySlots(mg?.email, new Date(d.getFullYear(),d.getMonth(),d.getDate())).list.find(s=>+s.at===+ms); if (!x) return;
+  S._book=+ms;
   sheet(`<div class="sh"><span class="eyebrow">1:1-Termin buchen</span><h2>${fmtDay(d)}, ${fmtTime(d)} Uhr</h2></div>
-    <p class="muted" style="margin:0">${s.minutes} Min. · ${esc(s.how)} mit ${esc(mg?firstName(mg):"deinem Manager")}</p>
+    <p class="muted" style="margin:0">${x.minutes} Min. · ${esc(x.how)} mit ${esc(mg?firstName(mg):"deinem Manager")}</p>
     <label class="f" for="sl-topic">Worüber möchtest du sprechen?<textarea id="sl-topic" maxlength="500" placeholder="Zum Beispiel: Meine Lives laufen gerade schlecht, ich brauche Ideen"></textarea></label>
     <button class="btn" id="sl-book">${ic("i-check")} Termin buchen</button>`);
 }
@@ -1272,73 +1310,80 @@ const BOOK_MSG = { ok:"Termin gebucht!", taken:"Die Zeit ist leider gerade wegge
 async function bookSlot(){
   if (S.viewAs || S.me.preview) return toast("In der Vorschau wird nichts gebucht.");
   const btn=$("#sl-book"); btn.disabled=true;
-  const r=await sb.rpc("book_slot",{ sid:S._book, t:$("#sl-topic").value.trim() }); if (r.error){ btn.disabled=false; return fail(r.error); }
+  const r=await sb.rpc("book_slot",{ st:new Date(S._book).toISOString(), t:$("#sl-topic").value.trim() }); if (r.error){ btn.disabled=false; return fail(r.error); }
   closeSheet(); toast(BOOK_MSG[r.data]||"Gespeichert."); await refresh(); render(true);
 }
 async function cancelMine(id){
   if (S.viewAs || S.me.preview) return toast("In der Vorschau wird nichts geändert.");
-  if (S.confirmDelete!=="sl"+id){ S.confirmDelete="sl"+id; return render(true); }
-  S.confirmDelete=null; const r=await sb.rpc("cancel_slot",{ sid:id }); if (r.error) return fail(r.error);
+  if (S.confirmDelete!=="bk"+id){ S.confirmDelete="bk"+id; return render(true); }
+  S.confirmDelete=null; const r=await sb.rpc("cancel_booking",{ bid:id }); if (r.error) return fail(r.error);
   toast(r.data==="ok"?"Termin abgesagt.":"Der Termin konnte nicht mehr abgesagt werden."); await refresh(); render(true);
 }
 function termStaff(){
-  const me=S.me, lead=S.real.role==="lead" && !S.viewAs, all=upSlots(), mine=all.filter(s=>s.owner_email===me.email);
-  const booked=mine.filter(s=>s.booked_by), free=mine.filter(s=>!s.booked_by);
+  const me=S.me, lead=S.real.role==="lead" && !S.viewAs, rules=(S.av||[]).filter(a=>a.owner_email===me.email).sort((a,b)=>a.weekday-b.weekday||toMin(a.t_from)-toMin(b.t_from));
   const opt=(v,l,sel)=>`<option value="${v}" ${sel?"selected":""}>${l}</option>`;
-  let h=`<div class="stack"><span class="eyebrow">1:1-Termine</span><h1>Meine <em>Termine</em></h1>
-    <p class="muted">Trag freie Zeiten ein. Deine Creator buchen sie direkt in der App und schreiben dazu, worum es gehen soll.</p></div>
-  <div class="panel stack"><h2>Freie Zeiten eintragen</h2>
+  const rulesPanel=`<div class="panel stack"><h2>Meine festen Zeiten</h2>
+    <p class="muted" style="margin:0">Zum Beispiel montags 11 bis 13 Uhr. Daraus macht die App Termine im Kalender, die deine Creator buchen können.</p>
+    ${rules.length?`<div class="trules">${rules.map(a=>`<div class="trule"><b>${WDL[a.weekday-1]}</b><span>${hm(a.t_from)}–${hm(a.t_to)} Uhr · ${a.minutes} Min. · ${esc(a.how)}</span><button class="tx" data-avdel="${esc(a.id)}" aria-label="Zeit löschen">×</button></div>`).join("")}</div>`:""}
     <div class="tform">
-      <label class="f" for="sl-date">Datum<input id="sl-date" type="date" min="${isoDay(new Date())}" value="${isoDay(new Date(Date.now()+DAY))}"></label>
-      <label class="f" for="sl-time">Ab Uhrzeit<input id="sl-time" type="time" value="18:00" step="900"></label>
-      <label class="f" for="sl-min">Dauer<select id="sl-min">${[15,30,45,60].map(m=>opt(m,m+" Min.",m===30)).join("")}</select></label>
-      <label class="f" for="sl-n">Termine hintereinander<select id="sl-n">${[1,2,3,4,5,6,8].map(n=>opt(n,n===1?"1 Termin":n+" Termine",n===1)).join("")}</select></label>
-      <label class="f" for="sl-how">Wie<select id="sl-how">${HOW.map(x=>opt(x,x)).join("")}</select></label>
-      <label class="f" for="sl-rep">Wiederholen<select id="sl-rep">${opt(1,"Nur an diesem Tag",1)}${opt(4,"4 Wochen jede Woche")}${opt(8,"8 Wochen jede Woche")}</select></label>
+      <label class="f" for="av-wd">Wochentag<select id="av-wd">${WDL.map((w,i)=>opt(i+1,w,i===0)).join("")}</select></label>
+      <label class="f" for="av-from">Von<input id="av-from" type="time" value="11:00" step="900"></label>
+      <label class="f" for="av-to">Bis<input id="av-to" type="time" value="13:00" step="900"></label>
+      <label class="f" for="av-min">Termin-Länge<select id="av-min">${[15,20,30,45,60].map(m=>opt(m,m+" Min.",m===30)).join("")}</select></label>
+      <label class="f" for="av-how">Wie<select id="av-how">${HOW.map(x=>opt(x,x)).join("")}</select></label>
     </div>
-    <button class="btn small" id="sl-add">${ic("i-clock")} Zeiten eintragen</button></div>
-  <div class="sec"><span>Gebucht</span><small>${booked.length}</small></div>
-  ${booked.length?`<div class="list">${booked.map(s=>slotRow(s,false)).join("")}</div>`:`<p class="muted">Noch keine Buchungen.</p>`}
-  <div class="sec"><span>Frei</span><small>${free.length}</small></div>
-  ${free.length?byDay(free, s=>`<span class="tslot free">${fmtTime(slotDT(s))}<small>${s.minutes} Min.</small><button class="tx" data-slotdel="${esc(s.id)}" aria-label="Zeit löschen">×</button></span>`):`<p class="muted">Noch keine freien Zeiten eingetragen.</p>`}`;
+    <button class="btn small" id="av-add">${ic("i-clock")} Zeit hinzufügen</button></div>`;
+  let h=`<div class="stack"><span class="eyebrow">1:1-Termine</span><h1>Meine <em>Termine</em></h1>
+    <p class="muted">Tipp auf einen Tag, um deine Termine zu sehen. Einzelne Tage kannst du sperren, zum Beispiel im Urlaub.</p></div>`;
+  if (!rules.length) h+=rulesPanel;
+  h+=termCal(me.email,true);
+  if (S.tDay){ const d=new Date(S.tDay+"T00:00"), ds=daySlots(me.email,d), wdRules=rules.some(a=>+a.weekday===isoDow(d));
+    h+=`<div class="panel stack tdayv"><div class="tdhead"><b class="tbig">${fmtDay(d)}</b>${wdRules?`<button class="btn small ghost" data-avoff="${S.tDay}">${ds.off?"Tag wieder freigeben":"Tag sperren"}</button>`:""}</div>
+      ${ds.off?`<p class="muted" style="margin:0">Dieser Tag ist gesperrt. Creator können hier nichts buchen.</p>`:""}
+      ${!ds.list.length&&!ds.off?`<p class="muted" style="margin:0">An diesem Tag hast du keine festen Zeiten.</p>`:""}
+      ${ds.list.length?`<div class="tlist">${ds.list.map(x=>{ const b=x.booking, c=b&&member(b.creator_email);
+        return `<div class="titem ${b?"bk":""}"><b>${fmtTime(x.at)}</b><div>${b?`<span>${esc(c?label(c):"Creator")}${c&&c.handle&&c.name?" · "+esc(c.name):""}</span>${b.topic?`<small>„${esc(b.topic)}“</small>`:""}<small>${b.minutes} Min. · ${esc(b.how)}</small>`:`<small>frei · ${x.minutes} Min.</small>`}</div>
+          ${b?`<button class="chip" data-bkfree="${esc(b.id)}">${S.confirmDelete==="bf"+b.id?"Wirklich absagen?":"Absagen"}</button>`:""}</div>`; }).join("")}</div>`:""}</div>`; }
+  const next=upBk().filter(b=>b.owner_email===me.email);
+  h+=`<div class="sec"><span>Nächste Termine</span><small>${next.length}</small></div>
+    ${next.length?`<div class="list">${next.slice(0,8).map(b=>{ const c=member(b.creator_email); return `<button class="row tnext" data-tday="${isoDay(bkAt(b))}"><b>${fmtDayS(bkAt(b))}, ${fmtTime(bkAt(b))} Uhr</b><small class="muted">${esc(c?label(c):"Creator")}${b.topic?" · „"+esc(b.topic)+"“":""}</small></button>`; }).join("")}</div>`:`<p class="muted">Noch keine Buchungen.</p>`}`;
+  if (rules.length) h+=rulesPanel;
   if (lead){
-    const others=all.filter(s=>s.owner_email!==me.email), owners=[...new Set(others.map(s=>s.owner_email))];
+    const others=upBk().filter(b=>b.owner_email!==me.email), owners=[...new Set([...others.map(b=>b.owner_email), ...(S.av||[]).filter(a=>a.owner_email!==me.email).map(a=>a.owner_email)])];
     h+=`<div class="sec"><span>Ganzes Team</span><small>nur Leitung</small></div>
-      ${owners.length?`<div class="list">${owners.map(o=>{ const xs=others.filter(s=>s.owner_email===o), b=xs.filter(s=>s.booked_by);
-        return `<div class="row"><div class="head"><b>${esc(member(o)?.name||o)}</b><small class="muted">${b.length} gebucht · ${xs.length-b.length} frei</small></div>${b.map(s=>slotRow(s,true)).join("")}</div>`; }).join("")}</div>`
-      :`<p class="muted">Die anderen haben noch keine Zeiten eingetragen.</p>`}`;
+      ${owners.length?`<div class="list">${owners.map(o=>{ const xs=others.filter(b=>b.owner_email===o), rs=(S.av||[]).filter(a=>a.owner_email===o);
+        return `<div class="row"><div class="head"><b>${esc(member(o)?.name||o)}</b><small class="muted">${xs.length} gebucht · ${rs.map(a=>`${WDL[a.weekday-1].slice(0,2)} ${hm(a.t_from)}–${hm(a.t_to)}`).join(", ")||"keine festen Zeiten"}</small></div>
+          ${xs.map(b=>{ const c=member(b.creator_email); return `<div class="tsub"><b>${fmtDayS(bkAt(b))}, ${fmtTime(bkAt(b))} Uhr</b> <small class="muted">${esc(c?label(c):"Creator")}${b.topic?" · „"+esc(b.topic)+"“":""}</small></div>`; }).join("")}</div>`; }).join("")}</div>`
+      :`<p class="muted">Die anderen haben noch keine Zeiten eingestellt.</p>`}`;
   }
   return h;
 }
-function slotRow(s, small){
-  const d=slotDT(s), c=member(s.booked_by);
-  return `<div class="${small?"tsub":"row"}"><div class="head"><b>${fmtDayS(d)}, ${fmtTime(d)} Uhr</b><small class="muted">${esc(c?label(c):"Creator")}${c&&c.name&&c.handle?" · "+esc(c.name):""} · ${s.minutes} Min. · ${esc(s.how)}</small></div>
-    ${s.topic?`<p class="soft" style="margin:4px 0 0">„${esc(s.topic)}“</p>`:""}
-    ${small?"":`<div class="actions"><button class="btn small ghost" data-slotfree="${esc(s.id)}">${S.confirmDelete==="sf"+s.id?"Wirklich absagen?":"Absagen"}</button></div>`}</div>`;
-}
-async function addSlots(){
+async function addRule(){
   if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
-  const date=$("#sl-date").value, time=$("#sl-time").value, min=+$("#sl-min").value, n=+$("#sl-n").value, rep=+$("#sl-rep").value, how=$("#sl-how").value;
-  if (!date || !time) return toast("Bitte Datum und Uhrzeit wählen.");
-  const base=new Date(`${date}T${time}`), have=new Set((S.slots||[]).filter(s=>s.owner_email===S.real.email).map(s=>+slotDT(s))), rows=[];
-  for (let w=0; w<rep; w++) for (let i=0; i<n; i++){
-    const d=new Date(base); d.setDate(d.getDate()+7*w); d.setMinutes(d.getMinutes()+i*min);
-    if (+d > Date.now() && !have.has(+d)) rows.push({ owner_email:S.real.email, starts_at:d.toISOString(), minutes:min, how });
-  }
-  if (!rows.length) return toast("Diese Zeiten liegen in der Vergangenheit oder sind schon eingetragen.");
-  $("#sl-add").disabled=true;
-  const r=await sb.from("slots").insert(rows); if (r.error){ fail(r.error); return render(true); }
-  toast(rows.length===1?"1 Zeit eingetragen.":`${rows.length} Zeiten eingetragen.`); await refresh(); render(true);
+  const weekday=+$("#av-wd").value, t_from=$("#av-from").value, t_to=$("#av-to").value, minutes=+$("#av-min").value, how=$("#av-how").value;
+  if (!t_from || !t_to) return toast("Bitte Von und Bis eintragen.");
+  if (toMin(t_to)-toMin(t_from) < minutes) return toast("Bis muss mindestens eine Termin-Länge nach Von liegen.");
+  $("#av-add").disabled=true;
+  const r=await sb.from("avail").insert({ owner_email:S.real.email, weekday, t_from, t_to, minutes, how }); if (r.error){ fail(r.error); return render(true); }
+  toast(`${WDL[weekday-1]} ${t_from}–${t_to} Uhr gespeichert.`); await refresh(); render(true);
 }
-async function delSlot(id){
+async function delRule(id){
   if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
-  const r=await sb.from("slots").delete().eq("id",id); if (r.error) return fail(r.error);
+  if (S.confirmDelete!=="av"+id){ S.confirmDelete="av"+id; toast("Nochmal tippen zum Löschen. Gebuchte Termine bleiben bestehen."); return; }
+  S.confirmDelete=null; const r=await sb.from("avail").delete().eq("id",id); if (r.error) return fail(r.error);
   await refresh(); render(true);
 }
-async function freeSlot(id){
+async function toggleOff(day){
   if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
-  if (S.confirmDelete!=="sf"+id){ S.confirmDelete="sf"+id; return render(true); }
-  S.confirmDelete=null; const r=await sb.from("slots").update({ booked_by:null, topic:null, booked_at:null }).eq("id",id); if (r.error) return fail(r.error);
+  const off=(S.avOff||[]).some(o=>o.owner_email===S.real.email && o.day===day);
+  const r = off ? await sb.from("avail_off").delete().eq("owner_email",S.real.email).eq("day",day) : await sb.from("avail_off").insert({ owner_email:S.real.email, day });
+  if (r.error) return fail(r.error);
+  toast(off?"Tag wieder freigegeben.":"Tag gesperrt. Schon gebuchte Termine bleiben bestehen."); await refresh(); render(true);
+}
+async function freeBooking(id){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  if (S.confirmDelete!=="bf"+id){ S.confirmDelete="bf"+id; return render(true); }
+  S.confirmDelete=null; const r=await sb.from("bookings").delete().eq("id",id); if (r.error) return fail(r.error);
   toast("Abgesagt. Sag dem Creator bitte kurz Bescheid."); await refresh(); render(true);
 }
 
@@ -2416,12 +2461,15 @@ document.addEventListener("click", async e => {
   if (t.dataset.refno) return refDecide(t.dataset.refno,"nein");
   if (t.id==="rf-add") return refAdd();
   if (t.id==="tt-add") return addTikTok();
-  if (t.id==="sl-add") return addSlots();
+  if (t.id==="av-add") return addRule();
   if (t.id==="sl-book") return bookSlot();
-  if (t.dataset.slotbook) return openBook(t.dataset.slotbook);
-  if (t.dataset.slotcancel) return cancelMine(t.dataset.slotcancel);
-  if (t.dataset.slotdel) return delSlot(t.dataset.slotdel);
-  if (t.dataset.slotfree) return freeSlot(t.dataset.slotfree);
+  if (t.dataset.tnav){ const m=tMonth(); S.tMonth=new Date(m.getFullYear(), m.getMonth()+ +t.dataset.tnav, 1); return render(true); }
+  if (t.dataset.tday){ S.tDay = t.dataset.tday; const d=new Date(t.dataset.tday+"T00:00"); S.tMonth=new Date(d.getFullYear(), d.getMonth(), 1); render(true); return $(".tdayv")?.scrollIntoView({ behavior:"smooth", block:"nearest" }); }
+  if (t.dataset.tbook) return openBook(t.dataset.tbook);
+  if (t.dataset.bkcancel) return cancelMine(t.dataset.bkcancel);
+  if (t.dataset.avdel) return delRule(t.dataset.avdel);
+  if (t.dataset.avoff) return toggleOff(t.dataset.avoff);
+  if (t.dataset.bkfree) return freeBooking(t.dataset.bkfree);
   if (t.dataset.tt){ award("extra", t.dataset.tt); return; }
   if (t.dataset.qzshow){ const q=QZ().find(x=>x.id===t.dataset.qzshow), r=qzRes(t.dataset.who||S.me.email, q?.id); if (q&&r) return sheet(quizResult(q, r.result, false, r.scores?._second)); return; }
   if (t.dataset.learn){ S.learn=t.dataset.learn; S.qz=null; return render(); }
