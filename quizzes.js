@@ -5,7 +5,7 @@ window.LDA_QUIZZES = [
 {
   id: "streamer",
   title: "Welcher Streamer-Typ bist du?",
-  teaser: "10 Fragen über dich. Danach weißt du, welche Live-Mechaniken zu dir passen.",
+  teaser: "16 Fragen über dich. Danach weißt du, welche Live-Mechaniken zu dir passen.",
   icon: "🎙️",
   types: [
     { key:"matcher", emoji:"⚔️", name:"Der Matcher", short:"Du lebst für den Wettkampf.",
@@ -99,7 +99,38 @@ window.LDA_QUIZZES = [
       { t:"Kurztrip, sofort!", w:{abenteurer:2, entertainer:1} },
       { t:"Neues Equipment: PC, Mikro, Licht", w:{gamer:2, kuenstler:1} },
       { t:"Eine Party für meine Leute", w:{gastgeber:1, entertainer:1, talkmaster:1} },
-      { t:"Erst mal sparen und in Ruhe überlegen", w:{experte:1, ruhepol:1, begleiter:1} } ] }
+      { t:"Erst mal sparen und in Ruhe überlegen", w:{experte:1, ruhepol:1, begleiter:1} } ] },
+    { q:"Welche Superkraft hättest du gern?", a:[
+      { t:"Gedanken lesen", w:{talkmaster:2, gastgeber:1} },
+      { t:"Unsichtbar sein, wann ich will", w:{begleiter:2, ruhepol:1} },
+      { t:"Nie wieder verlieren", w:{gamer:2, matcher:1} },
+      { t:"Alles sofort können", w:{kuenstler:2, experte:1} } ] },
+    { q:"Was läuft bei dir nebenbei, wenn du aufräumst?", a:[
+      { t:"Ein Let's Play oder ein Stream", w:{gamer:2, begleiter:1} },
+      { t:"Ein Telefonat mit einer Freundin oder einem Freund", w:{talkmaster:2, gastgeber:1} },
+      { t:"Laute Musik zum Mitsingen", w:{entertainer:1, kuenstler:1, gastgeber:1} },
+      { t:"Nichts, ich genieße die Stille", w:{ruhepol:1, begleiter:1} } ] },
+    { q:"Etwas geht richtig schief. Wie reagierst du?", a:[
+      { t:"Ich lache drüber und mache weiter", w:{begleiter:2, gastgeber:1} },
+      { t:"Ich versuche es, bis es klappt", w:{matcher:2, kuenstler:1} },
+      { t:"Ich frage andere, was sie davon halten", w:{talkmaster:2, gastgeber:1} },
+      { t:"Ich suche im Internet nach einer Lösung", w:{gamer:1, experte:1} } ] },
+    { q:"Was würdest du dir selbst schenken?", a:[
+      { t:"Ein neues Game oder Gadget", w:{gamer:2, experte:1} },
+      { t:"Material für ein kreatives Projekt", w:{kuenstler:2, begleiter:1} },
+      { t:"Einen Wellness-Tag", w:{ruhepol:2, begleiter:1} },
+      { t:"Ein Essen mit allen Freunden", w:{gastgeber:2, talkmaster:1} } ] },
+    { q:"Freier Nachmittag mit Freunden. Was schlägst du vor?", a:[
+      { t:"Bowling oder Kartfahren, mit Siegerehrung", w:{matcher:2, entertainer:1} },
+      { t:"Zusammen zocken", w:{gamer:2, talkmaster:1} },
+      { t:"Einfach quatschen bei Kaffee", w:{begleiter:2, gastgeber:1} },
+      { t:"Karaoke!", w:{entertainer:2, talkmaster:1} } ] },
+    { q:"Welcher Satz passt am besten zu dir?", a:[
+      { t:"„Geht nicht, gibt's nicht.“", w:{abenteurer:2, matcher:1} },
+      { t:"„Hauptsache, alle haben Spaß.“", w:{gastgeber:2, talkmaster:1} },
+      { t:"„Ich mach mein Ding.“", w:{kuenstler:2, ruhepol:1} },
+      { t:"„Erklär's mir genau.“", w:{experte:2, talkmaster:1} },
+      { t:"„Ich bin einfach da, wenn man mich braucht.“", w:{begleiter:1, ruhepol:2} } ] }
   ]
 },
 {
