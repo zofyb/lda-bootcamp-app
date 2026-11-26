@@ -271,6 +271,7 @@ async function refresh(){
   if (S.me?.role!=="creator"){ const [gc,gn]=await Promise.all([ sb.from("guide_checks").select("*"), sb.from("guide_notes").select("*") ]); S.noUpd13=!!(gc.error||gn.error); S.gchk=gc.data||[]; S.gnote=gn.data||[]; }
   S.noUpd11=!!rf.error; S.refs=rf.data||[];
   S.noUpd9=!!(xe.error||bs.error||gl.error); S.xp=xe.data||[]; S.bs=bs.data||[]; S.goals=gl.data||[]; S.bsTop=bt.error?[]:(bt.data||[]);
+  const sl=await sb.from("slots").select("*").gte("starts_at", new Date(Date.now()-DAY).toISOString()).order("starts_at"); S.noUpd14=!!sl.error; S.slots=sl.data||[];
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
   if (!S.noUpd7 && S.real?.role==="lead"){ const tk=await sb.from("tasks").select("*").order("created_at"); S.tasks=tk.data||[]; }
   S.snaps = sn.data||[]; S.questions = qu.data||[]; S.survey = sv.data||[]; S.top = tp.error ? [] : (tp.data||[]);
@@ -354,11 +355,11 @@ function navItems(){
   const me=S.me;
   if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],["anim","i-spark","Animation"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
   const mine=new Set(myCreators().map(c=>c.email)), open=S.subs.filter(s=>s.points==null && mine.has(s.creator_email)).length;
-  if (me.role==="manager") return [["bewerten","i-check","Bewerten",open],["creator","i-people","Creator"],["kalender","i-cal","Kalender"],["akademie","i-learn","Lernen"],["fragen","i-mail","Sag's uns"]];
+  if (me.role==="manager") return [["bewerten","i-check","Bewerten",open],["creator","i-people","Creator"],["kalender","i-cal","Kalender",soonBooked()],["akademie","i-learn","Lernen"],["fragen","i-mail","Sag's uns"]];
   return [["uebersicht","i-home","Start"],["bewerten","i-check","Bewerten",open],["kalender","i-cal","Kalender"],...(S.real.role==="lead"?[["fuehrung","i-list","Führung"]]:[]),["bootcamp","i-learn","Bootcamp"]];
 }
 function navHtml(){
-  const items=navItems(), cur = S.me.role!=="creator" && LEAD_MORE.includes(S.tab) && items.some(x=>x[0]==="uebersicht") ? "uebersicht" : S.tab;
+  const items=navItems(), cur = S.tab==="termine" ? "kalender" : S.me.role!=="creator" && LEAD_MORE.includes(S.tab) && items.some(x=>x[0]==="uebersicht") ? "uebersicht" : S.tab;
   return `<div class="bn" style="--n:${items.length}">${items.map(([k,i,l,n])=>`<button ${k==="@kk"?'id="kk-open"':`data-tab="${k}"`} aria-current="${cur===k?"page":"false"}"><span class="bi">${ic(i)}${n?`<i class="dot">${n}</i>`:""}</span>${l}</button>`).join("")}</div>`;
 }
 const ROLE_NAME = { lead:"Agenturleitung", manager:"Manager", creator:"Creator" };
@@ -392,17 +393,18 @@ function render(keepScroll){
   if (me.role==="creator"){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
-    if (!["start","lernen","kalender","profil","anim"].includes(S.tab)) S.tab="start";
+    if (!["start","lernen","kalender","profil","anim","termine"].includes(S.tab)) S.tab="start";
   } else if (["start","lernen","profil","themen"].includes(S.tab) || (S.tab==="fuehrung" && S.real.role!=="lead") || (S.tab==="mehr" && me.role!=="lead")) S.tab = me.role==="manager"?"bewerten":"uebersicht";
   if (me.role==="lead" && S.tab==="mehr") S.tab="uebersicht";
   bnav.innerHTML = navHtml(); bnav.hidden = !!S.openArea || !!(S.qz && !S.qz.done);
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
   if (S.qz && !S.creator) html = quizView();
-  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : ({ lernen:learnView, kalender:calendarView, profil:()=>profileView(me.email), anim:animView }[S.tab] || startView)();
+  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : ({ lernen:learnView, kalender:calendarView, profil:()=>profileView(me.email), anim:animView, termine:termView }[S.tab] || startView)();
   else if (S.creator) html = creatorDetail(S.creator);
   else if (S.tab==="akademie") html = academyView();
   else if (S.tab==="kalender") html = calendarView();
+  else if (S.tab==="termine") html = termView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
   else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView }[S.tab] || pendingView)();
   view.innerHTML = html;
@@ -1066,6 +1068,7 @@ function startView(){
     ${tile("i-play","Akademie",'data-tab="lernen" data-learn="akademie"',dot(newAk))}
     ${tile("i-quiz","Quizze",'data-tab="lernen" data-learn="quiz"',dot(openQz))}
     ${tile("i-cal","Kalender",'data-tab="kalender"',dot(now.length))}
+    ${S.noUpd14||S.me.preview?"":tile("i-clock","1:1-Termin",'data-tab="termine"',myBooking()?`<i class="dot">✓</i>`:"")}
     ${boot?tile("i-gift","Belohnungen",'id="rw-open"',ok?`<i class="dot">!</i>`:`<small class="tl">ab 10 P</small>`):""}
     ${tile("i-user","Profil",'data-tab="profil"')}
     ${tile("i-spark","Animationen",'data-tab="anim"')}
@@ -1109,7 +1112,7 @@ function profileView(email){
 }
 function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
-  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"]];
+  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
   return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a></div>`;
 }
 function leadStart(){ return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
@@ -1209,9 +1212,134 @@ function leadDash(){
       ${k("i-rocket",rf,"Recruiting","recruit",1)}
       ${!S.noUpd7?k("i-cal",drafts,"Freigeben","kalender",1):""}
       ${lead&&!S.noUpd7?k("i-list",tasks,"Aufgaben fällig","fuehrung",1):""}
+      ${!S.noUpd14?k("i-clock",upSlots().filter(s=>s.booked_by && s.owner_email===S.me.email).length,"1:1 gebucht","termine"):""}
       ${k("i-people",regs,"Registriert","personen")}
       ${!S.noUpd7?k("i-fire",live,"Kampagnen live","kalender"):""}
     </div>`;
+}
+
+/* ---------- 1:1-Termine: Leitung und Manager tragen freie Zeiten ein, Creator buchen beim eigenen Manager ---------- */
+const HOW = ["WhatsApp-Anruf","Videoanruf","Telefon"];
+const slotDT = s => new Date(s.starts_at);
+const fmtDay = d => d.toLocaleDateString("de-DE",{ weekday:"long", day:"numeric", month:"long" });
+const fmtDayS = d => d.toLocaleDateString("de-DE",{ weekday:"short", day:"numeric", month:"numeric" });
+const fmtTime = d => d.toLocaleTimeString("de-DE",{ hour:"2-digit", minute:"2-digit" });
+const upSlots = () => (S.slots||[]).filter(s=>+slotDT(s)+s.minutes*6e4 > Date.now()).sort((a,b)=>slotDT(a)-slotDT(b));
+const myBooking = () => S.me?.role==="creator" ? upSlots().find(s=>s.booked_by===S.me.email) : null;
+const soonBooked = () => S.noUpd14 ? 0 : upSlots().filter(s=>s.booked_by && s.owner_email===S.me.email && +slotDT(s) < Date.now()+7*DAY).length;
+function byDay(list, fn){
+  const g={}; list.forEach(s=>{ const k=isoDay(slotDT(s)); (g[k]=g[k]||[]).push(s); });
+  return `<div class="tdays">${Object.values(g).map(xs=>`<div class="tday"><b>${fmtDay(slotDT(xs[0]))}</b><div class="tslots">${xs.map(fn).join("")}</div></div>`).join("")}</div>`;
+}
+function termTeaser(){
+  if (S.noUpd14 || S.me.preview) return "";
+  const me=S.me;
+  if (me.role==="creator"){
+    const mg=member(me.manager_email), b=myBooking(); if (!mg) return "";
+    return `<button class="remind tteaser" data-tab="termine"><span class="kic">${ic("i-clock")}</span><div><b>1:1-Termin mit ${esc(firstName(mg))}</b><small>${b?`Gebucht: ${fmtDayS(slotDT(b))}, ${fmtTime(slotDT(b))} Uhr`:"Freie Zeit aussuchen und buchen"}</small></div><span class="rgo">${ic("i-chev")}</span></button>`;
+  }
+  const mine=upSlots().filter(s=>s.owner_email===me.email), bk=mine.filter(s=>s.booked_by).length;
+  return `<button class="remind tteaser" data-tab="termine"><span class="kic">${ic("i-clock")}</span><div><b>Meine 1:1-Termine</b><small>${bk} gebucht · ${mine.length-bk} frei</small></div><span class="rgo">${ic("i-chev")}</span></button>`;
+}
+function termView(){
+  if (S.noUpd14) return `<div class="stack"><span class="eyebrow">1:1-Termine</span><h1>Termin <em>buchen</em></h1></div><div class="panel"><p class="${S.real.role==="lead"?"err":"muted"}" style="margin:0">${S.real.role==="lead"?"Zuerst update-14-termine.sql in Supabase ausführen.":"Die Terminbuchung kommt bald."}</p></div>`;
+  return S.me.role==="creator" ? termCreator() : termStaff();
+}
+function termCreator(){
+  const me=S.me, mg=member(me.manager_email), mine=myBooking();
+  let h=`<div class="stack"><span class="eyebrow">1:1-Termin</span><h1>Termin mit <em>${esc(mg?firstName(mg):"deinem Manager")}</em></h1>
+    <p class="muted">Such dir eine freie Zeit aus und schreib kurz dazu, worüber ihr sprechen wollt.</p></div>`;
+  if (!mg) return h+`<div class="panel"><p class="muted" style="margin:0">Dir ist gerade noch kein Manager zugeordnet. Sobald das passiert ist, kannst du hier einen Termin buchen.</p></div>`;
+  if (mine){ const d=slotDT(mine);
+    h+=`<div class="panel stack tmine"><span class="eyebrow">Dein Termin</span><b class="tbig">${fmtDay(d)}, ${fmtTime(d)} Uhr</b>
+      <small class="muted">${mine.minutes} Min. · ${esc(mine.how)} mit ${esc(firstName(mg))}</small>${mine.topic?`<p class="soft" style="margin:0">„${esc(mine.topic)}“</p>`:""}
+      <div class="actions"><button class="btn small ghost" data-slotcancel="${esc(mine.id)}">${S.confirmDelete==="sl"+mine.id?"Wirklich absagen?":"Termin absagen"}</button></div></div>
+      <p class="muted">Du kannst immer einen Termin offen haben. Ist er vorbei oder abgesagt, kannst du den nächsten buchen.</p>`;
+    return h; }
+  const free=upSlots().filter(s=>!s.booked_by && s.owner_email===me.manager_email && +slotDT(s) > Date.now()+36e5);
+  if (!free.length) return h+`<div class="panel"><p class="muted" style="margin:0">${esc(firstName(mg))} hat gerade keine freien Zeiten eingetragen. Schau bald wieder rein.</p></div>`;
+  return h+`<div class="sec"><span>Freie Zeiten</span><small>Tippen zum Buchen</small></div>`+byDay(free, s=>`<button class="tslot" data-slotbook="${esc(s.id)}">${fmtTime(slotDT(s))}<small>${s.minutes} Min.</small></button>`);
+}
+function openBook(id){
+  const s=S.slots.find(x=>x.id===id); if (!s) return; const d=slotDT(s), mg=member(s.owner_email);
+  S._book=id;
+  sheet(`<div class="sh"><span class="eyebrow">1:1-Termin buchen</span><h2>${fmtDay(d)}, ${fmtTime(d)} Uhr</h2></div>
+    <p class="muted" style="margin:0">${s.minutes} Min. · ${esc(s.how)} mit ${esc(mg?firstName(mg):"deinem Manager")}</p>
+    <label class="f" for="sl-topic">Worüber möchtest du sprechen?<textarea id="sl-topic" maxlength="500" placeholder="Zum Beispiel: Meine Lives laufen gerade schlecht, ich brauche Ideen"></textarea></label>
+    <button class="btn" id="sl-book">${ic("i-check")} Termin buchen</button>`);
+}
+const BOOK_MSG = { ok:"Termin gebucht!", taken:"Die Zeit ist leider gerade weggegangen.", late:"Zu kurzfristig: bitte mindestens 1 Stunde vorher buchen.", has:"Du hast schon einen offenen Termin.", missing:"Diese Zeit gibt es nicht mehr.", role:"Buchen geht nur als Creator." };
+async function bookSlot(){
+  if (S.viewAs || S.me.preview) return toast("In der Vorschau wird nichts gebucht.");
+  const btn=$("#sl-book"); btn.disabled=true;
+  const r=await sb.rpc("book_slot",{ sid:S._book, t:$("#sl-topic").value.trim() }); if (r.error){ btn.disabled=false; return fail(r.error); }
+  closeSheet(); toast(BOOK_MSG[r.data]||"Gespeichert."); await refresh(); render(true);
+}
+async function cancelMine(id){
+  if (S.viewAs || S.me.preview) return toast("In der Vorschau wird nichts geändert.");
+  if (S.confirmDelete!=="sl"+id){ S.confirmDelete="sl"+id; return render(true); }
+  S.confirmDelete=null; const r=await sb.rpc("cancel_slot",{ sid:id }); if (r.error) return fail(r.error);
+  toast(r.data==="ok"?"Termin abgesagt.":"Der Termin konnte nicht mehr abgesagt werden."); await refresh(); render(true);
+}
+function termStaff(){
+  const me=S.me, lead=S.real.role==="lead" && !S.viewAs, all=upSlots(), mine=all.filter(s=>s.owner_email===me.email);
+  const booked=mine.filter(s=>s.booked_by), free=mine.filter(s=>!s.booked_by);
+  const opt=(v,l,sel)=>`<option value="${v}" ${sel?"selected":""}>${l}</option>`;
+  let h=`<div class="stack"><span class="eyebrow">1:1-Termine</span><h1>Meine <em>Termine</em></h1>
+    <p class="muted">Trag freie Zeiten ein. Deine Creator buchen sie direkt in der App und schreiben dazu, worum es gehen soll.</p></div>
+  <div class="panel stack"><h2>Freie Zeiten eintragen</h2>
+    <div class="tform">
+      <label class="f" for="sl-date">Datum<input id="sl-date" type="date" min="${isoDay(new Date())}" value="${isoDay(new Date(Date.now()+DAY))}"></label>
+      <label class="f" for="sl-time">Ab Uhrzeit<input id="sl-time" type="time" value="18:00" step="900"></label>
+      <label class="f" for="sl-min">Dauer<select id="sl-min">${[15,30,45,60].map(m=>opt(m,m+" Min.",m===30)).join("")}</select></label>
+      <label class="f" for="sl-n">Termine hintereinander<select id="sl-n">${[1,2,3,4,5,6,8].map(n=>opt(n,n===1?"1 Termin":n+" Termine",n===1)).join("")}</select></label>
+      <label class="f" for="sl-how">Wie<select id="sl-how">${HOW.map(x=>opt(x,x)).join("")}</select></label>
+      <label class="f" for="sl-rep">Wiederholen<select id="sl-rep">${opt(1,"Nur an diesem Tag",1)}${opt(4,"4 Wochen jede Woche")}${opt(8,"8 Wochen jede Woche")}</select></label>
+    </div>
+    <button class="btn small" id="sl-add">${ic("i-clock")} Zeiten eintragen</button></div>
+  <div class="sec"><span>Gebucht</span><small>${booked.length}</small></div>
+  ${booked.length?`<div class="list">${booked.map(s=>slotRow(s,false)).join("")}</div>`:`<p class="muted">Noch keine Buchungen.</p>`}
+  <div class="sec"><span>Frei</span><small>${free.length}</small></div>
+  ${free.length?byDay(free, s=>`<span class="tslot free">${fmtTime(slotDT(s))}<small>${s.minutes} Min.</small><button class="tx" data-slotdel="${esc(s.id)}" aria-label="Zeit löschen">×</button></span>`):`<p class="muted">Noch keine freien Zeiten eingetragen.</p>`}`;
+  if (lead){
+    const others=all.filter(s=>s.owner_email!==me.email), owners=[...new Set(others.map(s=>s.owner_email))];
+    h+=`<div class="sec"><span>Ganzes Team</span><small>nur Leitung</small></div>
+      ${owners.length?`<div class="list">${owners.map(o=>{ const xs=others.filter(s=>s.owner_email===o), b=xs.filter(s=>s.booked_by);
+        return `<div class="row"><div class="head"><b>${esc(member(o)?.name||o)}</b><small class="muted">${b.length} gebucht · ${xs.length-b.length} frei</small></div>${b.map(s=>slotRow(s,true)).join("")}</div>`; }).join("")}</div>`
+      :`<p class="muted">Die anderen haben noch keine Zeiten eingetragen.</p>`}`;
+  }
+  return h;
+}
+function slotRow(s, small){
+  const d=slotDT(s), c=member(s.booked_by);
+  return `<div class="${small?"tsub":"row"}"><div class="head"><b>${fmtDayS(d)}, ${fmtTime(d)} Uhr</b><small class="muted">${esc(c?label(c):"Creator")}${c&&c.name&&c.handle?" · "+esc(c.name):""} · ${s.minutes} Min. · ${esc(s.how)}</small></div>
+    ${s.topic?`<p class="soft" style="margin:4px 0 0">„${esc(s.topic)}“</p>`:""}
+    ${small?"":`<div class="actions"><button class="btn small ghost" data-slotfree="${esc(s.id)}">${S.confirmDelete==="sf"+s.id?"Wirklich absagen?":"Absagen"}</button></div>`}</div>`;
+}
+async function addSlots(){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const date=$("#sl-date").value, time=$("#sl-time").value, min=+$("#sl-min").value, n=+$("#sl-n").value, rep=+$("#sl-rep").value, how=$("#sl-how").value;
+  if (!date || !time) return toast("Bitte Datum und Uhrzeit wählen.");
+  const base=new Date(`${date}T${time}`), have=new Set((S.slots||[]).filter(s=>s.owner_email===S.real.email).map(s=>+slotDT(s))), rows=[];
+  for (let w=0; w<rep; w++) for (let i=0; i<n; i++){
+    const d=new Date(base); d.setDate(d.getDate()+7*w); d.setMinutes(d.getMinutes()+i*min);
+    if (+d > Date.now() && !have.has(+d)) rows.push({ owner_email:S.real.email, starts_at:d.toISOString(), minutes:min, how });
+  }
+  if (!rows.length) return toast("Diese Zeiten liegen in der Vergangenheit oder sind schon eingetragen.");
+  $("#sl-add").disabled=true;
+  const r=await sb.from("slots").insert(rows); if (r.error){ fail(r.error); return render(true); }
+  toast(rows.length===1?"1 Zeit eingetragen.":`${rows.length} Zeiten eingetragen.`); await refresh(); render(true);
+}
+async function delSlot(id){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const r=await sb.from("slots").delete().eq("id",id); if (r.error) return fail(r.error);
+  await refresh(); render(true);
+}
+async function freeSlot(id){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  if (S.confirmDelete!=="sf"+id){ S.confirmDelete="sf"+id; return render(true); }
+  S.confirmDelete=null; const r=await sb.from("slots").update({ booked_by:null, topic:null, booked_at:null }).eq("id",id); if (r.error) return fail(r.error);
+  toast("Abgesagt. Sag dem Creator bitte kurz Bescheid."); await refresh(); render(true);
 }
 
 /* ---------- Level-System: XP, Stufen, Hook des Tages, Impuls der Woche, Backstage, Monatsziel ---------- */
@@ -1866,6 +1994,7 @@ function calendarView(){
   const lead=S.me.role==="lead", items=calItems("all");
   let h=`<div class="stack"><span class="eyebrow">LIVEdream Academy</span><h1>Kampagnen-<em>Kalender</em></h1>
     <p class="muted">Alle TikTok- und LIVEdream-Kampagnen auf einen Blick. Tipp auf eine Kampagne für alle Infos.</p></div>`;
+  h += termTeaser();
   if (S.noUpd7) return h + `<div class="panel"><p class="err">${lead?"Zuerst update-7.sql in Supabase ausführen.":"Der Kalender kommt bald."}</p></div>`;
   h += `<div class="legend"><span><i class="k-tiktok"></i>TikTok</span><span><i class="k-livedream"></i>LIVEdream</span></div>`;
   if (lead) h += calDrafts() + calForm("all");
@@ -2287,6 +2416,12 @@ document.addEventListener("click", async e => {
   if (t.dataset.refno) return refDecide(t.dataset.refno,"nein");
   if (t.id==="rf-add") return refAdd();
   if (t.id==="tt-add") return addTikTok();
+  if (t.id==="sl-add") return addSlots();
+  if (t.id==="sl-book") return bookSlot();
+  if (t.dataset.slotbook) return openBook(t.dataset.slotbook);
+  if (t.dataset.slotcancel) return cancelMine(t.dataset.slotcancel);
+  if (t.dataset.slotdel) return delSlot(t.dataset.slotdel);
+  if (t.dataset.slotfree) return freeSlot(t.dataset.slotfree);
   if (t.dataset.tt){ award("extra", t.dataset.tt); return; }
   if (t.dataset.qzshow){ const q=QZ().find(x=>x.id===t.dataset.qzshow), r=qzRes(t.dataset.who||S.me.email, q?.id); if (q&&r) return sheet(quizResult(q, r.result, false, r.scores?._second)); return; }
   if (t.dataset.learn){ S.learn=t.dataset.learn; S.qz=null; return render(); }

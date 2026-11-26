@@ -82,11 +82,23 @@ const db = {
           {creator_email:"c3@demo", month:YM, title:"15 Lives im Monat", target:15, unit:"Lives", current:15, done:true, set_by:"max@demo"}]
 };
 db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootcamp=true; });
+{ const at=(d,h,m=0)=>{ const x=new Date(); x.setDate(x.getDate()+d); x.setHours(h,m,0,0); return x.toISOString(); };
+  db.slots=[
+    {id:"sl1", owner_email:"lena@demo", starts_at:at(1,18), minutes:30, how:"WhatsApp-Anruf", booked_by:"c2@demo", topic:"Meine Lives laufen gerade schlecht, ich brauche Ideen."},
+    {id:"sl2", owner_email:"lena@demo", starts_at:at(1,18,30), minutes:30, how:"WhatsApp-Anruf"},
+    {id:"sl3", owner_email:"lena@demo", starts_at:at(2,17), minutes:30, how:"Videoanruf"},
+    {id:"sl4", owner_email:"lena@demo", starts_at:at(2,17,30), minutes:30, how:"Videoanruf"},
+    {id:"sl5", owner_email:"lena@demo", starts_at:at(4,12), minutes:45, how:"Telefon"},
+    {id:"sl6", owner_email:"demo@demo", starts_at:at(1,19), minutes:30, how:"WhatsApp-Anruf", booked_by:"c5@demo", topic:"Wie komme ich in die Top 5?"},
+    {id:"sl7", owner_email:"demo@demo", starts_at:at(3,19), minutes:30, how:"WhatsApp-Anruf"},
+    {id:"sl8", owner_email:"max@demo", starts_at:at(2,20), minutes:30, how:"WhatsApp-Anruf", booked_by:"c3@demo", topic:"Kampagne im Dezember"},
+    {id:"sl9", owner_email:"max@demo", starts_at:at(5,20), minutes:30, how:"WhatsApp-Anruf"}];
+}
 const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"], goals:["creator_email","month"], referrals:["recruit_handle"], guide_checks:["creator_email","item"], guide_notes:["creator_email","chapter"] };
 function q(t){
   let rows = db[t] || (db[t]=[]), op = null, payload = null; const flt = [];
   const o = {
-    select(){ return o }, order(){ return o }, eq(k,v){ flt.push([k,v]); return o },
+    select(){ return o }, order(){ return o }, gte(){ return o }, eq(k,v){ flt.push([k,v]); return o },
     maybeSingle(){ return o.then(r => ({ data:(r.data||[])[0]||null, error:null })) },
     upsert(p){ op="up"; payload=p; return o }, insert(p){ op="ins"; payload=p; return o }, update(p){ op="upd"; payload=p; return o }, delete(){ op="del"; return o },
     then(res, rej){

@@ -132,7 +132,7 @@ p{margin:0;line-height:1.55}
 .files a:hover{border-color:rgba(214,64,159,.5)}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--lilac)}
 label.f .row2{display:flex;justify-content:space-between}
-input[type=text],input[type=email],input[type=url],input[type=date],input[type=number],input[type=month],textarea,select{font:400 14.5px var(--body);color:var(--fg);background:#0e0611;border:1px solid var(--line2);border-radius:12px;padding:12px;width:100%}
+input[type=text],input[type=email],input[type=url],input[type=date],input[type=time],input[type=number],input[type=month],textarea,select{font:400 14.5px var(--body);color:var(--fg);background:#0e0611;border:1px solid var(--line2);border-radius:12px;padding:12px;width:100%}
 textarea{min-height:96px;resize:vertical;line-height:1.5}
 select option,select optgroup{background:#140918}
 .btn{font:600 14.5px var(--body);color:#fff;border:0;border-radius:14px;padding:14px;width:100%;cursor:pointer;background:linear-gradient(135deg,var(--rose),var(--plum));box-shadow:0 10px 24px rgba(160,30,140,.35);transition:transform .15s,opacity .2s}
@@ -679,3 +679,23 @@ a.tile{text-decoration:none;color:var(--fg)}
 .paper.vid:has(.vth[src])::after{z-index:1;text-shadow:0 1px 4px #000;background:rgba(0,0,0,.25)}
 .ttimg.nocov{background:radial-gradient(80% 60% at 30% 20%,#5a1a66 0%,transparent 70%),linear-gradient(160deg,#2a0f36,#0e0512)}
 .ttimg.nocov em{position:absolute;left:10px;right:10px;bottom:12px;font-style:normal;font-family:var(--head);font-weight:700;font-size:12.5px;line-height:1.2;color:#fff;overflow-wrap:anywhere;hyphens:auto;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+/* 1:1-Termine */
+.tteaser{width:100%;grid-template-columns:auto 1fr auto;text-align:left;font:inherit;color:var(--fg);cursor:pointer;border-color:rgba(214,64,159,.4);background:linear-gradient(135deg,rgba(214,64,159,.12),rgba(123,47,201,.08))}
+.tteaser .kic{background:rgba(214,64,159,.18);color:var(--rose)}
+.tteaser .rgo{width:32px;height:32px}
+.tform{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:700px){.tform{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tform input,.tform select{width:100%;min-width:0;box-sizing:border-box}
+.tdays{display:grid;gap:14px}
+.tday{display:grid;gap:8px}
+.tday>b{font-size:13px;color:var(--soft);font-weight:600}
+.tslots{display:flex;flex-wrap:wrap;gap:8px}
+.tslot{position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:1px;min-width:76px;padding:9px 12px;border-radius:14px;border:1px solid var(--line2);background:linear-gradient(180deg,var(--panel2),var(--panel));color:var(--fg);font:600 15px var(--body);font-variant-numeric:tabular-nums;cursor:pointer}
+.tslot small{font:500 11px var(--body);color:var(--muted)}
+button.tslot:hover{border-color:var(--rose);box-shadow:0 0 0 1px var(--rose) inset}
+.tslot.free{cursor:default;padding-right:30px}
+.tslot .tx{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--muted);font-size:14px;line-height:1;cursor:pointer}
+.tslot .tx:hover{background:rgba(255,80,80,.25);color:#fff}
+.tmine{border-color:rgba(255,176,23,.4)}
+.tbig{font-family:var(--head);font-size:19px;line-height:1.25}
+.tsub{padding:10px 0 0;margin-top:10px;border-top:1px solid var(--line)}
