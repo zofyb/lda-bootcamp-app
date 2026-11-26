@@ -73,6 +73,8 @@ const db = {
     {creator_email:"c1@demo", kind:"camp", ref:"k1", xp:15},{creator_email:"c1@demo", kind:"extra", ref:"e1", xp:15}]),
   backstage: [["luna.live",22,61.5,48210,1,1],["sofia.sings",18,40.2,30550,2,3],["gamer_kevin",20,55,21800,3,2],["tim.talks",9,14,12040,4,6],["jenny.mama",15,22.5,9800,5,4],["mia.vibes",12,18,4100,6,5]]
     .map(([h,dy,hr,dm,rd,rt])=>({ month:BSM, handle:h, days:dy, hours:hr, diamonds:dm, rank_d:rd, rank_t:rt })),
+  guide_checks: ["start1","start2","start3","app1","app2","app3","video1","video2","anlauf1","licht1"].map((id,i)=>({ creator_email:"c1@demo", item:id, status:i%4===3?"known":"done", by_email:"lena@demo", at:iso(now-i*D) })),
+  guide_notes: [{ creator_email:"c1@demo", chapter:"video", note:"Hooks klappen gut, beim Text-Hook nochmal nachhaken.", by_email:"lena@demo" }],
   referrals: [{recruit_handle:"neu.creator", recruiter_email:"c1@demo", status:"ok", gun_sent:true, source:"registrierung", created_at:iso(now-12*D)},
     {recruit_handle:"lisa.sparkle", recruiter_email:"c1@demo", status:"offen", gun_sent:false, source:"creator", created_at:iso(now-D)},
     {recruit_handle:"ben.gaming", recruiter_email:"c2@demo", status:"offen", gun_sent:false, source:"registrierung", created_at:iso(now-2*D)}],
@@ -80,7 +82,7 @@ const db = {
           {creator_email:"c3@demo", month:YM, title:"15 Lives im Monat", target:15, unit:"Lives", current:15, done:true, set_by:"max@demo"}]
 };
 db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootcamp=true; });
-const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"], goals:["creator_email","month"], referrals:["recruit_handle"] };
+const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"], goals:["creator_email","month"], referrals:["recruit_handle"], guide_checks:["creator_email","item"], guide_notes:["creator_email","chapter"] };
 function q(t){
   let rows = db[t] || (db[t]=[]), op = null, payload = null; const flt = [];
   const o = {

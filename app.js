@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), bnav = $("#bnav");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, refs:[], noUpd11:false, impAns:null,
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, refs:[], noUpd11:false, gchk:[], gnote:[], noUpd13:false, gOpen:new Set(), impAns:null,
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -258,6 +258,7 @@ async function refresh(){
   if (S.real?.role==="lead" || S.me?.role==="lead"){ const ro=await sb.from("roster").select("*").order("handle"); S.noRoster=!!ro.error; S.roster=ro.data||[]; }
   const qr=await sb.from("quiz_results").select("*"); S.noUpd8=!!qr.error; S.qres=qr.data||[];
   const [xe,bs,gl,bt,rf]=await Promise.all([ sb.from("xp_events").select("*"), sb.from("backstage").select("*"), sb.from("goals").select("*"), sb.rpc("backstage_top",{ m:null }), sb.from("referrals").select("*").order("created_at",{ ascending:false }) ]);
+  if (S.me?.role!=="creator"){ const [gc,gn]=await Promise.all([ sb.from("guide_checks").select("*"), sb.from("guide_notes").select("*") ]); S.noUpd13=!!(gc.error||gn.error); S.gchk=gc.data||[]; S.gnote=gn.data||[]; }
   S.noUpd11=!!rf.error; S.refs=rf.data||[];
   S.noUpd9=!!(xe.error||bs.error||gl.error); S.xp=xe.data||[]; S.bs=bs.data||[]; S.goals=gl.data||[]; S.bsTop=bt.error?[]:(bt.data||[]);
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
@@ -795,7 +796,7 @@ function creatorRow(c){
   const t=total(c.email), st=streakInfo(c.email).cur, b=badgesFor(c.email).filter(x=>x.on), qr=qzRes(c.email,"streamer"), qt=qr&&qzType("streamer",qr.result);
   const L=S.noUpd9?null:levelOf(xpOf(c.email));
   return `<button class="row" data-creator="${esc(c.email)}"><div class="head">${L?`<span class="rwho">${lvRing(c.email,40,{badge:false})}<span><b>${esc(label(c))}</b><small class="lvt" style="${lvVars(L.i)}">Stufe ${L.n} · ${esc(L.name)}</small></span></span>`:`<b>${esc(label(c))}</b>`}<span class="tag ${t>=10?"gold":""}">${t} / ${maxPts()}</span></div>${dots(c.email)}
-    ${st||b.length||qt?`<div class="mini">${qt?`<span class="chip gold">${ic(TYPE_IC[qt.key]||"i-star")} ${esc(qt.name)}</span>`:""}${st?`<span class="chip">${ic("i-fire")} ${st}</span>`:""}${b.length?`<span class="chip">${ic("i-star")} ${b.length} Abzeichen</span>`:""}</div>`:""}</button>`;
+    ${st||b.length||qt?`<div class="mini">${qt?`<span class="chip gold">${ic(TYPE_IC[qt.key]||"i-star")} ${esc(qt.name)}</span>`:""}${st?`<span class="chip">${ic("i-fire")} ${st}</span>`:""}${b.length?`<span class="chip">${ic("i-star")} ${b.length} Abzeichen</span>`:""}${guideChip(c.email)}</div>`:`<div class="mini">${guideChip(c.email)}</div>`}</button>`;
 }
 function managerList(){
   const cs=myCreators();
@@ -807,7 +808,7 @@ function creatorDetail(email){
   let h=`<button class="btn ghost small back" id="back">← Zurück</button>
     <div class="stack"><span class="eyebrow">${esc(member(c.manager_email)?.name?"Manager: "+member(c.manager_email).name:"ohne Manager")}</span><h1>${esc(label(c))}</h1>
     <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p><div class="titles">${titleChips(email,false)}</div></div>
-    ${S.noUpd9?"":lvHero(email,false)}${liveStand(email)}${recCard(email,false)}${goalAdmin(email)}
+    ${S.noUpd9?"":lvHero(email,false)}${liveStand(email)}${recCard(email,false)}${goalAdmin(email)}${guideBlock(email)}
     <div class="hexes">${allBadges(email).map(hexBadge).join("")}</div>
     ${snapOf(email,"vorher")||snapOf(email,"nachher")?`<div class="panel stack"><h2>Vorher-Nachher</h2><div class="snaps">${["vorher","nachher"].map(k=>{const x=snapOf(email,k); return `<div class="snap">${x?`<a data-path="${esc(x.path)}" target="_blank" rel="noopener"><img data-img="${esc(x.path)}" alt="${k}"></a>`:`<div class="ph">–</div>`}<small>${k==="vorher"?"Vorher":"Nachher"}</small></div>`;}).join("")}</div></div>`:""}
     <div class="list">`;
@@ -1375,6 +1376,48 @@ async function hydrateCovers(){
   if (need.length){ const { data }=await sb.storage.from("unterlagen").createSignedUrls(need, 6*3600); (data||[]).forEach(d=>{ if (d.signedUrl) AVURL["u:"+d.path]=d.signedUrl; }); }
   imgs.forEach(i=>{ const u=AVURL["u:"+i.dataset.tcover]; if (u) i.src=u; });
 }
+
+/* ---------- Betreuungsleitfaden (Manager/Leitung pro Creator) ---------- */
+const GUIDE = () => window.LDA_GUIDE || [];
+const gIds = () => GUIDE().flatMap(c=>c.items.map(x=>x[0]));
+const gStat = (email,id) => S.gchk.find(x=>x.creator_email===email && x.item===id)?.status;
+function guideCount(email){ const all=gIds(); return [all.filter(id=>gStat(email,id)).length, all.length]; }
+function guideChip(email){ if (S.noUpd13 || !GUIDE().length) return ""; const [d,n]=guideCount(email); return `<span class="chip">${ic("i-list")} Leitfaden ${d}/${n}</span>`; }
+function guideBlock(email){
+  if (S.noUpd13) return S.me.role==="lead" ? `<div class="panel"><p class="err">Für den Betreuungsleitfaden zuerst update-13-leitfaden.sql in Supabase ausführen.</p></div>` : "";
+  if (!GUIDE().length) return "";
+  const [d,n]=guideCount(email), pct=n?Math.round(d/n*100):0;
+  return `<div class="panel guide"><div class="ghead"><div><span class="eyebrow">Betreuungsleitfaden</span><h2>${d} von ${n} besprochen</h2></div><span class="gpct">${pct} %</span></div>
+    <span class="lvbar"><i style="width:${pct}%"></i></span>
+    <p class="muted" style="margin:0;font-size:12.5px">✓ = besprochen · ★ = wusste es schon · ${ic("i-learn")} = im Bootcamp abgegeben. Nochmal tippen nimmt den Haken weg.</p>
+    ${GUIDE().map(c=>{ const ids=c.items.map(x=>x[0]), dc=ids.filter(id=>gStat(email,id)).length;
+      const sub=c.area && S.subs.some(s=>s.creator_email===email && s.area===c.area);
+      const note=S.gnote.find(x=>x.creator_email===email && x.chapter===c.id)?.note||"";
+      return `<details class="gch" data-gch="${c.id}" ${S.gOpen.has(c.id)?"open":""}><summary><span class="gic">${ic(c.icon)}</span><b>${esc(c.title)}</b>${sub?`<span class="gbc" title="Im Bootcamp abgegeben" aria-label="Im Bootcamp abgegeben">${ic("i-learn")}</span>`:""}${note?`<span class="gnoted" title="Notiz vorhanden">✎</span>`:""}<span class="gcnt ${dc===ids.length?"full":""}">${dc}/${ids.length}</span></summary>
+        <div class="gitems">${c.items.map(([id,t])=>{ const st=gStat(email,id);
+          return `<div class="gi ${st||""}"><span>${esc(t)}</span><span class="gbtns"><button class="gb ${st==="done"?"on":""}" data-gset="${id}" data-gst="done" data-who="${esc(email)}" aria-label="besprochen" title="besprochen">✓</button><button class="gb k ${st==="known"?"on":""}" data-gset="${id}" data-gst="known" data-who="${esc(email)}" aria-label="wusste es schon" title="wusste es schon">★</button></span></div>`; }).join("")}</div>
+        <label class="f gnote">Notiz zu diesem Kapitel<textarea data-gnote="${c.id}" data-who="${esc(email)}" rows="2" placeholder="z. B. beim nächsten Gespräch nochmal Licht anschauen">${esc(note)}</textarea></label></details>`; }).join("")}
+  </div>`;
+}
+async function guideSet(email, id, st){
+  if (S.viewAs && S.real.role!=="lead") return;
+  const cur=gStat(email,id);
+  if (cur===st){ const { error }=await sb.from("guide_checks").delete().eq("creator_email",email).eq("item",id); if (error) return fail(error);
+    S.gchk=S.gchk.filter(x=>!(x.creator_email===email && x.item===id)); }
+  else { const row={ creator_email:email, item:id, status:st, by_email:S.real.email, at:new Date().toISOString() };
+    const { error }=await sb.from("guide_checks").upsert(row); if (error) return fail(error);
+    S.gchk=S.gchk.filter(x=>!(x.creator_email===email && x.item===id)).concat([row]); }
+  render(true);
+}
+async function guideNote(email, ch, text){
+  const note=String(text||"").trim().slice(0,2000);
+  const r = note ? await sb.from("guide_notes").upsert({ creator_email:email, chapter:ch, note, by_email:S.real.email, at:new Date().toISOString() })
+                 : await sb.from("guide_notes").delete().eq("creator_email",email).eq("chapter",ch);
+  if (r.error) return fail(r.error);
+  S.gnote=S.gnote.filter(x=>!(x.creator_email===email && x.chapter===ch)).concat(note?[{ creator_email:email, chapter:ch, note }]:[]);
+  toast("Notiz gespeichert.");
+}
+document.addEventListener("toggle", e=>{ const d=e.target; if (d.matches?.("details.gch")) { if (d.open) S.gOpen.add(d.dataset.gch); else S.gOpen.delete(d.dataset.gch); } }, true);
 
 /* Hook des Tages */
 const HOOKS = () => window.LDA_HOOKS || [];
@@ -2071,6 +2114,7 @@ document.addEventListener("click", async e => {
   if (t.dataset.qz){ const r=S.me.role==="creator" && qzRes(S.me.email,t.dataset.qz); if (r){ const q=QZ().find(x=>x.id===t.dataset.qz); return sheet(quizResult(q, r.result, false, r.scores?._second)); } return quizStart(t.dataset.qz); }
   if (t.dataset.qzAgain){ closeSheet(); return quizStart(t.dataset.qzAgain); }
   if (t.dataset.lvsheet) return openLvSheet(t.dataset.lvsheet);
+  if (t.dataset.gset) return guideSet(t.dataset.who, t.dataset.gset, t.dataset.gst);
   if (t.id==="inv-open" || t.id==="inv-open2") return openInvite();
   if (t.id==="inv-share") return shareInvite();
   if (t.id==="inv-copy") return copyInvite();
@@ -2168,6 +2212,7 @@ document.addEventListener("change", e => {
     e.target.value=""; $("#pend").innerHTML=pendList(n);
   }
   if (e.target.id==="bs-file") return backstageRead();
+  if (e.target.dataset.gnote) return guideNote(e.target.dataset.who, e.target.dataset.gnote, e.target.value);
   if (e.target.dataset.refgun) return refGun(e.target.dataset.refgun, e.target.checked);
   if (e.target.id==="av-file"){ const f=e.target.files[0]; e.target.value=""; return avatarUpload(f); }
   if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"start":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
