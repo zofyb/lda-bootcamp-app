@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), tabsEl = $("#tabs");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{},
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{},
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -24,7 +24,10 @@ const label = m => m ? (m.handle ? "@" + m.handle.replace(/^@/,"") : m.name) : "
 const firstName = m => String(m?.name || m?.handle || "").trim().split(/\s+/)[0] || "du";
 const subOf = (email, n) => S.subs.find(s => s.creator_email === email && s.area === n);
 const total = email => S.subs.filter(s => s.creator_email === email).reduce((a,s)=>a+(s.points||0),0);
-const creators = () => S.members.filter(m => m.role === "creator");
+const allCreators = () => S.members.filter(m => m.role === "creator");
+const creators = () => allCreators().filter(m => m.bootcamp !== false);   // Bootcamp-Teilnehmer
+const inBootcamp = m => m && (m.role !== "creator" || m.preview || m.bootcamp !== false);
+const audOf = x => x.audience || "bootcamp";
 const myCreators = () => S.me.role === "lead" ? creators() : creators().filter(c => c.manager_email === S.me.email);
 const maxPts = () => S.areas.length * 2;
 const readOnly = () => !!(S.viewAs && S.me.role === "creator");
@@ -195,17 +198,33 @@ async function load(){
   const email = lc(S.session.user.email);
   view.innerHTML = `<p class="muted">Lädt …</p>`;
   try {
-    const { data: me, error } = await sb.from("members").select("*").eq("email", email).maybeSingle();
+    let { data: me, error } = await sb.from("members").select("*").eq("email", email).maybeSingle();
     if (error) throw error;
     $("#toplogo").hidden=false;
-    if (!me) { who.innerHTML = `<button class="chip" id="logout">Abmelden</button>`; view.innerHTML = `<div class="panel stack"><h2>Kein Zugang</h2><p class="muted">Die Adresse ${esc(email)} steht nicht auf der Teilnehmerliste. Bitte melde dich bei deinem Manager.</p></div>`; return; }
+    const noAccess = msg => { who.innerHTML = `<button class="chip" id="logout">Abmelden</button>`; view.innerHTML = `<div class="panel stack"><h2>Kein Zugang</h2><p class="muted">${msg}</p></div>`; };
+    if (!me) {
+      const reg = storeGet("ldb-register") || {}, md = S.session.user.user_metadata || {};
+      const handle = md.handle || (reg.email===email ? reg.handle : ""), name = md.name || reg.name || "";
+      if (handle) {
+        const { data: res, error: ce } = await sb.rpc("claim_member", { nm:name, h:handle });
+        if (ce) throw ce;
+        storeSet("ldb-register", null);
+        if (res==="ok" || res==="exists") { ({ data: me } = await sb.from("members").select("*").eq("email", email).maybeSingle()); if (me) toast("Willkommen in der LIVEdream Academy! 💜"); }
+        else return noAccess(res==="taken" ? `Der TikTok-Name @${esc(handle)} ist schon mit einer anderen E-Mail-Adresse registriert. Bitte melde dich bei deinem Manager.` : `Der TikTok-Name @${esc(handle)} steht nicht auf unserer Liste. Bitte melde dich bei deinem Manager.`);
+      }
+      if (!me) return noAccess(`Die Adresse ${esc(email)} ist noch nicht registriert. Melde dich ab und tippe auf „Neu hier? Registrieren“.`);
+    }
+    if (me.role==="creator") {
+      const { data: role } = await sb.rpc("my_role");
+      if (!role) return noAccess("Dein Zugang zur LIVEdream Academy ist abgelaufen, weil du nicht mehr auf unserer Creator-Liste stehst. Wenn das ein Fehler ist, melde dich bei deinem Manager.");
+    }
     S.real = me; S.me = me; S.viewAs = "";
     if (me.role==="creator") {
       const r = await sb.from("activity").upsert({ creator_email:email, day:isoDay(new Date()) }, { onConflict:"creator_email,day", ignoreDuplicates:true });
       if (r?.error) console.warn(r.error);
     }
     await refresh();
-    S.tab = S.tab || (me.role === "creator" ? "themen" : me.role === "manager" ? "bewerten" : "uebersicht");
+    S.tab = S.tab || (me.role === "creator" ? (me.bootcamp ? "themen" : "akademie") : me.role === "manager" ? "bewerten" : "uebersicht");
     render();
   } catch(e){ fail(e); }
 }
@@ -221,6 +240,7 @@ async function refresh(){
   S.noExtras = !!ex.error; S.extras = ex.data || [];
   const [sn,qu,sv,tp] = await Promise.all([ sb.from("snapshots").select("*"), sb.from("questions").select("*").order("created_at",{ascending:false}), sb.from("survey").select("*"), sb.rpc("top5") ]);
   S.noUpd5 = !!(sn.error || qu.error || sv.error);
+  if (S.real?.role==="lead" || S.me?.role==="lead"){ const ro=await sb.from("roster").select("*").order("handle"); S.noRoster=!!ro.error; S.roster=ro.data||[]; }
   S.snaps = sn.data||[]; S.questions = qu.data||[]; S.survey = sv.data||[]; S.top = tp.error ? [] : (tp.data||[]);
   S.needsUpdate = !!(p.error || ac.error || st.error);
   S.progress = p.data||[]; S.activity = ac.data||[];
@@ -228,33 +248,64 @@ async function refresh(){
 }
 
 /* ---------- Login ---------- */
-function loginView(email="", sent=false, err=""){
+function loginView(email="", sent=false, err="", mode){
+  mode = mode || S._loginMode || "login"; S._loginMode = mode;
   tabsEl.hidden = true; who.innerHTML = ""; $("#switch").hidden=true; $("#toplogo").hidden=true;
   document.querySelector(".wrap").classList.remove("wide");
+  const reg = mode==="register", r = S._reg || {};
   view.innerHTML = `<div class="login">
     <img class="logo" src="logo.png" alt="LIVEdream Agency">
     <div class="stack" style="text-align:center"><span class="eyebrow">LIVEdream Academy</span>
-    <h1>${sent ? "Schau in dein <em>Postfach</em>" : "Willkommen in der <em>Academy</em>"}</h1></div>
+    <h1>${sent ? "Schau in dein <em>Postfach</em>" : reg ? "Neu in der <em>Academy</em>" : "Willkommen in der <em>Academy</em>"}</h1></div>
     <div class="panel stack">
-    <p class="soft">${sent ? `Wir haben dir eine E-Mail an <b>${esc(email)}</b> geschickt. Tippe auf den Link darin oder gib den Code hier ein.` : "Melde dich mit der E-Mail-Adresse an, die du deinem Manager gegeben hast. Du bekommst einen Anmelde-Link, ganz ohne Passwort."}</p>
-    ${sent ? `<p class="muted"><b style="color:var(--gold);font-weight:600">Keine Mail da?</b> Schau bitte im Spam-Ordner nach und markiere die Mail als „Kein Spam“. Dann kommt sie beim nächsten Mal normal an.</p>
+    ${sent ? `<p class="soft">Wir haben dir eine E-Mail an <b>${esc(email)}</b> geschickt. Tippe auf den Link darin oder gib den Code hier ein.</p>
+      <p class="muted"><b style="color:var(--gold);font-weight:600">Keine Mail da?</b> Schau bitte im Spam-Ordner nach und markiere die Mail als „Kein Spam“. Dann kommt sie beim nächsten Mal normal an.</p>
       <label class="f" for="code">Code aus der E-Mail<input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>
-      <button class="btn" id="verify">Anmelden</button><button class="btn ghost" id="restart">Andere E-Mail-Adresse</button>`
-    : `<label class="f" for="email">E-Mail-Adresse<input id="email" type="email" autocomplete="email" value="${esc(email)}"></label>
-      <button class="btn" id="send-link">Anmelde-Link schicken</button>`}
-    ${err ? `<p class="err">${esc(err)}</p>` : ""}</div>
+      <button class="btn" id="verify">${reg?"Registrierung abschließen":"Anmelden"}</button><button class="btn ghost" id="restart">Andere E-Mail-Adresse</button>`
+    : reg ? `<p class="soft">Für Creator der LIVEdream Agency. Gib deinen Namen, deinen TikTok-Namen und deine E-Mail-Adresse ein. Steht dein TikTok-Name auf unserer Liste, bist du sofort drin.</p>
+      <label class="f" for="rg-name">Dein Name<input id="rg-name" type="text" autocomplete="name" value="${esc(r.name||"")}"></label>
+      <label class="f" for="rg-handle">Dein TikTok-Name<input id="rg-handle" type="text" autocapitalize="none" autocomplete="off" placeholder="@deinname" value="${esc(r.handle||"")}"></label>
+      <label class="f" for="email">E-Mail-Adresse<input id="email" type="email" autocomplete="email" value="${esc(email)}"></label>
+      <button class="btn" id="register">Registrieren</button>
+      <button class="btn ghost" id="to-login">Ich habe schon ein Konto</button>`
+    : `<p class="soft">Melde dich mit deiner E-Mail-Adresse an. Du bekommst einen Anmelde-Link, ganz ohne Passwort.</p>
+      <label class="f" for="email">E-Mail-Adresse<input id="email" type="email" autocomplete="email" value="${esc(email)}"></label>
+      <button class="btn" id="send-link">Anmelde-Link schicken</button>
+      <button class="btn ghost" id="to-register">Neu hier? Registrieren</button>`}
+    ${err ? `<p class="err">${err}</p>` : ""}</div>
   </div>`;
   S._loginEmail = email;
+}
+async function otp(email, data){
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.origin + location.pathname, shouldCreateUser:true, data } });
+  if (error) return error.status===429 ? "Zu viele Versuche. Bitte in ein paar Minuten nochmal." : esc(error.message);
+  return null;
 }
 async function sendLink(){
   const email = lc($("#email").value);
   if (!/^\S+@\S+\.\S+$/.test(email)) return loginView(email,false,"Bitte eine gültige E-Mail-Adresse eingeben.");
   $("#send-link").disabled = true;
   const { data: ok, error: e1 } = await sb.rpc("is_member", { e: email });
-  if (e1) return loginView(email,false,e1.message);
-  if (!ok) return loginView(email,false,"Diese Adresse ist nicht freigeschaltet. Bitte frag deinen Manager.");
-  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.origin + location.pathname, shouldCreateUser:true } });
-  if (error) return loginView(email,false, error.status===429 ? "Zu viele Versuche. Bitte in ein paar Minuten nochmal." : error.message);
+  if (e1) return loginView(email,false,esc(e1.message));
+  if (!ok) return loginView(email,false,"Diese Adresse ist nicht freigeschaltet. Bist du neu? Dann tippe unten auf „Neu hier? Registrieren“.");
+  const er = await otp(email); if (er) return loginView(email,false,er);
+  loginView(email,true);
+}
+async function register(){
+  const name=$("#rg-name").value.trim(), handle=$("#rg-handle").value.trim().replace(/^@/,"").toLowerCase(), email=lc($("#email").value);
+  S._reg={ name, handle };
+  if (!name || !handle) return loginView(email,false,"Bitte Name und TikTok-Namen eingeben.");
+  if (!/^\S+@\S+\.\S+$/.test(email)) return loginView(email,false,"Bitte eine gültige E-Mail-Adresse eingeben.");
+  $("#register").disabled = true;
+  const { data: res, error } = await sb.rpc("register_check", { h:handle, e:email });
+  if (error) return loginView(email,false,esc(error.message));
+  if (res==="login"){ const er=await otp(email); if (er) return loginView(email,false,er); toast("Du hast schon ein Konto. Wir haben dir einen Anmelde-Code geschickt."); S._loginMode="login"; return loginView(email,true); }
+  const msg = { not_on_list:`Der TikTok-Name <b>@${esc(handle)}</b> steht nicht auf unserer Liste. Prüf die Schreibweise oder melde dich bei deinem Manager.`,
+    taken:`Der TikTok-Name <b>@${esc(handle)}</b> ist schon registriert. Wenn das nicht du warst, melde dich bitte bei deinem Manager.`,
+    inactive:"Diese E-Mail-Adresse hat gerade keinen Zugang. Bitte melde dich bei deinem Manager.", missing:"Bitte alles ausfüllen." }[res];
+  if (msg) return loginView(email,false,msg);
+  storeSet("ldb-register", { name, handle, email });
+  const er = await otp(email, { name, handle }); if (er) return loginView(email,false,er);
   loginView(email,true);
 }
 async function verifyCode(){
@@ -283,7 +334,7 @@ function switcher(){
   return `<label class="f" for="viewas">Ansicht<select id="viewas">
     ${opt("","Agenturleitung (alles)")}
     ${ms.length?`<optgroup label="Manager">${ms.map(m=>opt(m.email,"Manager: "+m.name)).join("")}</optgroup>`:""}
-    <optgroup label="Creator">${opt("__preview","Creator: Vorschau (alle Themen offen)")}${creators().map(c=>opt(c.email,"Creator: "+label(c))).join("")}</optgroup>
+    <optgroup label="Creator">${opt("__preview","Creator: Vorschau (alle Themen offen)")}${allCreators().map(c=>opt(c.email,"Creator: "+label(c)+(c.bootcamp===false?" (nur Akademie)":""))).join("")}</optgroup>
   </select></label>
   ${S.viewAs?`<p class="viewnote">Du siehst die App gerade so wie ${S.viewAs==="__preview"?"ein Creator":esc(S.me.role==="creator"?label(S.me):S.me.name)}.${S.me.role==="creator"?" Abgeben ist hier gesperrt, Video und Handout kannst du durchklicken.":""}</p>`:""}
   ${S.needsUpdate?`<p class="err">Die Datenbank braucht noch das Update (update-2.sql). Bis dahin fehlen Startdatum, Fortschritt und Streak.</p>`:""}
@@ -295,12 +346,14 @@ function render(keepScroll){
   const sw=$("#switch"); sw.innerHTML = switcher(); sw.hidden = !sw.innerHTML.trim();
   const st = me.role==="creator" && !me.preview ? streakInfo(me.email).cur : 0;
   who.innerHTML = `${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}<span class="chip">${esc(me.role==="creator"?firstName(me):S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
-  const t = TABS[me.role];
+  const t = me.role==="creator" ? (inBootcamp(me) ? [["themen","Bootcamp"],["akademie","Akademie"]] : [["akademie","Akademie"]]) : [...TABS[me.role], ["akademie","Akademie"]];
+  if (me.role==="creator" && !inBootcamp(me)) S.tab="akademie";
   tabsEl.hidden = t.length < 2 || !!S.openArea;
   tabsEl.innerHTML = t.map(([k,l]) => `<button data-tab="${k}" aria-pressed="${S.tab===k}">${l}</button>`).join("");
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
-  if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : creatorHome();
+  if (S.tab==="akademie" && !S.creator) html = academyView();
+  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : creatorHome();
   else if (S.creator) html = creatorDetail(S.creator);
   else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor }[S.tab] || pendingView)();
   view.innerHTML = html;
@@ -397,7 +450,7 @@ function extraCard(x, seen){
   return `<a class="doc" data-handout="${esc(x.path)}" data-extra="${esc(x.id)}" target="_blank" rel="noopener"><span class="paper ${isVid(x.path)?"vid":""}"></span><span><b>${esc(x.title)}${seen && !seen.includes(x.id)?' <span class="tag gold">Neu</span>':""}</b><small class="muted">${fileKind(x.path)}${x.note?" · "+esc(x.note):""}</small></span></a>`;
 }
 function extrasBlock(e){
-  const xs=S.extras.filter(x=>x.kind!=="reward"); if (!xs.length) return "";
+  const xs=S.extras.filter(x=>x.kind!=="reward" && audOf(x)==="bootcamp"); if (!xs.length) return "";
   const seen = storeGet("ldb-extras-"+e) || [];
   return `<div class="stack"><div class="wkh"><span>EXTRAS</span><small class="muted">Zusatz-Infos, ohne Punkte</small></div>
     <div class="extras">${xs.map(x=>extraCard(x,seen)).join("")}</div></div>`;
@@ -565,7 +618,7 @@ function topicView(a){
     ${a.handout_path ? (l2 ? `<div class="doc" aria-disabled="true"><span class="paper"></span><span><b>Handout Thema ${a.n}</b><small class="muted">PDF zum Nachlesen</small></span></div>`
       : `<a class="doc" data-handout="${esc(a.handout_path)}" data-n="${a.n}" target="_blank" rel="noopener"><span class="paper"></span><span><b>Handout Thema ${a.n} öffnen</b><small class="muted">PDF zum Nachlesen${!hOk?", danach ist deine Aufgabe frei":""}</small></span></a>`)
       : `<p class="muted">Für dieses Thema gibt es kein Handout.</p>`}
-    ${!l2 && S.extras.some(x=>x.area===a.n&&x.kind!=="reward") ? `<small class="muted">Zusätzlich zu diesem Thema</small><div class="extras">${S.extras.filter(x=>x.area===a.n&&x.kind!=="reward").map(x=>extraCard(x,storeGet("ldb-extras-"+e)||[])).join("")}</div>`:""}</section>`;
+    ${!l2 && S.extras.some(x=>x.area===a.n&&x.kind!=="reward"&&audOf(x)==="bootcamp") ? `<small class="muted">Zusätzlich zu diesem Thema</small><div class="extras">${S.extras.filter(x=>x.area===a.n&&x.kind!=="reward"&&audOf(x)==="bootcamp").map(x=>extraCard(x,storeGet("ldb-extras-"+e)||[])).join("")}</div>`:""}</section>`;
   const l3=!hOk;
   h += `<section class="panel step ${l3?"locked":""} ${ju==="task"?"unlocked":""}"><div class="sh"><span class="eyebrow">Schritt ${no}</span><h2>Deine Aufgabe</h2>${l3?`<span class="lk">🔒 nach dem Handout</span>`:""}</div>`;
   if (l3) h += `<p class="muted">Hier siehst du gleich, was du für 1 und 2 Punkte machst, und gibst deinen Nachweis ab.</p>`;
@@ -739,11 +792,94 @@ async function delQ(id){
   await refresh(); render(true); toast("Gelöscht.");
 }
 
+/* ---------- Akademie ---------- */
+function academyView(){
+  const me=S.me, staff=me.role!=="creator", lead=me.role==="lead";
+  const xs=S.extras.filter(x=>x.kind!=="reward" && (audOf(x)==="all" || (audOf(x)==="team" && staff)));
+  const seen=storeGet("ldb-extras-"+me.email)||[];
+  const groups={}; xs.forEach(x=>{ (groups[x.category||"Allgemein"] ||= []).push(x); });
+  let h=`<div class="stack"><span class="eyebrow">LIVEdream Academy</span><h1>Die <em>Akademie</em></h1>
+    <p class="muted">Schulungen, Videos und Infos für alle Creator der LIVEdream Agency. Immer offen, ohne Punkte.</p></div>`;
+  if (lead) h += S.noRoster ? `<div class="panel"><p class="err">Zuerst update-6.sql in Supabase ausführen, dann kannst du hier Inhalte hochladen.</p></div>` : `<div class="panel stack"><h2>Inhalt hinzufügen</h2>
+    <div class="grid2"><label class="f" for="ak-title">Titel<input id="ak-title" type="text" placeholder="z. B. Schulung Videoproduktion"></label>
+    <label class="f" for="ak-cat">Rubrik<input id="ak-cat" type="text" list="ak-cats" placeholder="z. B. Schulungen"><datalist id="ak-cats">${[...new Set(S.extras.map(x=>x.category).filter(Boolean).concat(["Schulungen","Infos","Videos"]))].map(c=>`<option value="${esc(c)}">`).join("")}</datalist></label>
+    <label class="f" for="ak-note">Kurzbeschreibung (optional)<input id="ak-note" type="text"></label>
+    <label class="f" for="ak-aud">Wer sieht es?<select id="ak-aud"><option value="all">Alle Creator der Agentur</option><option value="team">Nur Manager und Leitung</option></select></label></div>
+    <label class="f" for="ak-file">Datei (PDF, Video, Bild oder ZIP, max. 50 MB)<input id="ak-file" type="file"></label>
+    <button class="btn small" id="ak-add">Hinzufügen</button></div>`;
+  const cats=Object.keys(groups).sort((a,b)=>a.localeCompare(b));
+  if (!cats.length) h += `<div class="panel"><p class="muted">Hier kommen bald Schulungen und Infos rein.</p></div>`;
+  for (const c of cats){
+    h += `<div class="wkh"><span>${esc(c.toUpperCase())}</span></div><div class="extras">${groups[c].map(x=> lead
+      ? `<div class="row"><div class="head">${extraCard(x,seen)}</div><div class="actions"><span class="tag">${audOf(x)==="team"?"nur Team":"alle Creator"}</span><button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></div></div>`
+      : extraCard(x,seen)).join("")}</div>`;
+  }
+  return h;
+}
+
+/* ---------- TikTok-Liste (Zugang) ---------- */
+const normH = h => String(h||"").trim().replace(/^@/,"").toLowerCase();
+function parseRoster(text){
+  const staff=S.members.filter(m=>m.role!=="creator"), rows=[], warn=[];
+  const lines=String(text||"").replace(/\r/g,"").split("\n").map(l=>l.trim()).filter(Boolean);
+  lines.forEach((l,i)=>{
+    const c=l.split(/\t|;|,/).map(x=>x.trim().replace(/^"|"$/g,""));
+    if (i===0 && /tiktok|handle|manager|bootcamp/i.test(l) && !/^@/.test(c[0])) return;
+    const handle=normH(c[0]); if (!handle || /\s/.test(handle)) { if(handle) warn.push(`Zeile ${i+1}: „${c[0]}“ ist kein TikTok-Name`); return; }
+    const row={ handle };
+    if (c[1]){ const m=staff.find(x=>lc(x.name)===lc(c[1])||x.email===lc(c[1])||lc(x.name).split(" ")[0]===lc(c[1])); if (m) row.manager_email=m.email; else warn.push(`@${handle}: Manager „${c[1]}“ nicht gefunden`); }
+    if (c[2]) row.bootcamp=/^(ja|j|yes|y|x|1|true|bootcamp)$/i.test(c[2]);
+    rows.push(row);
+  });
+  return { rows, warn };
+}
+function rosterPreview(){
+  const { rows, warn }=parseRoster($("#ro-text").value), replace=$("#ro-replace").checked;
+  if (!rows.length) return toast("Keine TikTok-Namen gefunden.");
+  const now=new Set(S.roster.map(r=>r.handle)), inList=new Set(rows.map(r=>r.handle));
+  const neu=rows.filter(r=>!now.has(r.handle)).length, gone=replace?S.roster.filter(r=>!inList.has(r.handle)):[];
+  S.rosterPreview={ rows, warn, replace, neu, gone, text:$("#ro-text").value }; render(true);
+}
+async function rosterApply(){
+  const P=S.rosterPreview; if(!P) return;
+  const { data, error }=await sb.rpc("import_roster",{ rows:P.rows, replace_all:P.replace });
+  if (error) return fail(error);
+  S.rosterPreview=null; await refresh(); render(true); toast(`Liste übernommen (${data} Namen).`);
+}
+async function rosterToggle(h){
+  const r=S.roster.find(x=>x.handle===h); if(!r) return;
+  const { error }=await sb.rpc("import_roster",{ rows:[{ handle:h, bootcamp:!r.bootcamp }], replace_all:false }); if(error) return fail(error);
+  await refresh(); render(true);
+}
+async function rosterDelete(h){
+  const k="ro:"+h; if (S.confirmDelete!==k){ S.confirmDelete=k; return render(true); }
+  S.confirmDelete=null; const { error }=await sb.from("roster").delete().eq("handle",h); if(error) return fail(error);
+  await refresh(); render(true); toast(`@${h} hat keinen Zugang mehr.`);
+}
+function rosterPanel(){
+  if (S.noRoster) return `<div class="panel"><p class="err">Für die TikTok-Liste zuerst update-6.sql in Supabase ausführen.</p></div>`;
+  const P=S.rosterPreview, reg=h=>allCreators().find(m=>normH(m.handle)===h);
+  let h=`<div class="panel stack"><h2>TikTok-Liste <small class="muted">(${S.roster.length})</small></h2>
+    <p class="muted">Nur wer auf dieser Liste steht, kann sich registrieren und die Academy nutzen. Eine Zeile pro Creator: <b>TikTok-Name; Manager; Bootcamp (ja/nein)</b>. Du kannst die Spalten direkt aus Excel kopieren oder eine CSV-Datei wählen. Fehlt Manager oder Bootcamp, bleibt der bisherige Wert.</p>
+    <textarea id="ro-text" placeholder="@luna.live; Parec; ja&#10;@gamer_kevin; Alan; nein">${esc(P?.text||"")}</textarea>
+    <div class="actions"><label class="btn small ghost" for="ro-file">CSV-Datei wählen<input id="ro-file" type="file" accept=".csv,.txt,text/csv,text/plain" hidden></label></div>
+    <label class="qopt" style="font-size:13px;color:var(--soft)"><input type="checkbox" id="ro-replace" ${P?.replace?"checked":""}> Liste ersetzen: Wer nicht in der neuen Liste steht, verliert den Zugang</label>
+    ${P?`<div class="feedback gold"><b>Vorschau:</b> ${P.rows.length} Namen, davon ${P.neu} neu.${P.replace?` <b>${P.gone.length} verlieren den Zugang</b>${P.gone.length?": "+P.gone.slice(0,12).map(r=>"@"+esc(r.handle)).join(", ")+(P.gone.length>12?" …":""):""}.`:""}
+      ${P.warn.length?`<br><span style="color:var(--err)">${P.warn.slice(0,8).map(esc).join("<br>")}</span>`:""}</div>
+      <div class="actions"><button class="btn small gold" id="ro-apply">Ja, übernehmen</button><button class="btn small ghost" id="ro-cancel">Abbrechen</button></div>`
+    : `<button class="btn small" id="ro-preview">Vorschau</button>`}</div>`;
+  if (S.roster.length) h += `<div class="list">${S.roster.map(r=>{ const m=reg(r.handle); return `<div class="row"><div class="head"><b>@${esc(r.handle)}</b><span class="actions">
+      <button class="chip" data-robc="${esc(r.handle)}" title="Bootcamp an/aus">${r.bootcamp?"🎓 Bootcamp":"Nur Akademie"}</button>
+      <button class="chip" data-rodel="${esc(r.handle)}">${S.confirmDelete==="ro:"+r.handle?"Wirklich entfernen?":"Entfernen"}</button></span></div>
+      <span class="muted">${m?`✓ registriert (${esc(m.email)})`:"noch nicht registriert"} · ${esc(member(r.manager_email)?.name||"ohne Manager")}</span></div>`; }).join("")}</div>`;
+  return h;
+}
+
 /* ---------- Teilnehmer verwalten ---------- */
 function peopleView(){
   const m = S.editMember ? member(S.editMember) : null;
   const managers = S.members.filter(x=>x.role!=="creator");
-  let h = `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1><em>Teilnehmer</em></h1></div>
+  let h = `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1><em>Teilnehmer</em></h1></div>${rosterPanel()}
   <div class="panel stack"><h2>${m?"Person bearbeiten":"Person hinzufügen"}</h2>
   <div class="grid2">
     <label class="f" for="pm-email">E-Mail-Adresse<input id="pm-email" type="email" value="${esc(m?.email||"")}"></label>
@@ -765,6 +901,7 @@ async function saveMember(){
   if (row.role!=="creator"){ row.handle=null; row.manager_email=null; }
   const res = S.editMember ? await sb.from("members").update(row).eq("email", S.editMember) : await sb.from("members").insert(row);
   if (res.error) return fail(res.error.code==="23505"?"Diese E-Mail gibt es schon.":res.error);
+  if (row.role==="creator" && row.handle && !S.noRoster){ const r2=await sb.rpc("import_roster",{ rows:[{ handle:row.handle, manager_email:row.manager_email, bootcamp:true }], replace_all:false }); if (r2.error) console.warn(r2.error); }
   S.editMember=null; await refresh(); render(); toast("Gespeichert.");
 }
 
@@ -779,7 +916,7 @@ function areaEditor(){
     <div class="actions"><input id="st-date" type="date" value="${esc(S.settings.start||"")}" style="max-width:220px"><button class="btn small" id="st-save" ${S.needsUpdate?"disabled":""}>Start speichern</button></div></div>`;
   h += `<div class="panel stack"><h2>Extras & Belohnungen</h2><p class="muted">Extras sind immer offen, geben keine Punkte und erscheinen bei den Creatorn mit „Neu“-Zeichen. Belohnungen (z. B. Streamer-Rahmen, Overlay, Animation) sehen nur Creator ab 10 Punkten, zusammen mit ihrer Urkunde.</p>
     ${S.noExtras ? `<p class="err">Zuerst update-4.sql in Supabase ausführen.</p>` : `
-    ${S.extras.length?`<div class="list">${S.extras.map(x=>`<div class="row"><div class="head"><b>${x.kind==="reward"?"🎁":isVid(x.path)?"🎬":"📄"} ${esc(x.title)}${x.area?` <span class="muted">· Thema ${x.area}</span>`:""}</b><span class="actions"><a class="chip" data-handout="${esc(x.path)}" target="_blank" rel="noopener" style="text-decoration:none">Öffnen</a><button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></span></div>${x.note?`<span class="muted">${esc(x.note)}</span>`:""}</div>`).join("")}</div>`:""}
+    ${S.extras.filter(x=>audOf(x)==="bootcamp").length?`<div class="list">${S.extras.filter(x=>audOf(x)==="bootcamp").map(x=>`<div class="row"><div class="head"><b>${x.kind==="reward"?"🎁":isVid(x.path)?"🎬":"📄"} ${esc(x.title)}${x.area?` <span class="muted">· Thema ${x.area}</span>`:""}</b><span class="actions"><a class="chip" data-handout="${esc(x.path)}" target="_blank" rel="noopener" style="text-decoration:none">Öffnen</a><button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></span></div>${x.note?`<span class="muted">${esc(x.note)}</span>`:""}</div>`).join("")}</div>`:""}
     <div class="grid2"><label class="f" for="ex-title">Titel<input id="ex-title" type="text" placeholder="z. B. Richtlinien & Tabus"></label>
     <label class="f" for="ex-note">Kurzbeschreibung (optional)<input id="ex-note" type="text" placeholder="z. B. Was im Live erlaubt ist"></label></div>
     <div class="grid2"><label class="f" for="ex-kind">Art<select id="ex-kind"><option value="extra">Extra (für alle, sofort)</option><option value="reward">Belohnung (ab 10 Punkten)</option></select></label>
@@ -811,15 +948,16 @@ function areaEditor(){
   <button class="btn" id="ae-save">Thema speichern</button></div>`;
   return h;
 }
-async function addExtra(){
-  const title=$("#ex-title").value.trim(), note=$("#ex-note").value.trim()||null, f=$("#ex-file").files[0];
+async function addExtra(pre="ex"){
+  const q=id=>$(`#${pre}-${id}`);
+  const title=q("title").value.trim(), note=q("note").value.trim()||null, f=q("file").files[0];
   if (!title || !f) return toast("Bitte Titel und Datei auswählen.");
-  const vid=/^video\//.test(f.type)||isVid(f.name), ext=(f.name.match(/\.([a-z0-9]{2,5})$/i)?.[1]||(vid?"mp4":"pdf")).toLowerCase(), area=+$("#ex-area").value||null, kind=$("#ex-kind")?.value||"extra";
+  const vid=/^video\//.test(f.type)||isVid(f.name), ext=(f.name.match(/\.([a-z0-9]{2,5})$/i)?.[1]||(vid?"mp4":"pdf")).toLowerCase(), area=+(q("area")?.value)||null, kind=q("kind")?.value||"extra", audience=q("aud")?.value||null, category=q("cat")?.value.trim()||null;
   if (f.size>MAX_FILE) return toast("Die Datei ist größer als 50 MB.");
   try{
-    $("#ex-add").disabled=true; $("#ex-add").textContent="Wird hochgeladen …";
+    q("add").disabled=true; q("add").textContent="Wird hochgeladen …";
     const path=`extra-${Date.now()}.${ext}`; let r=await sb.storage.from("unterlagen").upload(path,f,{contentType:f.type||"application/octet-stream"}); if(r.error) throw r.error;
-    r=await sb.from("extras").insert(Object.assign({ title, note, path, area, sort:S.extras.length }, kind==="reward"?{kind}:{})); if(r.error) throw r.error;
+    r=await sb.from("extras").insert(Object.assign({ title, note, path, area, sort:S.extras.length }, kind==="reward"?{kind}:{}, audience?{audience, category}:{})); if(r.error) throw r.error;
     await refresh(); render(true); toast("Extra hinzugefügt.");
   } catch(e){ fail(e); render(true); }
 }
@@ -924,6 +1062,9 @@ document.addEventListener("click", async e => {
   if (t.id==="send-link") return sendLink();
   if (t.id==="verify") return verifyCode();
   if (t.id==="restart") return loginView();
+  if (t.id==="register") return register();
+  if (t.id==="to-register"){ S._loginMode="register"; return loginView($("#email")?.value||""); }
+  if (t.id==="to-login"){ S._loginMode="login"; return loginView($("#email")?.value||""); }
   if (t.id==="logout"){ await sb.auth.signOut(); Object.assign(S,{me:null,real:null,viewAs:"",tab:null,creator:null,openArea:null,ringShown:false,localProg:{}}); return loginView(); }
   if (t.dataset.tab){ S.tab=t.dataset.tab; S.creator=null; S.editMember=null; return render(); }
   if (t.dataset.area){
@@ -965,7 +1106,13 @@ document.addEventListener("click", async e => {
     S.editMember=null; S.confirmDelete=null; await refresh(); render(); return toast("Gelöscht.");
   }
   if (t.id==="st-save") return saveStart();
-  if (t.id==="ex-add") return addExtra();
+  if (t.id==="ex-add") return addExtra("ex");
+  if (t.id==="ak-add") return addExtra("ak");
+  if (t.id==="ro-preview") return rosterPreview();
+  if (t.id==="ro-apply") return rosterApply();
+  if (t.id==="ro-cancel"){ S.rosterPreview=null; return render(true); }
+  if (t.dataset.robc) return rosterToggle(t.dataset.robc);
+  if (t.dataset.rodel) return rosterDelete(t.dataset.rodel);
   if (t.dataset.delextra) return delExtra(t.dataset.delextra);
   if (t.id==="ae-save") return saveArea();
 });
@@ -976,7 +1123,8 @@ document.addEventListener("change", e => {
     S.pending[n]=[...(S.pending[n]||[]), ...fs.filter(f=>f.size<=MAX_FILE)];
     e.target.value=""; $("#pend").innerHTML=pendList(n);
   }
-  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"themen":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
+  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?(inBootcamp(S.me)?"themen":"akademie"):S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
+  if (e.target.id==="ro-file"){ const f=e.target.files[0]; if(f) f.text().then(tx=>{ $("#ro-text").value=tx; toast("Datei eingelesen. Jetzt „Vorschau“ tippen."); }); return; }
   if (e.target.dataset.snap) return uploadSnap(e.target.dataset.snap, e.target.files[0]);
   if (e.target.id==="ae-n"){ S.editArea=+e.target.value; render(true); }
 });
@@ -984,7 +1132,7 @@ document.addEventListener("input", e => { if (e.target.id==="note"){ const c=$("
 document.addEventListener("keydown", e => {
   if (e.key==="Escape") $("#win").classList.remove("show");
   if (e.key!=="Enter") return;
-  if (e.target.id==="email") sendLink();
+  if (e.target.id==="email") (S._loginMode==="register" ? register() : sendLink());
   if (e.target.id==="code") verifyCode();
 });
 

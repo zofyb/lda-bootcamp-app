@@ -15,7 +15,8 @@ const db = {
     {email:"c2@demo", role:"creator", name:"Kevin Beispiel", handle:"gamer_kevin", manager_email:"lena@demo"},
     {email:"c3@demo", role:"creator", name:"Jenny Beispiel", handle:"jenny.mama", manager_email:"max@demo"},
     {email:"c4@demo", role:"creator", name:"Tim Beispiel", handle:"tim.talks", manager_email:"max@demo"},
-    {email:"c5@demo", role:"creator", name:"Sofia Beispiel", handle:"sofia.sings", manager_email:"demo@demo"}
+    {email:"c5@demo", role:"creator", name:"Sofia Beispiel", handle:"sofia.sings", manager_email:"demo@demo"},
+    {email:"c6@demo", role:"creator", name:"Mia Beispiel", handle:"mia.vibes", manager_email:"max@demo", bootcamp:false}
   ],
   submissions: [
     {id:"s1", creator_email:"c1@demo", area:1, points:2, feedback:"Mega Bio, genau so!", note:"Profil komplett neu gemacht, Screenshots anbei.", files:[], submitted_at:iso(now-9*D), rated_by:"lena@demo", rated_at:iso(now-8*D)},
@@ -29,7 +30,15 @@ const db = {
     {id:"s9", creator_email:"c5@demo", area:1, points:2, files:[], submitted_at:iso(now-9*D), rated_by:"demo@demo", rated_at:iso(now-9*D)},
     {id:"s10", creator_email:"c5@demo", area:2, points:2, files:[], submitted_at:iso(now-4*D), rated_by:"demo@demo", rated_at:iso(now-4*D)}
   ],
-  progress: [], snapshots: [], extras: [],
+  progress: [], snapshots: [],
+  extras: [
+    {id:"e1", title:"Richtlinien & Tabus", note:"Was im Live erlaubt ist", path:"demo-1.pdf", audience:"all", category:"Infos", kind:"extra"},
+    {id:"e2", title:"Geschenke mit Extra-Wirkung", note:"Beschützer, Superfan, Schatzkiste", path:"demo-2.pdf", audience:"all", category:"Infos", kind:"extra"},
+    {id:"e3", title:"Schulung Videoproduktion", note:"Aufzeichnung der Agentur-Schulung", path:"demo-3.mp4", audience:"all", category:"Schulungen", kind:"extra"},
+    {id:"e4", title:"Leitfaden für Manager", path:"demo-4.pdf", audience:"team", category:"Team", kind:"extra"},
+    {id:"e5", title:"Untertitel erstellen", path:"demo-5.mp4", audience:"bootcamp", area:2, kind:"extra"}
+  ],
+  roster: ["luna.live","gamer_kevin","jenny.mama","tim.talks","sofia.sings","mia.vibes","neu.creator"].map(h=>({ handle:h, bootcamp:h!=="mia.vibes"&&h!=="neu.creator", manager_email:{"luna.live":"lena@demo","gamer_kevin":"lena@demo","jenny.mama":"max@demo","tim.talks":"max@demo","mia.vibes":"max@demo"}[h]||null })),
   activity: ["c1@demo","c1@demo","c1@demo","c3@demo","c5@demo"].map((e,i)=>({creator_email:e, day:day(i<3?i:0)})),
   settings: [{key:"start", value:start}],
   questions: [
@@ -38,9 +47,10 @@ const db = {
   ],
   survey: [{creator_email:"c5@demo", rating:5, helped:2, missing:"Mehr Beispiele für Hooks", wish:"Schulung zu Events", created_at:iso(now-D)}]
 };
-const keys = { progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"] };
+db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootcamp=true; });
+const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"] };
 function q(t){
-  let rows = db[t] || [], op = null, payload = null; const flt = [];
+  let rows = db[t] || (db[t]=[]), op = null, payload = null; const flt = [];
   const o = {
     select(){ return o }, order(){ return o }, eq(k,v){ flt.push([k,v]); return o },
     maybeSingle(){ return o.then(r => ({ data:(r.data||[])[0]||null, error:null })) },
@@ -71,6 +81,11 @@ window.supabase = { createClient(){ return {
   }; } },
   rpc:async(n,a)=>{
     if (n==="top5") return { data:top5(), error:null };
+    if (n==="my_role") return { data:"lead", error:null };
+    if (n==="import_roster"){ const rows=a.rows||[]; if(a.replace_all) db.roster=db.roster.filter(r=>rows.some(x=>x.handle===r.handle));
+      rows.forEach(x=>{ const r=db.roster.find(y=>y.handle===x.handle); if(r){ if(x.manager_email) r.manager_email=x.manager_email; if(x.bootcamp!==undefined) r.bootcamp=x.bootcamp; } else db.roster.push({ handle:x.handle, manager_email:x.manager_email||null, bootcamp:!!x.bootcamp }); });
+      db.members.forEach(m=>{ const r=db.roster.find(y=>y.handle===m.handle); if(r&&m.role==="creator"){ m.bootcamp=r.bootcamp; if(r.manager_email) m.manager_email=r.manager_email; } });
+      return { data:rows.length, error:null }; }
     if (n==="rate_submission"){ const s=db.submissions.find(x=>x.id===a.sub_id); if(s){ s.points=a.pts; s.feedback=a.fb; s.rated_by="demo@demo"; s.rated_at=new Date().toISOString(); } return { data:null, error:null }; }
     return { data:true, error:null };
   }
