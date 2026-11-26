@@ -288,12 +288,14 @@ fieldset.qedit legend{font-size:12px;font-weight:600;color:var(--lilac);padding:
 .path.reveal::before{animation:none}}
 
 /* Sag's uns: runder Knopf + Fenster */
-.fab{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:30;display:flex;align-items:center;gap:8px;padding:12px 16px 12px 13px;border-radius:99px;border:1px solid rgba(255,255,255,.18);cursor:pointer;color:#fff;font:600 13px var(--body);background:linear-gradient(135deg,var(--rose),var(--plum));box-shadow:0 10px 30px rgba(160,30,140,.5),0 0 0 4px rgba(214,64,159,.12);animation:fabIn .6s cubic-bezier(.2,1.4,.4,1) both .4s}
-.fab .ic{font-size:18px;line-height:1}
+.fab{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:30;display:flex;align-items:center;gap:8px;padding:12px 16px 12px 13px;border-radius:99px;border:1px solid rgba(255,255,255,.18);cursor:pointer;color:#fff;font:600 13px var(--body);background:linear-gradient(135deg,var(--rose),var(--plum));box-shadow:0 10px 30px rgba(160,30,140,.5),0 0 0 4px rgba(214,64,159,.12);animation:fabIn .6s cubic-bezier(.2,1.4,.4,1) both .4s}
+.fab .ic{display:grid;place-items:center;line-height:1}
+.fab .ic svg{animation:envWiggle 4s ease-in-out infinite 2s}
+@keyframes envWiggle{0%,86%,100%{transform:none}89%{transform:rotate(-12deg)}92%{transform:rotate(10deg)}95%{transform:rotate(-6deg)}}
 .fab:active{transform:scale(.96)}
 @keyframes fabIn{from{opacity:0;transform:translateY(20px) scale(.8)}to{opacity:1;transform:none}}
 .kkcard{display:flex;align-items:center;gap:14px;width:100%;text-align:left;cursor:pointer;color:inherit;font:inherit}
-.kkcard .ic{font-size:26px}
+.kkcard .ic{display:grid;place-items:center;width:52px;height:52px;border-radius:16px;flex:none;color:#fff;background:linear-gradient(135deg,var(--rose),var(--plum))}
 .kkcard>span:nth-child(2){flex:1}
 .kkcard small{display:block}
 .kk-safe{background:rgba(95,227,168,.08);border:1px solid rgba(95,227,168,.25);color:var(--soft);border-radius:12px;padding:10px 12px;font-size:13px}
@@ -345,4 +347,4 @@ details.past .extras{margin-top:8px}
 .task.done b{text-decoration:line-through;color:var(--muted)}
 .late{color:var(--err)!important}
 a.btn{display:block;text-align:center;text-decoration:none}
-body:has(#kk-fab:not([hidden])) .wrap{padding-bottom:90px}
+body:has(#kk-fab:not([hidden])) .wrap{padding-bottom:150px}

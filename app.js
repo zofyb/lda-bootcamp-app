@@ -567,7 +567,7 @@ function topBlock(){
 }
 function questionBlock(){
   if (S.noUpd5) return "";
-  return `<button class="panel kkcard" id="kk-open"><span class="ic" aria-hidden="true">✉️</span><span><b>Sag's uns</b><small class="muted">Frage, Kritik oder Wunsch. Anonym, ohne Namen.</small></span><span class="go">Schreiben</span></button>`;
+  return `<button class="panel kkcard" id="kk-open"><span class="ic"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></svg></span><span><b>Sag's uns</b><small class="muted">Frage, Kritik oder Wunsch. Anonym, ohne Namen.</small></span><span class="go">Schreiben</span></button>`;
 }
 function surveyBlock(e){
   if (S.noUpd5 || S.me.role!=="creator") return "";
@@ -878,7 +878,7 @@ const kkLabel = k => (KK_KINDS.find(x=>x[0]===(k||"frage"))||KK_KINDS[0])[1];
 function fab(){
   let b=$("#kk-fab");
   if (!b){ b=document.createElement("button"); b.id="kk-fab"; b.className="fab"; b.setAttribute("aria-label","Anonyme Nachricht schreiben");
-    b.innerHTML=`<span class="ic" aria-hidden="true">✉️</span><span class="tx">Anonym</span>`; document.body.appendChild(b); }
+    b.innerHTML=`<span class="ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></svg></span><span class="tx">Anonym</span>`; document.body.appendChild(b); }
   b.hidden = !(S.me && S.me.role==="creator" && !S.noUpd5) || !!S.openArea;
 }
 function openKK(){
