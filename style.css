@@ -814,3 +814,27 @@ div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;
 .sheet .panel{background:none;border:0;box-shadow:none;padding:0}
 .sheet .panel::before,.sheet .panel::after{content:none}
 .sheet>.panel:first-of-type .sh,.sheet .panel .sh{padding-right:44px}
+/* Manager-Punkte */
+.mlv{display:flex;flex-direction:column;gap:10px;border-color:rgba(255,176,23,.35)}
+.mlvtop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.mlvtop h2{margin:2px 0}
+.mlvtop small{color:var(--muted);font-size:12.5px}
+.mq{flex:none;text-align:center;min-width:86px;padding:8px 10px;border-radius:14px;background:var(--panel2);border:1px solid var(--line2)}
+.mq b{display:block;font:700 22px var(--head,var(--body));color:var(--fg)}
+.mq small{display:block;font-size:11px;color:var(--muted);line-height:1.25}
+.mq.ok{border-color:rgba(95,227,168,.5)}.mq.ok b{color:var(--ok)}
+.mhow summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--lilac)}
+.mhow ul{margin:8px 0;padding-left:18px;display:grid;gap:4px;font-size:13px;color:var(--soft)}
+.mtbody{margin:0;font-size:14.5px;line-height:1.45;color:var(--fg);white-space:pre-wrap;border-left:2px solid var(--gold);padding-left:10px}
+.mtask.done{opacity:.8}
+.tconf{border-color:rgba(214,64,159,.5)}
+.tklist{display:grid;gap:8px;margin-top:4px}
+.tk{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line);display:grid;gap:6px;justify-items:start}
+.tktop{display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%}
+.tktop small{color:var(--muted);font-size:12px}
+.tktop .tag{margin-left:auto}
+.tk p{margin:0;font-size:13.5px;color:var(--soft);white-space:pre-wrap}
+.tk .chip{cursor:pointer}
+.chip.ok{color:var(--ok);border-color:rgba(95,227,168,.4)}
+.chip.warn{color:var(--gold);border-color:rgba(255,176,23,.4)}
+.pendl .chip{cursor:pointer}

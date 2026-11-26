@@ -99,6 +99,13 @@ db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootc
     {id:"bk3", owner_email:"max@demo", creator_email:"c3@demo", starts_at:nextDow(2,19,30), minutes:30, how:"WhatsApp-Anruf", topic:"Kampagne im Dezember"}];
   const hAgo=h=>new Date(Date.now()-h*36e5).toISOString(), hIn=h=>{ const x=new Date(Date.now()+h*36e5); x.setMinutes(0,0,0); return x.toISOString(); };
   db.extras.push({ id:"yt1", kind:"extra", title:"Schulung Geschenke & Gifting (Aufzeichnung)", note:"Mit Präsentation", path:"youtube", link:"https://youtu.be/aqz-KE-bpKQ", audience:"all", category:"Schulungen", sort:99, created_at:hAgo(10) });
+  const isoD=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`, dAgo=n=>{ const x=new Date(); x.setDate(x.getDate()-n); return isoD(x); }, mon=(()=>{ const x=new Date(); x.setHours(0,0,0,0); x.setDate(x.getDate()-((x.getDay()+6)%7)); return isoD(x); })();
+  db.talks=[
+    {id:"tk1", manager_email:"lena@demo", creator_key:"c1@demo", day:dAgo(1), tips:"– Licht von vorne statt von oben\n– 3× pro Woche live, immer zur gleichen Zeit\n– Anlaufvideo 30 Min. vorher", status:"offen", created_at:hAgo(20)},
+    {id:"tk2", manager_email:"lena@demo", creator_key:"c2@demo", day:dAgo(6), tips:"– Hook in den ersten 2 Sekunden\n– Match-Börse ausprobieren", status:"ok", created_at:hAgo(140)},
+    {id:"tk3", manager_email:"max@demo", creator_key:"c3@demo", day:dAgo(3), tips:"– Overlay mit Wochenplan", status:"ok", created_at:hAgo(70)}];
+  db.mtasks=[{id:"mt1", manager_email:"lena@demo", week:mon, body:"Poste diese Woche ein Video mit Text-Hook und schick mir den Link per WhatsApp.", created_at:hAgo(30)}];
+  db.mtask_done=[{task_id:"mt1", creator_email:"c2@demo", at:hAgo(5)}];
   db.match_posts=[
     {id:"mp1", author_email:"c3@demo", handle:"jenny.mama", live_at:hAgo(0.5), rules:"Best of 3, wer verliert, singt ein Lied", note:"Bin gerade live, komm rein!", created_at:hAgo(1)},
     {id:"mp2", author_email:"c5@demo", handle:"sofia.sings", live_at:hIn(3), rules:"5 Runden, Verlierer macht eine Strafe", note:null, created_at:hAgo(2)},
@@ -143,6 +150,7 @@ window.supabase = { createClient(){ return {
     createSignedUrls:async p=>({ data:p.map(x=>({ path:x, signedUrl:/^demo-(tt|w)/.test(x)?TTCOVER(x):/^demo-av/.test(x)?"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f7b2d9'/%3E%3Cstop offset='1' stop-color='%236a2a9a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3Ccircle cx='50' cy='40' r='18' fill='%23fff' fill-opacity='.85'/%3E%3Cpath d='M18 100c4-22 18-32 32-32s28 10 32 32z' fill='%23fff' fill-opacity='.85'/%3E%3C/svg%3E":null })) }), createSignedUrl:async()=>({ data:null })
   }; } },
   rpc:async(n,a)=>{
+    if (n==="answer_talk"){ const t=(db.talks||[]).find(x=>x.id===a.tid); if (t&&t.status==="offen") t.status=a.ok?"ok":"nein"; return { data:"ok", error:null }; }
     if (n==="top5") return { data:top5(), error:null };
     if (n==="my_role") return { data:"lead", error:null };
     if (n==="import_roster"){ const rows=a.rows||[]; if(a.replace_all) db.roster=db.roster.filter(r=>rows.some(x=>x.handle===r.handle));

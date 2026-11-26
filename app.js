@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), bnav = $("#bnav");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, refs:[], noUpd11:false, gchk:[], gnote:[], noUpd13:false, mp:[], ml:[], wins:[], wr:[], noUpd16:false, mpForm:false, wForm:false,  gOpen:new Set(), impAns:null,
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, refs:[], noUpd11:false, gchk:[], gnote:[], noUpd13:false, mp:[], ml:[], wins:[], wr:[], noUpd16:false, talks:[], mt:[], md:[], noUpd19:false, mpForm:false, wForm:false,  gOpen:new Set(), impAns:null,
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -274,6 +274,8 @@ async function refresh(){
   const [av,ao,bk]=await Promise.all([ sb.from("avail").select("*").order("weekday"), sb.from("avail_off").select("*"), sb.from("bookings").select("*").gte("starts_at", new Date(Date.now()-DAY).toISOString()).order("starts_at") ]);
   const [mp,ml,wi,wr]=await Promise.all([ sb.from("match_posts").select("*").gte("until", new Date().toISOString()).order("live_at"), sb.from("match_likes").select("*").gte("created_at", new Date(Date.now()-16*DAY).toISOString()), sb.from("wins").select("*").order("created_at",{ ascending:false }).limit(60), sb.from("win_reacts").select("*") ]);
   S.noUpd16=!!(mp.error||ml.error||wi.error||wr.error); S.mp=mp.data||[]; S.ml=ml.data||[]; S.wins=wi.data||[]; S.wr=wr.data||[];
+  const [tk,mt,md]=await Promise.all([ sb.from("talks").select("*").order("day",{ ascending:false }), sb.from("mtasks").select("*").order("week",{ ascending:false }), sb.from("mtask_done").select("*") ]);
+  S.noUpd19=!!(tk.error||mt.error||md.error); S.talks=tk.data||[]; S.mt=mt.data||[]; S.md=md.data||[];
   S.noUpd14=!!(av.error||ao.error||bk.error); S.av=av.data||[]; S.avOff=ao.data||[]; S.bk=bk.data||[];
   if (!S.noUpd14 && S.real?.role==="creator"){ const bz=await sb.rpc("busy_times"); S.busy=new Set(Array.isArray(bz.data)?bz.data.map(x=>+new Date(x)):[]); }
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
@@ -354,7 +356,7 @@ async function verifyCode(){
 
 /* ---------- Rahmen ---------- */
 const ic = (n, cls="") => `<svg class="ico ${cls}" aria-hidden="true"><use href="#${n}"/></svg>`;
-const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","match","erfolge"];
+const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","match","erfolge","mteam"];
 function navItems(){
   const me=S.me;
   if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],["anim","i-spark","Animation"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
@@ -411,7 +413,7 @@ function render(keepScroll){
   else if (S.tab==="kalender") html = calendarView();
   else if (S.tab==="termine") html = termView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
-  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView }[S.tab] || pendingView)();
+  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView, mteam:mteamView }[S.tab] || pendingView)();
   view.innerHTML = html;
   if (!keepScroll) window.scrollTo(0,0);
   afterRender(); watchAni(); fab();
@@ -895,14 +897,14 @@ function pendingDetail(h){
   return `<button class="btn ghost small back" id="back">← Zurück</button>
     <div class="stack"><span class="eyebrow">${esc(member(r.manager_email)?.name?"Manager: "+member(r.manager_email).name:"ohne Manager")}</span><h1>@${esc(h)}</h1>
     <p class="muted">${r.name?esc(r.name)+" · ":""}Steht auf der Liste, ist aber noch nicht in der App. Alles, was du hier abhakst und notierst, wird übernommen, sobald sich der Creator registriert.</p></div>
-    ${guideBlock("h:"+h)}`;
+    ${talkPanel("h:"+h)}${guideBlock("h:"+h)}`;
 }
 function creatorDetail(email){
   const c=member(email); if(!c){ S.creator=null; return ""; }
   let h=`<button class="btn ghost small back" id="back">← Zurück</button>
     <div class="stack"><span class="eyebrow">${esc(member(c.manager_email)?.name?"Manager: "+member(c.manager_email).name:"ohne Manager")}</span><h1>${esc(label(c))}</h1>
     <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p><div class="titles">${titleChips(email,false)}</div></div>
-    ${S.noUpd9?"":lvHero(email,false)}${liveStand(email)}${recCard(email,false)}${goalAdmin(email)}${guideBlock(email)}
+    ${S.noUpd9?"":lvHero(email,false)}${liveStand(email)}${recCard(email,false)}${goalAdmin(email)}${talkPanel(email)}${guideBlock(email)}
     <div class="hexes">${allBadges(email).map(hexBadge).join("")}</div>
     ${snapOf(email,"vorher")||snapOf(email,"nachher")?`<div class="panel stack"><h2>Vorher-Nachher</h2><div class="snaps">${["vorher","nachher"].map(k=>{const x=snapOf(email,k); return `<div class="snap">${x?`<a data-path="${esc(x.path)}" target="_blank" rel="noopener"><img data-img="${esc(x.path)}" alt="${k}"></a>`:`<div class="ph">–</div>`}<small>${k==="vorher"?"Vorher":"Nachher"}</small></div>`;}).join("")}</div></div>`:""}
     <div class="list">`;
@@ -1123,6 +1125,7 @@ function startView(){
   ${inviteBar()}
   ${nextCard(e)}
   ${hk||im?`<div class="daily">${hk?`<button class="dcard ${hkDone?"done":""}" id="hook-open"><span class="dic">${ic("i-spark")}</span><b>Hook des Tages</b><small>${hkDone?"Erledigt ✓":"+10 XP"}</small></button>`:""}${im?`<button class="dcard ${imDone?"done":""}" id="imp-open"><span class="dic">${ic("i-bulb")}</span><b>Impuls der Woche</b><small>${imDone?"Angesehen ✓":"bis +50 XP"}</small></button>`:""}</div>`:""}
+  ${creatorMgrCards(e)}
   ${goalCard(e,true)}
   <div class="tiles">
     ${boot?tile("i-learn","Bootcamp",'data-tab="lernen" data-learn="bootcamp"',`<span class="tbar"><i style="width:${fill}%"></i></span>`):""}
@@ -1174,7 +1177,7 @@ function profileView(email){
 }
 function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
-  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
+  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
   return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${partnerTiles()}</div>`;
 }
 function leadStart(){ if (S.me.role==="manager") return mgrStart(); return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
@@ -1500,6 +1503,7 @@ function mgrStart(){
       ${k("i-check",open,"Bewerten","bewerten",1)}
       ${S.noUpd14?"":k("i-clock",bk,"1:1 gebucht","termine")}
     </div>
+    ${mgrBlock(me.email)}
     <div class="sec"><span>Neuigkeiten</span><small>letzte 7 Tage</small></div>
     ${news.length?`<div class="news">${news.map(n=>`<button class="nrow" ${n.go}><span class="kic">${ic(n.ic)}</span><span>${n.t}</span><small>${ago(n.at)}</small></button>`).join("")}</div>`:`<p class="muted">Gerade nichts Neues von deinen Creatorn.</p>`}
     <div class="sec"><span>Bereiche</span></div>
@@ -1572,6 +1576,7 @@ function xpParts(email){
   for (const b of bsRows(email)) parts.live += (b.days||0)*10 + Math.max(rankBonus(b.rank_d), rankBonus(b.rank_t));
   parts.ziel += S.goals.filter(g=>g.creator_email===email && g.done).length*250;
   parts.werben = recOk(email)*REC_XP;
+  parts.app += S.md.filter(d=>d.creator_email===email).length*MXP.cdone;
   return parts;
 }
 const xpOf = email => Object.values(xpParts(email)).reduce((a,b)=>a+b,0);
@@ -2781,6 +2786,176 @@ async function hydrateWins(){
   imgs.forEach(i=>{ const u=AVURL["w:"+i.dataset.win]; if (u) i.src=u; });
 }
 
+/* ---------- Manager-Punkte: Gespräche, Wochenaufgabe, Stufen (nur Manager selbst + Leitung sehen das) ---------- */
+const MLEVELS = [[0,"Betreuer"],[500,"Coach"],[1500,"Mentor"],[3500,"Senior-Coach"],[7000,"Head-Coach"]];
+const MXP = { talk:50, talkList:20, task:10, done:10, rec:300, camp:50, pass:100, goal:250, cdone:20 };
+const ymOf = d => String(d||"").slice(0,7);
+const mondayKey = (d=new Date()) => { const x=new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate()-((x.getDay()+6)%7)); return isoDay(x); };
+const peopleOf = mgr => allCreators().filter(c=>c.manager_email===mgr);
+const pendingOf = mgr => { const reg=new Set(allCreators().map(c=>normH(c.handle))); return (S.roster||[]).filter(r=>r.manager_email===mgr && !reg.has(normH(r.handle))); };
+const teamKeys = mgr => peopleOf(mgr).map(c=>c.email).concat(pendingOf(mgr).map(r=>"h:"+normH(r.handle)));
+const keyLabel = k => k.startsWith("h:") ? "@"+k.slice(2) : label(member(k)) || k;
+const counted = t => t.status==="ok" || t.status==="liste";
+const weekTask = mgr => S.mt.find(t=>t.manager_email===mgr && t.week===mondayKey());
+const doneOf = tid => S.md.filter(d=>d.task_id===tid);
+const talkedSet = (mgr, ym=ymNow()) => new Set(S.talks.filter(t=>t.manager_email===mgr && counted(t) && ymOf(t.day)===ym).map(t=>t.creator_key));
+function mxpParts(mgr){
+  const p={ gespraeche:0, aufgaben:0, werben:0, bootcamp:0, ziel:0 }, best={};
+  S.talks.filter(t=>t.manager_email===mgr && counted(t)).forEach(t=>{ const k=t.creator_key+"|"+ymOf(t.day), v=t.status==="ok"?MXP.talk:MXP.talkList; best[k]=Math.max(best[k]||0,v); });
+  p.gespraeche=Object.values(best).reduce((a,b)=>a+b,0);
+  const tasks=S.mt.filter(t=>t.manager_email===mgr);
+  p.aufgaben=tasks.length*MXP.task + tasks.reduce((a,t)=>a+doneOf(t.id).length*MXP.done,0);
+  p.werben=recOk(mgr)*MXP.rec;
+  const ppl=peopleOf(mgr); p.bootcamp=ppl.filter(c=>c.bootcamp===true).length*MXP.camp + ppl.filter(c=>c.bootcamp===true && passed(c.email)).length*MXP.pass;
+  const team=teamKeys(mgr); if (team.length){ const months=new Set(S.talks.filter(t=>t.manager_email===mgr).map(t=>ymOf(t.day)));
+    months.forEach(m=>{ const s=talkedSet(mgr,m); if (team.every(k=>s.has(k))) p.ziel+=MXP.goal; }); }
+  return p;
+}
+const mxpOf = mgr => Object.values(mxpParts(mgr)).reduce((a,b)=>a+b,0);
+function mLevel(xp){ let i=0; MLEVELS.forEach(([min],k)=>{ if (xp>=min) i=k; }); const [min,name]=MLEVELS[i], nx=MLEVELS[i+1];
+  return { i, name, min, next:nx?.[0], nextName:nx?.[1], pct: nx ? Math.round((xp-min)/(nx[0]-min)*100) : 100 }; }
+function lastContact(k){
+  const ds=[ ...S.talks.filter(t=>t.creator_key===k && t.status!=="nein").map(t=>+new Date(t.day+"T12:00")),
+             ...S.gchk.filter(x=>x.creator_email===k && x.at).map(x=>+new Date(x.at)),
+             ...S.gnote.filter(x=>x.creator_email===k && x.at).map(x=>+new Date(x.at)) ];
+  return ds.length ? Math.max(...ds) : 0;
+}
+function staleList(mgr){ return teamKeys(mgr).map(k=>({ k, at:lastContact(k) })).filter(x=>!x.at || Date.now()-x.at>14*DAY).sort((a,b)=>a.at-b.at); }
+function inactiveList(mgr){
+  const ms=[...new Set(S.bs.map(b=>b.month))].sort(); const m=ms[ms.length-1]; if (!m) return { m:null, list:[] };
+  const hs=new Map(peopleOf(mgr).map(c=>[normH(c.handle),c.email]).concat(pendingOf(mgr).map(r=>[normH(r.handle),"h:"+normH(r.handle)])));
+  return { m, list:S.bs.filter(b=>b.month===m && hs.has(normH(b.handle)) && (b.days||0)<5).map(b=>({ k:hs.get(normH(b.handle)), days:b.days||0 })).sort((a,b)=>a.days-b.days) };
+}
+const keyBtn = (k, extra) => `<button class="chip" ${k.startsWith("h:")?`data-pend="${esc(k.slice(2))}"`:`data-creator="${esc(k)}"`}>${esc(keyLabel(k))}${extra?` · ${extra}`:""}</button>`;
+
+function mgrBlock(mgr){
+  if (S.noUpd19) return "";
+  const xp=mxpOf(mgr), L=mLevel(xp), team=teamKeys(mgr), talked=talkedSet(mgr), done=team.filter(k=>talked.has(k)).length;
+  const st=staleList(mgr), ina=inactiveList(mgr), t=weekTask(mgr), mon=MONTHS[new Date().getMonth()];
+  const mine=S.refs.filter(r=>r.recruiter_email===mgr);
+  return `<div class="panel mlv">
+      <div class="mlvtop"><div><span class="eyebrow">Deine Manager-Stufe</span><h2>${esc(L.name)}</h2>
+        <small>${fmtN(xp)} Punkte${L.next?` · noch ${fmtN(L.next-xp)} bis ${esc(L.nextName)}`:" · höchste Stufe"}</small></div>
+        <div class="mq ${team.length&&done===team.length?"ok":""}"><b>${done}/${team.length}</b><small>Gespräche im ${mon}</small></div></div>
+      <span class="lvbar"><i style="width:${L.pct}%"></i></span>
+      <details class="mhow"><summary>So sammelst du Punkte</summary><ul>
+        <li>Gespräch mit Creator, vom Creator bestätigt: <b>${MXP.talk}</b> (1× pro Creator und Monat, ohne App: ${MXP.talkList})</li>
+        <li>Alle deine Creator im Monat gesprochen: <b>${MXP.goal}</b></li>
+        <li>Wochenaufgabe gestellt: <b>${MXP.task}</b>, plus <b>${MXP.done}</b> für jeden Creator, der sie erledigt</li>
+        <li>Neuer Streamer rekrutiert, von der Leitung bestätigt: <b>${MXP.rec}</b></li>
+        <li>Dein Creator macht im Bootcamp mit: <b>${MXP.camp}</b>, besteht: <b>${MXP.pass}</b></li></ul>
+        <small class="muted">Nur du und die Agenturleitung sehen deine Stufe.</small></details>
+    </div>
+    <div class="panel stack mtask">
+      <div class="sh"><span class="eyebrow">Wochenaufgabe für deine Creator</span>${t?`<h2>${doneOf(t.id).length} von ${peopleOf(mgr).length} erledigt</h2>`:`<h2>Noch keine Aufgabe diese Woche</h2>`}</div>
+      ${t?`<p class="mtbody">${esc(t.body)}</p><div class="btns"><button class="chip" data-mtdel="${esc(t.id)}">${S.confirmDelete==="mt"+t.id?"Wirklich löschen?":"Löschen"}</button></div>`
+        :`<label class="f" for="mt-body">Etwas Entspanntes für diese Woche<textarea id="mt-body" maxlength="300" rows="2" placeholder="z. B. Poste diese Woche ein Video mit Text-Hook und schick mir den Link."></textarea></label>
+          <button class="btn small" id="mt-add">An alle meine Creator schicken</button>
+          <small class="muted">Deine Creator sehen sie auf ihrer Startseite und bekommen ${MXP.cdone} Punkte fürs Erledigen. Du bekommst ${MXP.task} Punkte plus ${MXP.done} für jeden, der sie erledigt.</small>`}
+    </div>
+    ${st.length?`<div class="sec"><span>Länger nicht betreut</span><small>${st.length}</small></div>
+      <p class="muted" style="margin:0 0 8px">Seit über 2 Wochen kein Gespräch und nichts im Leitfaden.</p>
+      <div class="pendl">${st.slice(0,12).map(x=>keyBtn(x.k, x.at?`seit ${Math.floor((Date.now()-x.at)/DAY)} Tg.`:"noch nie")).join("")}${st.length>12?`<span class="chip">+${st.length-12} weitere</span>`:""}</div>`:""}
+    ${ina.list.length?`<div class="sec"><span>Wenig live</span><small>${esc(ymLabel(ina.m))}</small></div>
+      <p class="muted" style="margin:0 0 8px">Unter 5 Live-Tagen laut Backstage. Sprich sie an.</p>
+      <div class="pendl">${ina.list.map(x=>keyBtn(x.k, `${x.days} Tage`)).join("")}</div>`:""}
+    <div class="panel stack">
+      <div class="sh"><span class="eyebrow">Rekrutiert</span><h2>Neuen Streamer gewonnen?</h2></div>
+      <div class="two"><input id="mr-handle" type="text" placeholder="@tiktokname" aria-label="TikTok-Name"><button class="btn small" id="mr-add">Eintragen</button></div>
+      <small class="muted">Die Leitung bestätigt, dann gibt es ${MXP.rec} Punkte.</small>
+      ${mine.length?`<div class="pendl">${mine.map(r=>`<span class="chip">@${esc(r.recruit_handle)} · ${r.status==="ok"?"✓ bestätigt":r.status==="nein"?"nicht bestätigt":"wartet"}</span>`).join("")}</div>`:""}
+    </div>`;
+}
+
+function talkPanel(k){
+  if (S.noUpd19 || S.me.role==="creator") return "";
+  const ts=S.talks.filter(t=>t.creator_key===k).sort((a,b)=>b.day.localeCompare(a.day)||String(b.created_at).localeCompare(String(a.created_at)));
+  const stTxt = t => t.status==="ok"?`<span class="tag ok">✓ bestätigt</span>`:t.status==="nein"?`<span class="tag">nicht bestätigt</span>`:t.status==="liste"?`<span class="tag">ohne App</span>`:`<span class="tag gold">wartet auf Bestätigung</span>`;
+  return `<div class="panel stack talks"><div class="sh"><span class="eyebrow">Gespräche</span><h2>Gespräch eintragen</h2></div>
+    <div class="two"><label class="f" for="tk-day">Wann?<input id="tk-day" type="date" value="${isoDay(new Date())}" max="${isoDay(new Date())}" min="${isoDay(new Date(Date.now()-30*DAY))}"></label><span></span></div>
+    <label class="f" for="tk-tips">Welche Tipps hast du gegeben? (2–3 Stichpunkte)<textarea id="tk-tips" maxlength="600" rows="3" placeholder="– Licht von vorne&#10;– 3× pro Woche live&#10;– Anlaufvideo vor dem Live"></textarea></label>
+    <button class="btn small" id="tk-add" data-key="${esc(k)}">Eintragen</button>
+    <small class="muted">${k.startsWith("h:")?"Dieser Creator ist noch nicht in der App, das Gespräch zählt ohne Bestätigung.":"Der Creator bestätigt das Gespräch in der App, erst dann zählt es."}</small>
+    ${ts.length?`<div class="tklist">${ts.map(t=>`<div class="tk"><div class="tktop"><b>${fmtDayS(new Date(t.day+"T12:00"))}</b><small>${esc(member(t.manager_email)?.name||"")}</small>${stTxt(t)}</div><p>${esc(t.tips)}</p>${(t.manager_email===S.real.email && t.status!=="ok" && t.status!=="nein") || S.real.role==="lead"?`<button class="chip" data-tkdel="${esc(t.id)}">${S.confirmDelete==="tk"+t.id?"Wirklich löschen?":"Löschen"}</button>`:""}</div>`).join("")}</div>`:""}
+  </div>`;
+}
+
+/* Creator: Gespräch bestätigen + Wochenaufgabe vom Manager */
+function creatorMgrCards(e){
+  if (S.noUpd19 || S.me.preview) return "";
+  const mg=member(S.me.manager_email), open=S.talks.filter(t=>t.creator_key===e && t.status==="offen"), t=S.me.manager_email?weekTask(S.me.manager_email):null;
+  const done=t && S.md.some(d=>d.task_id===t.id && d.creator_email===e);
+  return open.map(x=>`<div class="panel stack tconf"><span class="eyebrow">Gespräch bestätigen</span>
+      <h2>Hattest du am ${fmtDayS(new Date(x.day+"T12:00"))} ein Gespräch mit ${esc(firstName(member(x.manager_email)))}?</h2>
+      <p class="mtbody">${esc(x.tips)}</p>
+      <div class="btns"><button class="btn small" data-tkok="${esc(x.id)}">Ja, hatten wir</button><button class="btn ghost small" data-tkno="${esc(x.id)}">Nein</button></div></div>`).join("")
+    + (t?`<div class="panel stack mtask ${done?"done":""}"><span class="eyebrow">Wochenaufgabe von ${esc(firstName(mg))}</span>
+      <p class="mtbody">${esc(t.body)}</p>
+      <button class="btn ${done?"ghost":"gold"} small" data-mtdone="${esc(t.id)}">${done?"✓ Erledigt":`Erledigt · +${MXP.cdone} XP`}</button></div>`:"");
+}
+
+function mteamView(){
+  if (S.noUpd19) return soonUpd16("Manager-","Rangliste");
+  const staff=S.members.filter(m=>m.role==="manager" || (m.role==="lead" && (peopleOf(m.email).length || pendingOf(m.email).length)));
+  const rows=staff.map(m=>{ const xp=mxpOf(m.email), team=teamKeys(m.email), s=talkedSet(m.email); return { m, xp, L:mLevel(xp), team:team.length, done:team.filter(k=>s.has(k)).length, stale:staleList(m.email).length, task:!!weekTask(m.email) }; }).sort((a,b)=>b.xp-a.xp);
+  const mon=MONTHS[new Date().getMonth()];
+  return `<div class="stack"><span class="eyebrow">Nur für die Leitung</span><h1>Manager-<em>Rangliste</em></h1>
+    <p class="muted">Punkte, Stufe und Gespräche im ${mon}. Die Manager sehen nur ihre eigene Stufe.</p></div>
+    <div class="list">${rows.map((r,i)=>`<button class="row" data-viewmgr="${esc(r.m.email)}"><div class="head"><b>${i+1}. ${esc(r.m.name)}</b><span class="tag gold">${esc(r.L.name)} · ${fmtN(r.xp)}</span></div>
+      <div class="mini"><span class="chip ${r.team&&r.done===r.team?"ok":""}">${ic("i-check")} ${r.done}/${r.team} gesprochen</span>${r.stale?`<span class="chip warn">${r.stale} länger nicht betreut</span>`:""}<span class="chip">${r.task?"✓ Wochenaufgabe":"keine Wochenaufgabe"}</span></div></button>`).join("")}</div>
+    ${rows.length?"":`<div class="panel"><p class="muted" style="margin:0">Noch keine Manager eingetragen.</p></div>`}`;
+}
+
+async function tkAdd(k){
+  if (S.viewAs && S.real.role!=="lead") return toast("In der Vorschau wird nichts gespeichert.");
+  const day=$("#tk-day").value, tips=$("#tk-tips").value.trim();
+  if (!day) return toast("Bitte das Datum wählen.");
+  if (tips.length<3) return toast("Schreib kurz 2–3 Stichpunkte zu deinen Tipps.");
+  $("#tk-add").disabled=true;
+  const r=await sb.from("talks").insert({ creator_key:k, day, tips, manager_email:S.real.email, status:k.startsWith("h:")?"liste":"offen" });
+  if (r.error){ $("#tk-add").disabled=false; return fail(/Datum/.test(r.error.message)?"Das Datum geht nicht (höchstens 30 Tage zurück).":r.error); }
+  await refresh(); render(true); toast(k.startsWith("h:")?"Gespräch eingetragen.":"Eingetragen. Der Creator bestätigt es in der App.");
+}
+async function tkDel(id){
+  if (S.confirmDelete!=="tk"+id){ S.confirmDelete="tk"+id; return render(true); }
+  S.confirmDelete=null; const r=await sb.from("talks").delete().eq("id",id); if (r.error) return fail(r.error);
+  await refresh(); render(true); toast("Gelöscht.");
+}
+async function tkAnswer(id, ok){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const r=await sb.rpc("answer_talk",{ tid:id, ok }); if (r.error) return fail(r.error);
+  await refresh(); render(true); if (ok){ toast("Danke! Schön, dass ihr gesprochen habt."); }
+}
+async function mtAdd(){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const body=$("#mt-body").value.trim(); if (body.length<3) return toast("Schreib kurz, was die Aufgabe ist.");
+  $("#mt-add").disabled=true;
+  const r=await sb.from("mtasks").insert({ body, manager_email:S.me.email, week:mondayKey() });
+  if (r.error){ $("#mt-add").disabled=false; return fail(r.error); }
+  await refresh(); render(true); toast("Aufgabe ist bei deinen Creatorn.");
+}
+async function mtDel(id){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  if (S.confirmDelete!=="mt"+id){ S.confirmDelete="mt"+id; return render(true); }
+  S.confirmDelete=null; const r=await sb.from("mtasks").delete().eq("id",id); if (r.error) return fail(r.error);
+  await refresh(); render(true); toast("Aufgabe gelöscht.");
+}
+async function mtDone(id){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const on=S.md.some(d=>d.task_id===id && d.creator_email===S.me.email);
+  const r = on ? await sb.from("mtask_done").delete().eq("task_id",id).eq("creator_email",S.me.email)
+               : await sb.from("mtask_done").insert({ task_id:id, creator_email:S.me.email });
+  if (r.error) return fail(r.error);
+  await refresh(); render(true); if (!on){ xpToast(MXP.cdone); confetti(); checkLevelUp(S.me.email); }
+}
+async function mrAdd(){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const h=$("#mr-handle").value.trim(); if (!h) return toast("Bitte den TikTok-Namen eintragen.");
+  const r=await sb.rpc("report_referral",{ rh:h }); if (r.error) return fail(r.error);
+  const msg={ ok:"Eingetragen. Die Leitung bestätigt es.", exists:"Diesen Namen hat schon jemand eingetragen.", invalid:"Das ist kein gültiger TikTok-Name.", self:"Das bist du selbst." }[r.data]||"Hat nicht geklappt.";
+  if (r.data==="ok"){ await refresh(); render(true); } toast(msg);
+}
+
 document.addEventListener("click", async e => {
   if (e.target.closest("#cert-png")) { dl(S._cert.url, S._cert.base+".png"); return; }
   if (e.target.closest("#cert-pdf")) { certPdf(); return; }
@@ -2832,6 +3007,15 @@ document.addEventListener("click", async e => {
   if (t.dataset.partner) return openPartner(t.dataset.partner);
   if (t.id==="pt-save") return savePartner(t.dataset.pk);
   if (t.dataset.ttdel) return ttDelete(t.dataset.ttdel);
+  if (t.id==="tk-add") return tkAdd(t.dataset.key);
+  if (t.dataset.tkdel) return tkDel(t.dataset.tkdel);
+  if (t.dataset.tkok) return tkAnswer(t.dataset.tkok, true);
+  if (t.dataset.tkno) return tkAnswer(t.dataset.tkno, false);
+  if (t.id==="mt-add") return mtAdd();
+  if (t.dataset.mtdel) return mtDel(t.dataset.mtdel);
+  if (t.dataset.mtdone) return mtDone(t.dataset.mtdone);
+  if (t.id==="mr-add") return mrAdd();
+  if (t.dataset.viewmgr){ const sel=$("#viewas"); if (sel){ sel.value=t.dataset.viewmgr; sel.dispatchEvent(new Event("change",{ bubbles:true })); } return; }
   if (t.id==="mp-new"){ S.mpForm=true; return render(true); }
   if (t.id==="mp-cancel"){ S.mpForm=false; return render(true); }
   if (t.id==="mp-add") return mpAdd();
