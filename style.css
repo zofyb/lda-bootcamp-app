@@ -413,7 +413,7 @@ button.panel{border:0}
 .tile .dot{top:9px;right:9px}
 .tile .tbar{width:58%;height:4px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
 .tile .tbar i{display:block;height:100%;background:linear-gradient(90deg,var(--rose),var(--gold))}
-.tile .tl{font-size:10px;color:var(--muted);font-weight:500}
+.tile .tl{display:none}
 .sec{display:flex;justify-content:space-between;align-items:center;font:600 11px var(--body);letter-spacing:.16em;color:var(--lilac);text-transform:uppercase}
 .sec small,.sec .lnk{letter-spacing:0;text-transform:none;color:var(--muted);font:500 12px var(--body)}
 .lnk{background:none;border:0;cursor:pointer;padding:4px 0}
@@ -733,14 +733,16 @@ button.tslot:hover{border-color:var(--rose);box-shadow:0 0 0 1px var(--rose) ins
 .trule .tx,.titem .tx{width:26px;height:26px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--muted);font-size:15px;cursor:pointer}
 button.row.tnext{display:grid;gap:2px;text-align:left;width:100%;font:inherit;color:var(--fg);cursor:pointer}
 @media (max-width:420px){.trule{grid-template-columns:1fr auto}.trule span{grid-column:1}.trule .tx{grid-row:1/3;grid-column:2}}
-/* Leitung/Manager: kompakte Kacheln in der Größe der Kennzahl-Kreise */
-.wrap.wide .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+/* Bereiche als Liste in 2 Spalten (alle Rollen) */
+.tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 @media (min-width:900px){.wrap.wide .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
-.wrap.wide .tile{aspect-ratio:auto;flex-direction:row;justify-content:flex-start;align-items:center;gap:10px;padding:8px 10px;min-height:52px;border-radius:14px;text-align:left;font:600 13px/1.25 var(--body);color:var(--fg)}
-.wrap.wide .tile .tic{flex:none;width:34px;height:34px;border-radius:11px}
-.wrap.wide .tile .tic .ico{width:18px;height:18px}
-.wrap.wide .tile:hover{border-color:var(--rose)}
-.wrap.wide .tile .dot{position:static;margin-left:auto}
+.tile{aspect-ratio:auto;flex-direction:row;justify-content:flex-start;align-items:center;gap:10px;padding:8px 10px;min-height:52px;border-radius:14px;text-align:left;font:600 13px/1.25 var(--body);color:var(--fg)}
+.tile .tic{flex:none;width:34px;height:34px;border-radius:11px}
+.tile .tic .ico{width:18px;height:18px}
+.tile:hover{border-color:var(--rose)}
+.tile .dot{position:static;margin-left:auto}
+.tile .tbar{margin-left:auto;width:30px;flex:none}
+.tile .tl{display:none}
 /* TikTok-Videos verwalten */
 .ttlist{display:grid;gap:8px}
 .ttli{display:grid;grid-template-columns:40px 1fr auto auto;gap:10px;align-items:center;padding:8px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
