@@ -249,7 +249,7 @@ async function load(){
     }
     await refresh();
     if (me.role==="creator"){ S.impAns=storeGet("ldb-imp-"+me.email)||{}; setTimeout(()=>award("login", todayKey()).then(n=>{ if(n) render(true); }), 900); }
-    S.tab = S.tab || (me.role === "creator" ? "start" : me.role === "manager" ? "bewerten" : "uebersicht");
+    S.tab = S.tab || (me.role === "creator" ? "start" : "uebersicht");
     render();
   } catch(e){ fail(e); }
 }
@@ -357,7 +357,7 @@ function navItems(){
   const me=S.me;
   if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],["anim","i-spark","Animation"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
   const mine=new Set(myCreators().map(c=>c.email)), open=S.subs.filter(s=>s.points==null && mine.has(s.creator_email)).length;
-  if (me.role==="manager") return [["bewerten","i-check","Bewerten",open],["creator","i-people","Creator"],["kalender","i-cal","Kalender",soonBooked()],["akademie","i-learn","Lernen"],["fragen","i-mail","Sag's uns"]];
+  if (me.role==="manager") return [["uebersicht","i-home","Start"],["creator","i-people","Betreuung"],["bewerten","i-check","Bewerten",open],["kalender","i-cal","Kalender",soonBooked()],["akademie","i-learn","Lernen"]];
   return [["uebersicht","i-home","Start"],["bewerten","i-check","Bewerten",open],["kalender","i-cal","Kalender"],...(S.real.role==="lead"?[["fuehrung","i-list","Führung"]]:[]),["bootcamp","i-learn","Bootcamp"]];
 }
 function navHtml(){
@@ -396,7 +396,7 @@ function render(keepScroll){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
     if (!["start","lernen","kalender","profil","anim","termine"].includes(S.tab)) S.tab="start";
-  } else if (["start","lernen","profil","themen"].includes(S.tab) || (S.tab==="fuehrung" && S.real.role!=="lead") || (S.tab==="mehr" && me.role!=="lead")) S.tab = me.role==="manager"?"bewerten":"uebersicht";
+  } else if (["start","lernen","profil","themen"].includes(S.tab) || (S.tab==="fuehrung" && S.real.role!=="lead") || S.tab==="mehr") S.tab = "uebersicht";
   if (me.role==="lead" && S.tab==="mehr") S.tab="uebersicht";
   bnav.innerHTML = navHtml(); bnav.hidden = !!S.openArea || !!(S.qz && !S.qz.done);
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
@@ -1142,7 +1142,7 @@ function moreTiles(){
   const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
   return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a></div>`;
 }
-function leadStart(){ return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
+function leadStart(){ if (S.me.role==="manager") return mgrStart(); return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
 
 
 
@@ -1437,6 +1437,38 @@ function myReminders(){
 }
 function remindRows(list){
   return list.map(r=>`<div class="remind">${`<span class="kic">${ic(r.go?.includes("termine")?"i-clock":"i-bell")}</span>`}<div><b>${r.t}</b><small>${r.s}</small></div><button class="rgo" ${r.go||`data-tab="${r.tab}"`} aria-label="Öffnen">${ic("i-chev")}</button><button class="rx" data-remhide="${r.id}" data-remkey="${r.key}" aria-label="Ausblenden">${ic("i-check")}</button></div>`).join("");
+}
+
+/* ---------- Manager-Startseite: Übersicht, Erinnerungen, Neuigkeiten der eigenen Creator ---------- */
+function mgrNews(){
+  const mine=new Set(myPeople().map(c=>c.email)), since=Date.now()-7*DAY, out=[], who=e=>esc(label(member(e)));
+  allCreators().filter(c=>mine.has(c.email) && c.created_at && +new Date(c.created_at)>since).forEach(c=>out.push({ at:c.created_at, ic:"i-people", t:`${who(c.email)} ist jetzt in der App`, go:`data-creator="${esc(c.email)}"` }));
+  S.subs.filter(x=>mine.has(x.creator_email) && +new Date(x.submitted_at)>since).forEach(x=>out.push({ at:x.submitted_at, ic:"i-check", t:`${who(x.creator_email)} hat Thema ${x.area} abgegeben${x.points==null?" · wartet auf Bewertung":""}`, go:x.points==null?`data-tab="bewerten"`:`data-creator="${esc(x.creator_email)}"` }));
+  if (!S.noUpd14) (S.bk||[]).filter(b=>b.owner_email===S.me.email && b.created_at && +new Date(b.created_at)>since).forEach(b=>out.push({ at:b.created_at, ic:"i-clock", t:`${who(b.creator_email)} hat ein 1:1 gebucht: ${fmtDayS(bkAt(b))}, ${fmtTime(bkAt(b))} Uhr`, go:`data-tday="${isoDay(bkAt(b))}" data-tab2="termine"` }));
+  (S.qres||[]).filter(q=>mine.has(q.creator_email) && q.created_at && +new Date(q.created_at)>since).forEach(q=>{ const t=qzType(q.quiz,q.result); out.push({ at:q.created_at, ic:"i-quiz", t:`${who(q.creator_email)} hat ein Quiz gemacht${t?": "+esc(t.name):""}`, go:`data-creator="${esc(q.creator_email)}"` }); });
+  (S.goals||[]).filter(g=>mine.has(g.creator_email) && g.done && g.month===ymNow()).forEach(g=>out.push({ at:g.updated_at||new Date().toISOString(), ic:"i-trophy", t:`${who(g.creator_email)} hat das Monatsziel erreicht: ${esc(g.title)}`, go:`data-creator="${esc(g.creator_email)}"` }));
+  return out.sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,12);
+}
+function mgrStart(){
+  const me=S.me, people=myPeople(), pend=myPending(), mine=new Set(myCreators().map(c=>c.email));
+  const open=S.subs.filter(x=>x.points==null && mine.has(x.creator_email)).length, bk=S.noUpd14?0:upBk().filter(b=>b.owner_email===me.email).length;
+  const untouched=S.noUpd13?0:people.filter(c=>guideCount(c.email)[0]===0).length, news=mgrNews();
+  const k=(i,n,l,tab,warn)=>`<button class="kpi ${warn&&n?"warn":""}" data-tab="${tab}"><span class="kring"><b>${n}</b><i>${ic(i)}</i></span><small>${l}</small></button>`;
+  const tile=(tab,i,l,n)=>`<button class="tile" data-tab="${tab}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`;
+  const ago=d=>{ const h=Math.round((Date.now()-new Date(d))/36e5); return h<1?"gerade eben":h<24?`vor ${h} Std.`:`vor ${Math.round(h/24)} Tg.`; };
+  return `<div class="stack"><span class="eyebrow">Manager</span><h1>Hallo, <em>${esc(firstName(me))}</em></h1></div>
+    ${remindRows(myReminders())}
+    <div class="kpis">
+      ${k("i-people",people.length,"Meine Creator","creator")}
+      ${k("i-mail",pend.length,"Noch nicht in der App","creator",1)}
+      ${S.noUpd13?"":k("i-list",untouched,"Noch nicht betreut","creator",1)}
+      ${k("i-check",open,"Bewerten","bewerten",1)}
+      ${S.noUpd14?"":k("i-clock",bk,"1:1 gebucht","termine")}
+    </div>
+    <div class="sec"><span>Neuigkeiten</span><small>letzte 7 Tage</small></div>
+    ${news.length?`<div class="news">${news.map(n=>`<button class="nrow" ${n.go}><span class="kic">${ic(n.ic)}</span><span>${n.t}</span><small>${ago(n.at)}</small></button>`).join("")}</div>`:`<p class="muted">Gerade nichts Neues von deinen Creatorn.</p>`}
+    <div class="sec"><span>Bereiche</span></div>
+    <div class="tiles">${tile("creator","i-people","Betreuung")}${tile("bewerten","i-check","Bewerten",open)}${S.noUpd14?"":tile("termine","i-clock","1:1-Termine",soonBooked())}${tile("kalender","i-cal","Kalender")}${tile("akademie","i-learn","Akademie")}${tile("fragen","i-mail","Sag's uns")}</div>`;
 }
 
 /* ---------- Level-System: XP, Stufen, Hook des Tages, Impuls der Woche, Backstage, Monatsziel ---------- */
@@ -2543,7 +2575,7 @@ document.addEventListener("click", async e => {
   if (t.id==="av-add") return addRule();
   if (t.id==="sl-book") return bookSlot();
   if (t.dataset.tnav){ const m=tMonth(); S.tMonth=new Date(m.getFullYear(), m.getMonth()+ +t.dataset.tnav, 1); return render(true); }
-  if (t.dataset.tday){ S.tDay = t.dataset.tday; const d=new Date(t.dataset.tday+"T00:00"); S.tMonth=new Date(d.getFullYear(), d.getMonth(), 1); render(true); return $(".tdayv")?.scrollIntoView({ behavior:"smooth", block:"nearest" }); }
+  if (t.dataset.tday){ if (t.dataset.tab2){ S.tab=t.dataset.tab2; S.creator=null; } S.tDay = t.dataset.tday; const d=new Date(t.dataset.tday+"T00:00"); S.tMonth=new Date(d.getFullYear(), d.getMonth(), 1); render(true); return $(".tdayv")?.scrollIntoView({ behavior:"smooth", block:"nearest" }); }
   if (t.dataset.tbook) return openBook(t.dataset.tbook);
   if (t.dataset.bkcancel) return cancelMine(t.dataset.bkcancel);
   if (t.dataset.avdel) return delRule(t.dataset.avdel);
@@ -2643,7 +2675,7 @@ document.addEventListener("change", e => {
   if (e.target.dataset.gnote) return guideNote(e.target.dataset.who, e.target.dataset.gnote, e.target.value);
   if (e.target.dataset.refgun) return refGun(e.target.dataset.refgun, e.target.checked);
   if (e.target.id==="av-file"){ const f=e.target.files[0]; e.target.value=""; return avatarUpload(f); }
-  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"start":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
+  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"start":"uebersicht"; return render(); }
   if (e.target.id==="ro-file"){ const f=e.target.files[0]; if(f) f.text().then(tx=>{ $("#ro-text").value=tx; toast("Datei eingelesen. Jetzt „Vorschau“ tippen."); }); return; }
   if (e.target.dataset.snap) return uploadSnap(e.target.dataset.snap, e.target.files[0]);
   if (e.target.id==="cal-showcamp"){ S.calShowCamp=e.target.checked; return render(true); }
