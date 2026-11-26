@@ -2618,7 +2618,7 @@ function matchView(){
       <h2>Neues Inserat</h2>
       <div class="two"><label class="f" for="mp-day">Tag<input id="mp-day" type="date" value="${isoDay(def)}" min="${isoDay(now)}" max="${isoDay(new Date(Date.now()+13*DAY))}"></label>
       <label class="f" for="mp-time">Uhrzeit<input id="mp-time" type="time" value="${pad(def.getHours())}:00"></label></div>
-      <div class="f"><span>Jede Woche wiederholen? (optional)</span><div class="mdays">${WDS.map((w,i)=>`<button type="button" class="chip" data-mpday="${i+1}">${w}</button>`).join("")}</div><small class="muted">Wähle die Tage, an denen du immer zur gleichen Uhrzeit live bist. Das Inserat läuft dann 1 Woche.</small></div>
+      <div class="f"><span>An mehreren Tagen? (optional)</span><div class="mdays">${WDS.map((w,i)=>`<button type="button" class="chip" data-mpday="${i+1}">${w}</button>`).join("")}</div><small class="muted">Wähle die Tage, an denen du zur gleichen Uhrzeit live bist. Das Inserat läuft 1 Woche, danach einfach neu einstellen.</small></div>
       <label class="f" for="mp-rules">Regeln<input id="mp-rules" type="text" maxlength="200" placeholder="z. B. 3 Runden, wer verliert, macht eine Strafe"></label>
       <label class="f" for="mp-note">Noch was? (optional)<input id="mp-note" type="text" maxlength="300" placeholder="z. B. Ich bin neu und freue mich über jede Runde"></label>
       <div class="btns"><button class="btn small" id="mp-add">Veröffentlichen</button><button class="btn ghost small" id="mp-cancel">Abbrechen</button></div></div>`
