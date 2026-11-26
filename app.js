@@ -11,7 +11,7 @@ const view = $("#view"), who = $("#who"), tabsEl = $("#tabs");
 let sb = null;
 const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{},
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
-  busy:false, ringShown:false, localProg:{}, justUnlocked:null };
+  busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,3400); }
 function fail(e){ console.error(e); toast("Fehler: " + (e?.message || e)); }
@@ -51,13 +51,15 @@ function areaState(email, a){
   if (prev && !subOf(email, prev.n)) return "lock";
   return "open";
 }
+const quizOf = a => list(a?.quiz).filter(x => x && x.q && list(x.a).length >= 2);
 function progOf(email, n){ return S.progress.find(p => p.creator_email===email && p.area===n) || {}; }
 function stepsDone(email, a){
-  if (subOf(email, a.n)) return [true, true];
+  if (subOf(email, a.n)) return [true, true, true];
   const p = progOf(email, a.n), L = S.localProg;
-  const v = !a.video_url || !!p.video_at || !!L[`v-${email}-${a.n}`];
-  const h = !a.handout_path || !!p.handout_at || !!L[`h-${email}-${a.n}`];
-  return [v, v && h];
+  const v = !a.video_url || !!p.video_at || !!L[`video_at-${email}-${a.n}`];
+  const q = !quizOf(a).length || !!p.quiz_at || !!L[`quiz_at-${email}-${a.n}`];
+  const h = !a.handout_path || !!p.handout_at || !!L[`handout_at-${email}-${a.n}`];
+  return [v, v && q, v && q && h];
 }
 
 /* ---------- Streak & Abzeichen ---------- */
@@ -144,7 +146,7 @@ function watchVideos(){
 async function markStep(n, field){
   if (S.me.role!=="creator") return;
   const a=S.areas.find(x=>x.n===n), email=S.me.email, before=stepsDone(email,a);
-  const key=(field==="video_at"?"v-":"h-")+email+"-"+n;
+  const key=field+"-"+email+"-"+n;
   if (readOnly() || S.me.preview || S.needsUpdate) S.localProg[key]=true;
   else {
     const p=progOf(email,n); if (p[field]) return;
@@ -155,9 +157,13 @@ async function markStep(n, field){
   }
   const after=stepsDone(email,a);
   if (S.openArea===n){
-    if (!before[0] && after[0]) { S.justUnlocked=2; toast("Stark! Jetzt ist das Handout frei."); }
-    else if (!before[1] && after[1]) { S.justUnlocked=3; toast("Super! Jetzt ist deine Aufgabe frei."); }
-    if (before[0]!==after[0] || before[1]!==after[1]) render(true);
+    const k=after.findIndex((x,i)=>x&&!before[i]);
+    if (k>=0){
+      const nextName = k===0 ? (quizOf(a).length?"das Quiz":a.handout_path?"das Handout":"deine Aufgabe") : k===1 ? (a.handout_path?"das Handout":"deine Aufgabe") : "deine Aufgabe";
+      S.justUnlocked = k===0 ? (quizOf(a).length?"quiz":a.handout_path?"handout":"task") : k===1 ? (a.handout_path?"handout":"task") : "task";
+      toast((k===1?"Quiz geschafft! ":"Stark! ")+"Jetzt ist "+nextName+" frei.");
+      render(true);
+    }
   }
 }
 
@@ -371,27 +377,50 @@ function creatorHome(){
 }
 
 /* ---------- Creator: Thema ---------- */
+function quizBlock(a, done){
+  const qs=quizOf(a), n=a.n;
+  if (done) return `<p class="muted">Alle ${qs.length} Fragen richtig beantwortet. 💜</p>`;
+  const st=S.quiz[n] || (S.quiz[n]={i:0,wrong:null,ok:null});
+  const q=qs[Math.min(st.i,qs.length-1)];
+  return `<div class="quiz"><div class="qbar">${qs.map((_,i)=>`<i class="${i<st.i?"on":i===st.i?"cur":""}"></i>`).join("")}</div>
+    <small class="muted">Frage ${st.i+1} von ${qs.length}</small>
+    <p class="qq">${esc(q.q)}</p>
+    <div class="qa">${list(q.a).map((x,j)=>`<button data-quiz="${n}" data-j="${j}" class="${st.ok===j?"right":st.wrong===j?"wrong":""}" ${st.ok!=null?"disabled":""}>${esc(x)}</button>`).join("")}</div>
+    ${st.wrong!=null?`<p class="qhint">Nicht ganz. ${esc(q.h||"Versuch es nochmal.")}</p>`:""}</div>`;
+}
+function answerQuiz(n, j){
+  const a=S.areas.find(x=>x.n===n), qs=quizOf(a), st=S.quiz[n]; if(!st||st.ok!=null) return;
+  const q=qs[st.i];
+  if (j!==+q.c){ st.wrong=j; return render(true); }
+  st.ok=j; st.wrong=null; render(true);
+  setTimeout(()=>{ st.i++; st.ok=null; if (st.i>=qs.length){ delete S.quiz[n]; markStep(n,"quiz_at"); } else render(true); }, 750);
+}
 function topicView(a){
   if (!a) { S.openArea=null; return creatorHome(); }
-  const e=S.me.email, s=subOf(e,a.n), [vOk,hOk]=stepsDone(e,a);
-  const cur = !vOk ? 1 : !hOk ? 2 : 3, ju=S.justUnlocked;
-  const dot=(n)=>`<span class="sdot ${n<cur||s?"on":n===cur?"cur":""}">${n<cur||s?"✓":n}</span>`;
+  const e=S.me.email, s=subOf(e,a.n), [vOk,qOk,hOk]=stepsDone(e,a), ju=S.justUnlocked, hasQ=quizOf(a).length>0;
+  const steps=[["Video",vOk]]; if (hasQ) steps.push(["Quiz",qOk]); steps.push(["Handout",hOk],["Aufgabe",!!s]);
+  const cur=steps.findIndex(x=>!x[1]);
+  const dot=i=>`<span class="sdot ${steps[i][1]?"on":i===cur?"cur":""}">${steps[i][1]?"✓":i+1}</span>`;
   let h = `<button class="btn ghost small back" id="home">← Alle Themen</button>
   <div class="stack"><span class="eyebrow">Thema ${a.n} · Woche ${a.week}</span><h1>${esc(a.title)}</h1>${a.intro?`<p class="soft">${esc(a.intro)}</p>`:""}</div>
-  <div><div class="stepper">${dot(1)}<span class="sline ${cur>1||s?"on":""}"></span>${dot(2)}<span class="sline ${cur>2||s?"on":""}"></span>${dot(3)}</div>
-  <div class="slabels"><span>Video</span><span>Handout</span><span>Aufgabe</span></div></div>`;
-  // Schritt 1
-  h += `<section class="panel step"><div class="sh"><span class="eyebrow">Schritt 1</span><h2>Lehrvideo</h2>${vOk&&a.video_url?`<span class="lk tag ok">angesehen</span>`:""}</div>
-    ${videoBlock(a)}${!vOk?`<p class="muted">Schau das Video bis zum Ende. Danach öffnet sich das Handout.</p>`:""}</section>`;
-  // Schritt 2
-  const l2=!vOk;
-  h += `<section class="panel step ${l2?"locked":""} ${ju===2?"unlocked":""}"><div class="sh"><span class="eyebrow">Schritt 2</span><h2>Handout</h2>${l2?`<span class="lk">🔒 nach dem Video</span>`:hOk&&a.handout_path?`<span class="lk tag ok">gelesen</span>`:""}</div>
+  <div><div class="stepper">${steps.map((_,i)=>(i?`<span class="sline ${steps[i-1][1]?"on":""}"></span>`:"")+dot(i)).join("")}</div>
+  <div class="slabels">${steps.map(x=>`<span>${x[0]}</span>`).join("")}</div></div>`;
+  let no=1;
+  const after = hasQ ? "Danach kommt ein kurzes Quiz." : "Danach öffnet sich das Handout.";
+  h += `<section class="panel step"><div class="sh"><span class="eyebrow">Schritt ${no++}</span><h2>Lehrvideo</h2>${vOk&&a.video_url?`<span class="lk tag ok">angesehen</span>`:""}</div>
+    ${videoBlock(a)}${!vOk?`<p class="muted">Schau das Video bis zum Ende. ${after}</p>`:""}</section>`;
+  if (hasQ){
+    const lq=!vOk;
+    h += `<section class="panel step ${lq?"locked":""} ${ju==="quiz"?"unlocked":""}"><div class="sh"><span class="eyebrow">Schritt ${no++}</span><h2>Quiz</h2>${lq?`<span class="lk">🔒 nach dem Video</span>`:qOk?`<span class="lk tag ok">geschafft</span>`:""}</div>
+      ${lq?`<p class="muted">${quizOf(a).length} kurze Fragen zum Video. Zählt nicht für die Punkte.</p>`:quizBlock(a,qOk)}</section>`;
+  }
+  const l2=!qOk, l2txt=hasQ?"nach dem Quiz":"nach dem Video";
+  h += `<section class="panel step ${l2?"locked":""} ${ju==="handout"?"unlocked":""}"><div class="sh"><span class="eyebrow">Schritt ${no++}</span><h2>Handout</h2>${l2?`<span class="lk">🔒 ${l2txt}</span>`:hOk&&a.handout_path?`<span class="lk tag ok">gelesen</span>`:""}</div>
     ${a.handout_path ? (l2 ? `<div class="doc" aria-disabled="true"><span class="paper"></span><span><b>Handout Thema ${a.n}</b><small class="muted">PDF zum Nachlesen</small></span></div>`
       : `<a class="doc" data-handout="${esc(a.handout_path)}" data-n="${a.n}" target="_blank" rel="noopener"><span class="paper"></span><span><b>Handout Thema ${a.n} öffnen</b><small class="muted">PDF zum Nachlesen${!hOk?", danach ist deine Aufgabe frei":""}</small></span></a>`)
       : `<p class="muted">Für dieses Thema gibt es kein Handout.</p>`}</section>`;
-  // Schritt 3
   const l3=!hOk;
-  h += `<section class="panel step ${l3?"locked":""} ${ju===3?"unlocked":""}"><div class="sh"><span class="eyebrow">Schritt 3</span><h2>Deine Aufgabe</h2>${l3?`<span class="lk">🔒 nach dem Handout</span>`:""}</div>`;
+  h += `<section class="panel step ${l3?"locked":""} ${ju==="task"?"unlocked":""}"><div class="sh"><span class="eyebrow">Schritt ${no}</span><h2>Deine Aufgabe</h2>${l3?`<span class="lk">🔒 nach dem Handout</span>`:""}</div>`;
   if (l3) h += `<p class="muted">Hier siehst du gleich, was du für 1 und 2 Punkte machst, und gibst deinen Nachweis ab.</p>`;
   else h += taskBlock(a) + handIn(a, s);
   return h + `</section>`;
@@ -502,7 +531,7 @@ function creatorDetail(email){
     const s=subOf(email,a.n), p=progOf(email,a.n);
     if (s) { h += subCard(s,false); continue; }
     h += `<div class="row"><div class="head"><b>Thema ${a.n} · ${esc(a.title)}</b><span class="tag">Nicht abgegeben</span></div>
-      <div class="mini">${a.video_url?`<span class="chip">${p.video_at?"✓":"○"} Video</span>`:""}${a.handout_path?`<span class="chip">${p.handout_at?"✓":"○"} Handout</span>`:""}</div></div>`;
+      <div class="mini">${a.video_url?`<span class="chip">${p.video_at?"✓":"○"} Video</span>`:""}${quizOf(a).length?`<span class="chip">${p.quiz_at?"✓":"○"} Quiz</span>`:""}${a.handout_path?`<span class="chip">${p.handout_at?"✓":"○"} Handout</span>`:""}</div></div>`;
   }
   return h+`</div>`;
 }
@@ -580,6 +609,12 @@ function areaEditor(){
   <label class="f" for="ae-p1">Für 1 Punkt (eine Zeile pro Punkt)<textarea id="ae-p1">${lines(a.p1)}</textarea></label>
   <label class="f" for="ae-p2">Für 2 Punkte zusätzlich<textarea id="ae-p2">${lines(a.p2)}</textarea></label>
   <label class="f" for="ae-proof">Nachweis<input id="ae-proof" type="text" value="${esc(a.proof||"")}"></label>
+  ${"quiz" in a ? `<h3>Quiz nach dem Video</h3><p class="muted">Bis zu 3 Fragen. Leere Fragen werden weggelassen. Markiere die richtige Antwort.</p>
+  ${[0,1,2].map(i=>{ const q=list(a.quiz)[i]||{a:[]}; return `<fieldset class="qedit"><legend>Frage ${i+1}</legend>
+    <input id="qz-${i}-q" type="text" placeholder="Frage" value="${esc(q.q||"")}">
+    ${[0,1,2].map(j=>`<label class="qopt"><input type="radio" name="qz-${i}-c" value="${j}" ${(+q.c||0)===j?"checked":""} aria-label="Antwort ${j+1} ist richtig"><input id="qz-${i}-a${j}" type="text" placeholder="Antwort ${j+1}" value="${esc(list(q.a)[j]||"")}"></label>`).join("")}
+    <input id="qz-${i}-h" type="text" placeholder="Hinweis bei falscher Antwort" value="${esc(q.h||"")}"></fieldset>`; }).join("")}`
+  : `<p class="muted">Quiz: Erst update-3.sql in Supabase ausführen, dann kannst du hier Quizfragen bearbeiten.</p>`}
   ${a.video_url && !/^https?:/.test(a.video_url) ? `<div class="video"><video data-video="${esc(a.video_url)}" controls playsinline preload="metadata"></video></div>` : ""}
   <label class="f" for="ae-vfile">Lehrvideo hochladen (MP4, max. 50 MB)<input id="ae-vfile" type="file" accept="video/mp4,video/*"></label>
   <label class="f" for="ae-handout">Handout (PDF) ${a.handout_path?`· <a data-handout="${esc(a.handout_path)}" target="_blank" rel="noopener">aktuelles öffnen</a>`:"· noch keins"}<input id="ae-handout" type="file" accept="application/pdf"></label>
@@ -597,6 +632,12 @@ async function saveArea(){
   const n=+$("#ae-n").value, split=id=>$(id).value.split("\n").map(s=>s.trim()).filter(Boolean);
   const row={ title:$("#ae-title").value.trim(), week:parseInt($("#ae-week").value,10)||1, video_url:$("#ae-video").value.trim()||null,
     intro:$("#ae-intro").value.trim()||null, pre:split("#ae-pre"), p1:split("#ae-p1"), p2:split("#ae-p2"), proof:$("#ae-proof").value.trim()||null };
+  if ($("#qz-0-q")){
+    row.quiz=[0,1,2].map(i=>{ const q=$(`#qz-${i}-q`).value.trim(), an=[0,1,2].map(j=>$(`#qz-${i}-a${j}`).value.trim()), c=+(document.querySelector(`input[name="qz-${i}-c"]:checked`)?.value||0), h=$(`#qz-${i}-h`).value.trim();
+      return { q, a:an, c, h }; }).filter(q=>q.q);
+    const bad=row.quiz.find(q=>q.a.some(x=>!x));
+    if (bad) return toast("Bitte bei jeder Quizfrage alle 3 Antworten ausfüllen.");
+  }
   const f=$("#ae-handout").files[0], vf=$("#ae-vfile").files[0];
   if (vf && vf.size>MAX_FILE) return toast("Das Video ist größer als 50 MB.");
   try{
@@ -625,6 +666,7 @@ document.addEventListener("click", async e => {
     S.openArea=+t.dataset.area; return render();
   }
   if (t.id==="home"){ S.openArea=null; return render(); }
+  if (t.dataset.quiz) return answerQuiz(+t.dataset.quiz, +t.dataset.j);
   if (t.dataset.seen) return markStep(+t.dataset.seen,"video_at");
   if (t.dataset.handout && t.dataset.n){ if (!t.href) { e.preventDefault(); toast("Handout lädt noch, bitte gleich nochmal tippen."); return; } setTimeout(()=>markStep(+t.dataset.n,"handout_at"),300); return; }
   if (t.dataset.unpend){ const n=+t.dataset.unpend; (S.pending[n]||[]).splice(+t.dataset.i,1); $("#pend").innerHTML=pendList(n); return; }
@@ -656,7 +698,7 @@ document.addEventListener("change", e => {
     S.pending[n]=[...(S.pending[n]||[]), ...fs.filter(f=>f.size<=MAX_FILE)];
     e.target.value=""; $("#pend").innerHTML=pendList(n);
   }
-  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"themen":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
+  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"themen":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
   if (e.target.id==="ae-n"){ S.editArea=+e.target.value; render(true); }
 });
 document.addEventListener("input", e => { if (e.target.id==="note"){ const c=$("#cnt"); if(c) c.textContent=`${e.target.value.length} / 1000`; } });
