@@ -3,24 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#050407">
+<meta name="theme-color" content="#060208">
 <title>LIVEdream Creator Bootcamp</title>
 <link rel="icon" href="logo.png">
 <link rel="apple-touch-icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Manrope:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Poppins:wght@300;400;500;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="bg" aria-hidden="true"><div class="glow a"></div><div class="glow b"></div><svg id="wave" viewBox="0 0 400 300" preserveAspectRatio="none"></svg></div>
 <div class="wrap">
   <header class="top">
-    <div class="brand">LIVEdream<span>Creator Bootcamp</span></div>
+    <img src="logo.png" alt="LIVEdream Agency" id="toplogo" hidden>
     <div class="who" id="who"></div>
   </header>
-  <div id="switch"></div>
-  <nav class="roles" id="tabs" hidden></nav>
-  <main id="view"><p class="meta">Lädt …</p></main>
+  <div class="switch" id="switch" hidden></div>
+  <nav class="tabs" id="tabs" hidden></nav>
+  <main id="view"><p class="muted">Lädt …</p></main>
 </div>
+<div class="win" id="win" aria-live="polite"><div><div class="medal">✓</div><h2 id="win-t"></h2><p class="muted" id="win-p"></p></div></div>
+<canvas id="conf"></canvas>
 <div class="toast" id="toast" role="status" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
