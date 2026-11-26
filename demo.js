@@ -6,6 +6,8 @@ const day = n => { const d = new Date(now - n*D); return `${d.getFullYear()}-${S
 const dd = n => day(-n);
 const mon = new Date(); mon.setHours(0,0,0,0); mon.setDate(mon.getDate() - ((mon.getDay()+6)%7) - 7);
 const start = `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,"0")}-${String(mon.getDate()).padStart(2,"0")}`;
+const ymOf = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+const YM = ymOf(new Date()), BSM = ymOf(new Date(new Date().getFullYear(), new Date().getMonth()-1, 1));
 const db = {
   areas: AREAS,
   members: [
@@ -61,10 +63,17 @@ const db = {
     {id:"t3", area:"Kampagnen", title:"Adventskalender in der WhatsApp-Gruppe ankündigen", owner_email:null, due:dd(4), priority:2, created_at:iso(now-D)},
     {id:"t4", area:"Finanzen", title:"Auszahlungen November prüfen", owner_email:"demo@demo", priority:3, done_at:iso(now-D), created_at:iso(now-3*D)}
   ],
-  survey: [{creator_email:"c5@demo", rating:5, helped:2, missing:"Mehr Beispiele für Hooks", wish:"Schulung zu Events", created_at:iso(now-D)}]
+  survey: [{creator_email:"c5@demo", rating:5, helped:2, missing:"Mehr Beispiele für Hooks", wish:"Schulung zu Events", created_at:iso(now-D)}],
+  xp_events: [].concat(...["c1@demo","c3@demo","c5@demo"].map((e,j)=>Array.from({length:[12,5,8][j]},(_,i)=>({creator_email:e, kind:"login", ref:day(i), xp:5})))).concat([
+    {creator_email:"c1@demo", kind:"hook", ref:day(0), xp:10},{creator_email:"c1@demo", kind:"impuls", ref:"w", xp:20},{creator_email:"c1@demo", kind:"iq1", ref:"w", xp:10},
+    {creator_email:"c1@demo", kind:"camp", ref:"k1", xp:15},{creator_email:"c1@demo", kind:"extra", ref:"e1", xp:15}]),
+  backstage: [["luna.live",22,61.5,48210,1,1],["sofia.sings",18,40.2,30550,2,3],["gamer_kevin",20,55,21800,3,2],["tim.talks",9,14,12040,4,6],["jenny.mama",15,22.5,9800,5,4],["mia.vibes",12,18,4100,6,5]]
+    .map(([h,dy,hr,dm,rd,rt])=>({ month:BSM, handle:h, days:dy, hours:hr, diamonds:dm, rank_d:rd, rank_t:rt })),
+  goals: [{creator_email:"c1@demo", month:YM, title:"50.000 Diamanten", target:50000, unit:"Diamanten", current:31200, done:false, set_by:"lena@demo"},
+          {creator_email:"c3@demo", month:YM, title:"15 Lives im Monat", target:15, unit:"Lives", current:15, done:true, set_by:"max@demo"}]
 };
 db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootcamp=true; });
-const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"] };
+const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"], goals:["creator_email","month"] };
 function q(t){
   let rows = db[t] || (db[t]=[]), op = null, payload = null; const flt = [];
   const o = {
@@ -73,7 +82,7 @@ function q(t){
     upsert(p){ op="up"; payload=p; return o }, insert(p){ op="ins"; payload=p; return o }, update(p){ op="upd"; payload=p; return o }, delete(){ op="del"; return o },
     then(res, rej){
       let r = rows.filter(x => flt.every(([k,v]) => x[k] === v));
-      if (op==="ins") rows.push({ id:"n"+Math.random().toString(36).slice(2), created_at:new Date().toISOString(), submitted_at:new Date().toISOString(), points:null, ...payload });
+      if (op==="ins") [].concat(payload).forEach(pl => rows.push({ id:"n"+Math.random().toString(36).slice(2), created_at:new Date().toISOString(), submitted_at:new Date().toISOString(), points:null, ...pl }));
       if (op==="up"){ const ks=keys[t]||["id"]; const ex=rows.find(x=>ks.every(k=>x[k]===payload[k])); if(ex) Object.assign(ex,payload); else rows.push({...payload}); }
       if (op==="upd") r.forEach(x => Object.assign(x, payload));
       if (op==="del") db[t] = rows.filter(x => !r.includes(x));
@@ -103,6 +112,11 @@ window.supabase = { createClient(){ return {
       db.members.forEach(m=>{ const r=db.roster.find(y=>y.handle===m.handle); if(r&&m.role==="creator"){ m.bootcamp=r.bootcamp; if(r.manager_email) m.manager_email=r.manager_email; } });
       return { data:rows.length, error:null }; }
     if (n==="rate_submission"){ const s=db.submissions.find(x=>x.id===a.sub_id); if(s){ s.points=a.pts; s.feedback=a.fb; s.rated_by="demo@demo"; s.rated_at=new Date().toISOString(); } return { data:null, error:null }; }
+    if (n==="backstage_top"){ const mm=a?.m||db.backstage.map(b=>b.month).sort().pop(); const out=[];
+      ["d","t"].forEach(l=>db.backstage.filter(b=>b.month===mm&&b["rank_"+l]>=1&&b["rank_"+l]<=5).sort((x,y)=>x["rank_"+l]-y["rank_"+l]).forEach(b=>out.push({ month:mm, list:l, place:b["rank_"+l], handle:b.handle })));
+      return { data:out, error:null }; }
+    if (n==="award_xp") return { data:0, error:null };
+    if (n==="goal_progress") return { data:null, error:null };
     return { data:true, error:null };
   }
 }; } };

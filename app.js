@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), bnav = $("#bnav");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null,
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, impAns:null,
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -235,6 +235,7 @@ async function load(){
       if (r?.error) console.warn(r.error);
     }
     await refresh();
+    if (me.role==="creator"){ S.impAns=storeGet("ldb-imp-"+me.email)||{}; setTimeout(()=>award("login", todayKey()).then(n=>{ if(n) render(true); }), 900); }
     S.tab = S.tab || (me.role === "creator" ? "start" : me.role === "manager" ? "bewerten" : "uebersicht");
     render();
   } catch(e){ fail(e); }
@@ -253,6 +254,8 @@ async function refresh(){
   S.noUpd5 = !!(sn.error || qu.error || sv.error);
   if (S.real?.role==="lead" || S.me?.role==="lead"){ const ro=await sb.from("roster").select("*").order("handle"); S.noRoster=!!ro.error; S.roster=ro.data||[]; }
   const qr=await sb.from("quiz_results").select("*"); S.noUpd8=!!qr.error; S.qres=qr.data||[];
+  const [xe,bs,gl,bt]=await Promise.all([ sb.from("xp_events").select("*"), sb.from("backstage").select("*"), sb.from("goals").select("*"), sb.rpc("backstage_top",{ m:null }) ]);
+  S.noUpd9=!!(xe.error||bs.error||gl.error); S.xp=xe.data||[]; S.bs=bs.data||[]; S.goals=gl.data||[]; S.bsTop=bt.error?[]:(bt.data||[]);
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
   if (!S.noUpd7 && S.real?.role==="lead"){ const tk=await sb.from("tasks").select("*").order("created_at"); S.tasks=tk.data||[]; }
   S.snaps = sn.data||[]; S.questions = qu.data||[]; S.survey = sv.data||[]; S.top = tp.error ? [] : (tp.data||[]);
@@ -798,6 +801,7 @@ function creatorDetail(email){
   let h=`<button class="btn ghost small back" id="back">← Zurück</button>
     <div class="stack"><span class="eyebrow">${esc(member(c.manager_email)?.name?"Manager: "+member(c.manager_email).name:"ohne Manager")}</span><h1>${esc(label(c))}</h1>
     <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p><div class="titles">${titleChips(email,false)}</div></div>
+    ${S.noUpd9?"":levelPanel(email)}${liveStand(email)}${goalAdmin(email)}
     <div class="hexes">${allBadges(email).map(hexBadge).join("")}</div>
     ${snapOf(email,"vorher")||snapOf(email,"nachher")?`<div class="panel stack"><h2>Vorher-Nachher</h2><div class="snaps">${["vorher","nachher"].map(k=>{const x=snapOf(email,k); return `<div class="snap">${x?`<a data-path="${esc(x.path)}" target="_blank" rel="noopener"><img data-img="${esc(x.path)}" alt="${k}"></a>`:`<div class="ph">–</div>`}<small>${k==="vorher"?"Vorher":"Nachher"}</small></div>`;}).join("")}</div></div>`:""}
     <div class="list">`;
@@ -867,7 +871,7 @@ async function delQ(id){
 /* ---------- Akademie ---------- */
 function academyView(){
   const me=S.me, staff=me.role!=="creator", lead=me.role==="lead";
-  const xs=S.extras.filter(x=>x.kind!=="reward" && (audOf(x)==="all" || (audOf(x)==="team" && staff)));
+  const xs=S.extras.filter(x=>x.kind!=="reward" && (x.level==null || lead) && (audOf(x)==="all" || (audOf(x)==="team" && staff)));
   const seen=storeGet("ldb-extras-"+me.email)||[];
   const groups={}; xs.forEach(x=>{ (groups[x.category||"Allgemein"] ||= []).push(x); });
   let h=`<div class="stack"><span class="eyebrow">LIVEdream Academy</span><h1>Die <em>Akademie</em></h1>
@@ -876,14 +880,15 @@ function academyView(){
     <div class="grid2"><label class="f" for="ak-title">Titel<input id="ak-title" type="text" placeholder="z. B. Schulung Videoproduktion"></label>
     <label class="f" for="ak-cat">Rubrik<input id="ak-cat" type="text" list="ak-cats" placeholder="z. B. Schulungen"><datalist id="ak-cats">${[...new Set(S.extras.map(x=>x.category).filter(Boolean).concat(["Schulungen","Infos","Videos"]))].map(c=>`<option value="${esc(c)}">`).join("")}</datalist></label>
     <label class="f" for="ak-note">Kurzbeschreibung (optional)<input id="ak-note" type="text"></label>
-    <label class="f" for="ak-aud">Wer sieht es?<select id="ak-aud"><option value="all">Alle Creator der Agentur</option><option value="team">Nur Manager und Leitung</option></select></label></div>
+    <label class="f" for="ak-aud">Wer sieht es?<select id="ak-aud"><option value="all">Alle Creator der Agentur</option><option value="team">Nur Manager und Leitung</option></select></label>
+    <label class="f" for="ak-level">Freischaltung (Overlay, Animation …)<select id="ak-level"><option value="">Nein, normaler Inhalt</option>${LEVELS.slice(1).map(([,n],i)=>`<option value="${i+2}">Ab Stufe ${i+2} · ${n}</option>`).join("")}</select></label></div>
     <label class="f" for="ak-file">Datei (PDF, Video, Bild oder ZIP, max. 50 MB)<input id="ak-file" type="file"></label>
     <button class="btn small" id="ak-add">Hinzufügen</button></div>`;
   const cats=Object.keys(groups).sort((a,b)=>a.localeCompare(b));
   if (!cats.length) h += `<div class="panel"><p class="muted">Hier kommen bald Schulungen und Infos rein.</p></div>`;
   for (const c of cats){
     h += `<div class="wkh"><span>${esc(c.toUpperCase())}</span></div><div class="extras">${groups[c].map(x=> lead
-      ? `<div class="row"><div class="head">${extraCard(x,seen)}</div><div class="actions"><span class="tag">${audOf(x)==="team"?"nur Team":"alle Creator"}</span><button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></div></div>`
+      ? `<div class="row"><div class="head">${extraCard(x,seen)}</div><div class="actions"><span class="tag">${x.level!=null?"Freischaltung ab Stufe "+x.level:audOf(x)==="team"?"nur Team":"alle Creator"}</span><button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></div></div>`
       : extraCard(x,seen)).join("")}</div>`;
   }
   return h;
@@ -1008,8 +1013,12 @@ function startView(){
   const tile=(i,l,attr,extra="")=>`<button class="tile" ${attr}><span class="tic">${ic(i)}</span>${l}${extra}</button>`;
   const dot=n=>n?`<i class="dot">${n>9?"9+":n}</i>`:"";
   const camps=[...now,...soon].slice(0,4);
-  return `<div class="hi"><h1>${hello}, <em>${esc(firstName(me))}</em></h1>${mt?`<button class="title" data-qzshow="${main.quiz}" data-who="${esc(e)}"><i>${ic(TYPE_IC[mt.key]||"i-star")}</i>${esc(mt.name)}</button>`:""}</div>
+  checkLevelUp(e);
+  const hk=hookToday(), im=impulsNow(), hkDone=S.xp.some(x=>x.creator_email===e&&x.kind==="hook"&&x.ref===todayKey()), imDone=S.xp.some(x=>x.creator_email===e&&x.kind==="impuls"&&x.ref===weekKey());
+  return `<div class="hi"><h1>${hello}, <em>${esc(firstName(me))}</em></h1><div class="hirow">${S.noUpd9?"":levelChip(e)}${mt?`<button class="title" data-qzshow="${main.quiz}" data-who="${esc(e)}"><i>${ic(TYPE_IC[mt.key]||"i-star")}</i>${esc(mt.name)}</button>`:""}</div></div>
   ${nextCard(e)}
+  ${hk||im?`<div class="daily">${hk?`<button class="dcard ${hkDone?"done":""}" id="hook-open"><span class="dic">${ic("i-spark")}</span><b>Hook des Tages</b><small>${hkDone?"Erledigt ✓":"+10 XP"}</small></button>`:""}${im?`<button class="dcard ${imDone?"done":""}" id="imp-open"><span class="dic">${ic("i-bulb")}</span><b>Impuls der Woche</b><small>${imDone?"Angesehen ✓":"bis +50 XP"}</small></button>`:""}</div>`:""}
+  ${goalCard(e,true)}
   <div class="tiles">
     ${boot?tile("i-learn","Bootcamp",'data-tab="lernen" data-learn="bootcamp"',`<span class="tbar"><i style="width:${fill}%"></i></span>`):""}
     ${tile("i-play","Akademie",'data-tab="lernen" data-learn="akademie"',dot(newAk))}
@@ -1021,6 +1030,7 @@ function startView(){
   ${boot?reminderBlock(e):""}
   ${camps.length?`<div class="sec"><span>${now.length?"Läuft gerade":"Kommt bald"}</span><button class="lnk" data-tab="kalender">Alle ansehen</button></div>
     <div class="camps">${camps.map(c=>`<button class="camp k-${c.kind}" data-cal="${esc(c.id)}"><b>${esc(c.title)}</b><small>${c.starts>t?"ab "+fmtDate(c.starts).replace(/\.\d{4}$/,"."):"bis "+fmtDate(c.ends).replace(/\.\d{4}$/,".")}</small></button>`).join("")}</div>`:""}
+  ${topLists()}
   ${boot?surveyBlock(e)+topBlock():""}`;
 }
 function learnView(){
@@ -1039,9 +1049,13 @@ function profileView(email){
   return `<div class="prof"><span class="ava">${esc(initialOf(m))}</span><b>${esc(m.name||label(m))}</b>
     <small class="muted">${m.handle?"@"+esc(String(m.handle).replace(/^@/,"")):""}${mg?` · Manager: ${esc(mg.name)}`:""}</small>
     <div class="titles">${titleChips(email, own && S.me.role==="creator")}</div></div>
-  <div class="stats">${boot?`<div><b>${total(email)}</b><small>Punkte</small></div>`:""}<div><b>${streakInfo(email).cur}</b><small>Tage am Stück</small></div><div><b>${on}</b><small>Abzeichen</small></div></div>
+  ${S.noUpd9?"":levelPanel(email)}
+  <div class="stats"><div><b>${fmtN(xpOf(email))}</b><small>XP</small></div>${boot?`<div><b>${total(email)}</b><small>Bootcamp-Punkte</small></div>`:""}<div><b>${on}</b><small>Abzeichen</small></div></div>
+  ${goalCard(email, own)}
+  ${liveStand(email)}
   <div class="sec"><span>Abzeichen</span><small>${on} von ${bs.length}</small></div>
   <div class="hexes">${bs.map(hexBadge).join("")}</div>
+  ${unlocksBlock(email)}
   ${own && !S.viewAs ? `<button class="btn ghost small" id="logout">${ic("i-out")} Abmelden</button>` : ""}`;
 }
 function moreView(){
@@ -1051,6 +1065,227 @@ function moreView(){
   <div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}</div>`;
 }
 
+
+
+/* ---------- Level-System: XP, Stufen, Hook des Tages, Impuls der Woche, Backstage, Monatsziel ---------- */
+const LEVELS = [[0,"Newcomer"],[300,"Rookie"],[1000,"Rising Star"],[2500,"Performer"],[5000,"Pro"],[9000,"Elite"],[15000,"Legend"]];
+const XP_LABEL = { login:"Reingeschaut", hook:"Hook des Tages", impuls:"Impuls der Woche", iq1:"Impuls-Frage", iq2:"Impuls-Frage", iq3:"Impuls-Frage", camp:"Kampagne gelesen", extra:"Akademie-Inhalt" };
+const fmtN = n => Number(n||0).toLocaleString("de-DE");
+const hnorm = h => lc(String(h||"").replace(/^@/,""));
+const ymNow = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; };
+const ymLabel = ym => { const [y,m]=String(ym||"").split("-").map(Number); return m?`${MONTHS[m-1]} ${y}`:""; };
+const todayKey = () => isoDay(new Date());
+function weekKey(d=new Date()){ const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-day);
+  const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1)); return `${t.getUTCFullYear()}-W${pad(Math.ceil(((t-y0)/DAY+1)/7))}`; }
+const rankBonus = r => !r ? 0 : r===1 ? 300 : r===2 ? 200 : r===3 ? 150 : r<=5 ? 100 : r<=10 ? 50 : 0;
+const bsRows = email => { const h=hnorm(member(email)?.handle || (S.me?.email===email ? S.me.handle : "")); return h ? S.bs.filter(b=>hnorm(b.handle)===h).sort((a,b)=>b.month.localeCompare(a.month)) : []; };
+function xpParts(email){
+  const ev=S.xp.filter(x=>x.creator_email===email), m=member(email)||S.me;
+  const parts={ app:ev.reduce((a,x)=>a+x.xp,0), lernen:0, live:0, ziel:0 };
+  parts.lernen += S.subs.filter(s=>s.creator_email===email).length*50 + (inBootcamp(m) && passed(email) ? 200 : 0) + S.qres.filter(r=>r.creator_email===email).length*50;
+  for (const b of bsRows(email)) parts.live += (b.days||0)*10 + Math.max(rankBonus(b.rank_d), rankBonus(b.rank_t));
+  parts.ziel += S.goals.filter(g=>g.creator_email===email && g.done).length*250;
+  return parts;
+}
+const xpOf = email => Object.values(xpParts(email)).reduce((a,b)=>a+b,0);
+function levelOf(xp){
+  let i=0; LEVELS.forEach(([min],k)=>{ if (xp>=min) i=k; });
+  const [min,name]=LEVELS[i], next=LEVELS[i+1];
+  return { i, n:i+1, name, min, next:next?.[0], nextName:next?.[1], pct: next ? Math.round((xp-min)/(next[0]-min)*100) : 100 };
+}
+function levelChip(email){ const L=levelOf(xpOf(email)); return `<button class="lvchip" data-tab="profil"><b>${L.n}</b><span>${esc(L.name)}</span><i style="--p:${L.pct}%"></i></button>`; }
+function levelPanel(email){
+  const xp=xpOf(email), L=levelOf(xp), P=xpParts(email);
+  return `<div class="panel lvpanel"><div class="lvhex"><span>Stufe</span><b>${L.n}</b></div>
+    <div class="lvinfo"><b>${esc(L.name)}</b><small class="muted">${fmtN(xp)} XP${L.next!=null?` · noch ${fmtN(L.next-xp)} bis ${esc(L.nextName)}`:" · höchste Stufe"}</small>
+    <span class="lvbar"><i style="width:${L.pct}%"></i></span>
+    <small class="lvsrc">${[["App",P.app],["Lernen",P.lernen],["Live",P.live],["Monatsziel",P.ziel]].filter(x=>x[1]).map(([l,v])=>`${l} ${fmtN(v)}`).join(" · ")||"Sammle XP mit Hook des Tages, Impuls der Woche und deinen Lives."}</small></div></div>`;
+}
+let levelSeen=null;
+function checkLevelUp(email){
+  if (S.viewAs || S.me.preview || S.me.role!=="creator") return;
+  const n=levelOf(xpOf(email)).n, k="ldb-level-"+email, was=storeGet(k);
+  if (was==null){ storeSet(k,n); return; }
+  if (n>was){ storeSet(k,n); const L=levelOf(xpOf(email)); setTimeout(()=>{ win("Stufe "+n+": "+L.name, "Neue Stufe erreicht. Schau in deinem Profil, was du freigeschaltet hast."); confetti(); }, 500); }
+}
+function win(t,p){ const w=$("#win"); if(!w) return toast(t); $("#win-t").textContent=t; $("#win-p").textContent=p; w.classList.add("show"); setTimeout(()=>w.classList.remove("show"),2600); }
+async function award(kind, ref){
+  if (S.noUpd9 || S.viewAs || !S.me || S.me.role!=="creator" || S.me.preview) return 0;
+  if (S.xp.some(x=>x.creator_email===S.me.email && x.kind===kind && x.ref===ref)) return 0;
+  const r=await sb.rpc("award_xp",{ k:kind, r:ref }); if (r.error){ console.warn(r.error); return 0; }
+  const pts=r.data||0;
+  S.xp.push({ creator_email:S.me.email, kind, ref, xp:pts, created_at:new Date().toISOString() });
+  if (pts>0){ xpToast(pts); checkLevelUp(S.me.email); }
+  return pts;
+}
+function xpToast(n){ const t=document.createElement("div"); t.className="xpfly"; t.textContent="+"+n+" XP"; document.body.appendChild(t); setTimeout(()=>t.remove(),1800); }
+
+/* Hook des Tages */
+const HOOKS = () => window.LDA_HOOKS || [];
+const NICHE_WORD = { alltag:"deinem Alltag", humor:"deinen Sketchen", beauty:"Make-up", kreativ:"deinem Hobby", gaming:"Gaming", wissen:"deinen Tipps", fitness:"Sport", liebe:"Beziehungen", tiere:"deinem Haustier", reisen:"Reisen" };
+function dayIndex(n){ const d=new Date(); return Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/DAY) % n; }
+function hookToday(){ const xs=HOOKS(); return xs.length ? xs[dayIndex(xs.length)] : null; }
+function hookFill(t, email){
+  const r=qzRes(email,"nische"), w=r && NICHE_WORD[r.result];
+  return esc(t).replace(/\{thema\}/g, w ? `<mark>${esc(w)}</mark>` : `<mark>[dein Thema]</mark>`);
+}
+function openHook(){
+  const h=hookToday(); if (!h) return;
+  const e=S.me.email, done=S.xp.some(x=>x.creator_email===e && x.kind==="hook" && x.ref===todayKey());
+  sheet(`<div class="sh"><span class="eyebrow">Hook des Tages · ${esc(h.trig||"")}</span><h2>Dein Einstieg <em>für heute</em></h2></div>
+    <div class="hookcard"><p class="hooktxt">„${hookFill(h.t, e)}“</p>${h.tip?`<small class="muted">${esc(h.tip)}</small>`:""}</div>
+    <p class="muted">Pass das markierte Wort an dein Thema an. Der Hook gehört in die ersten 2 Sekunden, als Text oben im Bild und gesprochen.</p>
+    <button class="btn" id="hook-copy" data-txt="${esc(h.t.replace(/\{thema\}/g, NICHE_WORD[qzRes(e,"nische")?.result] || "[dein Thema]"))}">${ic("i-check")} Kopieren</button>`);
+  if (!done) award("hook", todayKey()).then(n=>{ if(n) render(true); });
+}
+
+/* Impuls der Woche */
+const IMPULSE = () => window.LDA_IMPULSE || [];
+function impulsNow(){ const xs=IMPULSE(); if (!xs.length) return null; const base=Date.UTC(2026,10,30), w=Math.max(0,Math.floor((Date.now()-base)/(7*DAY))); return xs[w % xs.length]; }
+function openImpuls(){
+  const im=impulsNow(); if (!im) return;
+  const e=S.me.email, wk=weekKey(), A=S.impAns?.[wk]||{};
+  sheet(`<div class="sh"><span class="eyebrow">Impuls der Woche${im.src?` · ${esc(im.src)}`:""}</span><h2>${esc(im.title)}</h2></div>
+    <div class="impbody">${im.text.map(p=>`<p>${esc(p)}</p>`).join("")}</div>
+    ${im.note?`<p class="muted small">${esc(im.note)}</p>`:""}
+    <div class="wkh"><span>3 FRAGEN</span><small class="muted">je 10 XP</small></div>
+    ${im.q.map((q,i)=>`<div class="impq"><b>${esc(q.q)}</b><div class="qa">${q.a.map((a,j)=>{ const st=A[i]; const cls=st==null?"":j===q.ok?"right":st===j?"wrong":"";
+      return `<button class="iqopt ${cls}" data-iq="${i}" data-ia="${j}" ${st!=null?"disabled":""}>${esc(a)}</button>`; }).join("")}</div>
+      ${A[i]!=null?`<small class="${A[i]===q.ok?"ok":"muted"}">${A[i]===q.ok?"Richtig!":"Leider nicht. Richtig ist: "+esc(q.a[q.ok])}</small>`:""}</div>`).join("")}`);
+  award("impuls", wk).then(n=>{ if(n) render(true); });
+}
+function answerImpuls(i, j){
+  const im=impulsNow(), wk=weekKey(); S.impAns ||= {}; const A=(S.impAns[wk] ||= {});
+  if (A[i]!=null) return; A[i]=j; storeSet("ldb-imp-"+S.me.email, S.impAns);
+  const y=$("#sheet .sheetwrap")?.scrollTop; openImpuls(); const sw=$("#sheet .sheetwrap"); if (sw && y!=null) sw.scrollTop=y;
+  if (j===im.q[i].ok) award("iq"+(i+1), wk).then(n=>{ if(n) render(true); });
+}
+
+/* Top 5 aus der Backstage-Liste */
+function topLists(){
+  if (!S.bsTop.length) return "";
+  const m=S.bsTop[0].month, L=k=>S.bsTop.filter(x=>x.list===k).sort((a,b)=>a.place-b.place);
+  const medal=["🥇","🥈","🥉","4","5"], col=(t,i,xs)=>`<div class="tl5"><span class="tl5h">${ic(i)} ${t}</span><ol>${xs.map(x=>`<li><span class="pl">${medal[x.place-1]||x.place}</span><b>@${esc(String(x.handle).replace(/^@/,""))}</b></li>`).join("")}</ol></div>`;
+  return `<div class="sec"><span>Top 5 · ${esc(ymLabel(m))}</span><small>Agentur</small></div>
+    <div class="panel top2">${col("Diamanten","i-gem",L("d"))}${col("Fleißigste","i-fire",L("t"))}</div>`;
+}
+
+/* Monatsziel */
+const goalOf = (email, ym=ymNow()) => S.goals.find(g=>g.creator_email===email && g.month===ym);
+function goalCard(email, mine){
+  const g=goalOf(email); if (!g) return "";
+  const pct=g.target ? Math.min(100, Math.round((g.current||0)/g.target*100)) : 0;
+  return `<div class="panel goal ${g.done?"done":""}"><div class="gh"><span class="gic">${ic(g.done?"i-trophy":"i-star")}</span><span><small class="muted">Monatsziel ${esc(ymLabel(g.month))}</small><b>${esc(g.title)}</b></span>${g.done?`<span class="tag gold">Geschafft · 250 XP</span>`:""}</div>
+    ${g.target?`<span class="lvbar"><i style="width:${pct}%"></i></span><small class="muted">${fmtN(g.current)} von ${fmtN(g.target)} ${esc(g.unit||"")} · ${pct} %</small>`:""}
+    ${mine && !g.done && !readOnly() && !S.me.preview ? `<div class="grow"><input id="gl-cur" type="number" inputmode="numeric" min="0" placeholder="Dein Stand" value="${g.current||""}"><button class="btn small" id="gl-save">Stand speichern</button></div>` : ""}</div>`;
+}
+function goalAdmin(email){
+  if (S.noUpd9) return "";
+  const g=goalOf(email), ym=ymNow();
+  if (g) return `<div class="panel stack"><h2>Monatsziel</h2>${goalCard(email,false)}
+    <div class="actions">${!g.done?`<button class="btn small" data-goaldone="${esc(email)}">Erreicht bestätigen</button>`:`<button class="btn small ghost" data-goalundo="${esc(email)}">Doch nicht erreicht</button>`}
+    <button class="btn small ghost" data-goaldel="${esc(email)}">${S.confirmDelete==="goal"+email?"Wirklich löschen?":"Löschen"}</button></div></div>`;
+  if (!S.goalOpen) return `<button class="panel kkcard" data-goalnew="${esc(email)}"><span class="ic">${ic("i-star")}</span><span><b>Monatsziel vereinbaren</b><small class="muted">Freiwillig, z. B. eine Diamanten-Challenge für ${esc(ymLabel(ym))}</small></span><span class="go">Anlegen</span></button>`;
+  return `<div class="panel stack"><h2>Monatsziel für ${esc(ymLabel(ym))}</h2>
+    <label class="f" for="g-title">Ziel<input id="g-title" type="text" placeholder="z. B. 50.000 Diamanten im Dezember"></label>
+    <div class="grid2"><label class="f" for="g-target">Zielwert (optional, für den Balken)<input id="g-target" type="number" inputmode="numeric" min="1" placeholder="50000"></label>
+    <label class="f" for="g-unit">Einheit<input id="g-unit" type="text" value="Diamanten"></label></div>
+    <div class="actions"><button class="btn small" data-goalsave="${esc(email)}">Ziel speichern</button><button class="btn small ghost" id="g-cancel">Abbrechen</button></div></div>`;
+}
+async function goalSave(email){
+  const title=$("#g-title").value.trim(), target=+$("#g-target").value||null, unit=$("#g-unit").value.trim()||null;
+  if (!title) return toast("Bitte das Ziel eintragen.");
+  const r=await sb.from("goals").upsert({ creator_email:email, month:ymNow(), title, target, unit, set_by:S.real.email, updated_at:new Date().toISOString() },{ onConflict:"creator_email,month" });
+  if (r.error) return fail(r.error);
+  S.goalOpen=false; await refresh(); render(true); toast("Monatsziel gespeichert.");
+}
+async function goalSet(email, patch){
+  const r=await sb.from("goals").update({ ...patch, updated_at:new Date().toISOString() }).eq("creator_email",email).eq("month",ymNow());
+  if (r.error) return fail(r.error); await refresh(); render(true);
+}
+async function goalDelete(email){
+  if (S.confirmDelete!=="goal"+email){ S.confirmDelete="goal"+email; return render(true); }
+  S.confirmDelete=null; const r=await sb.from("goals").delete().eq("creator_email",email).eq("month",ymNow()); if (r.error) return fail(r.error);
+  await refresh(); render(true); toast("Gelöscht.");
+}
+async function goalProgress(){
+  const v=+$("#gl-cur").value; if (!(v>=0)) return toast("Bitte eine Zahl eintragen.");
+  const r=await sb.rpc("goal_progress",{ m:ymNow(), val:v }); if (r.error) return fail(r.error);
+  const g=goalOf(S.me.email); if (g) g.current=v; render(true); toast("Stand gespeichert.");
+}
+
+/* Freischaltungen */
+function unlocksBlock(email){
+  const xs=S.extras.filter(x=>x.level!=null).sort((a,b)=>a.level-b.level); if (!xs.length) return "";
+  const L=levelOf(xpOf(email)).n, own=email===S.me.email;
+  return `<div class="sec"><span>Freischaltungen</span><small>${xs.filter(x=>L>=x.level).length} von ${xs.length}</small></div>
+  <div class="extras">${xs.map(x=> L>=x.level && own ? extraCard(x,null)
+    : `<div class="doc locked"><span class="lockic">${ic("i-lock")}</span><span><b>${esc(x.title)}</b><small class="muted">ab Stufe ${x.level} · ${esc(LEVELS[x.level-1]?.[1]||"")}</small></span></div>`).join("")}</div>`;
+}
+function liveStand(email){
+  const b=bsRows(email)[0]; if (!b) return "";
+  return `<div class="sec"><span>Live · letzte 30 Tage</span><small>Stand ${esc(ymLabel(b.month))}</small></div>
+  <div class="stats"><div><b>${fmtN(b.days)}</b><small>Live-Tage</small></div><div><b>${fmtN(Math.round(b.hours))}</b><small>Stunden</small></div><div><b>${b.rank_t&&b.rank_t<=10?"#"+b.rank_t:"–"}</b><small>Fleiß-Platz</small></div></div>`;
+}
+
+/* Backstage-Liste hochladen (nur Leitung) */
+async function readXlsx(file){
+  const buf=new Uint8Array(await file.arrayBuffer()), dv=new DataView(buf.buffer), td=new TextDecoder();
+  let e=buf.length-22; while (e>=0 && dv.getUint32(e,true)!==0x06054b50) e--;
+  if (e<0) throw new Error("Das ist keine Excel-Datei (.xlsx).");
+  const n=dv.getUint16(e+10,true), files={}; let p=dv.getUint32(e+16,true);
+  for (let i=0;i<n;i++){ const fl=dv.getUint16(p+28,true), xl=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true);
+    files[td.decode(buf.subarray(p+46,p+46+fl))]={ m:dv.getUint16(p+10,true), csz:dv.getUint32(p+20,true), off:dv.getUint32(p+42,true) }; p+=46+fl+xl+cl; }
+  const get=async name=>{ const f=files[name]; if (!f) return null; const o=f.off+30+dv.getUint16(f.off+26,true)+dv.getUint16(f.off+28,true), d=buf.subarray(o,o+f.csz);
+    if (f.m===0) return td.decode(d); return await new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text(); };
+  const P=x=>new DOMParser().parseFromString(x,"application/xml"), ss=[];
+  const sx=await get("xl/sharedStrings.xml"); if (sx) for (const si of P(sx).getElementsByTagName("si")) ss.push([...si.getElementsByTagName("t")].map(t=>t.textContent).join(""));
+  const sheetName=Object.keys(files).filter(k=>/^xl\/worksheets\/sheet\d+\.xml$/.test(k)).sort()[0];
+  const doc=P(await get(sheetName)||""), rows=[];
+  for (const r of doc.getElementsByTagName("row")){ const row=[];
+    for (const c of r.getElementsByTagName("c")){ const ref=c.getAttribute("r")||"", col=[...ref.replace(/\d+/g,"")].reduce((a,ch)=>a*26+ch.charCodeAt(0)-64,0)-1, t=c.getAttribute("t");
+      const v=c.getElementsByTagName("v")[0]?.textContent ?? "", val = t==="s" ? ss[+v] : t==="inlineStr" ? [...c.getElementsByTagName("t")].map(x=>x.textContent).join("") : v;
+      row[col<0?row.length:col]=val; }
+    rows.push(row); }
+  return rows;
+}
+function parseBackstage(rows){
+  const hi=rows.findIndex(r=>r && r.some(x=>/Anmeldename/i.test(x||""))); if (hi<0) throw new Error("Spalte „Anmeldename“ nicht gefunden. Ist das der Export „Creator*innen verwalten“?");
+  const H=rows[hi].map(x=>String(x||"").replace(/\s+/g," ")), col=rx=>H.findIndex(x=>rx.test(x));
+  const cH=col(/Anmeldename/i), cD=col(/^Diamanten in den letzten 30/i), cT=col(/G.ltige LIVE-Gehen-Tage/i), cL=col(/LIVE-Dauer/i);
+  if (cD<0 || cT<0) throw new Error("Spalten für Diamanten oder Live-Tage fehlen im Export.");
+  const num=v=>{ const x=parseFloat(String(v??"").replace(/\s/g,"").replace(",",".")); return isFinite(x)?x:0; };
+  const out=rows.slice(hi+1).filter(r=>r && r[cH]).map(r=>({ handle:hnorm(r[cH]), diamonds:Math.round(num(r[cD])), days:Math.round(num(r[cT])), hours:cL>=0?Math.round(num(r[cL])*100)/100:0 }));
+  const by=(k,k2)=>out.filter(x=>x[k]>0).sort((a,b)=>b[k]-a[k] || (k2?b[k2]-a[k2]:0));
+  by("diamonds").forEach((x,i)=>x.rank_d=i+1); by("days","hours").forEach((x,i)=>x.rank_t=i+1);
+  return out;
+}
+function backstagePanel(){
+  if (S.noUpd9) return `<div class="panel"><p class="err">Für die Backstage-Liste zuerst update-9.sql in Supabase ausführen.</p></div>`;
+  const P=S.bsPrev, d=new Date(), def=d.getDate()<=10 ? new Date(d.getFullYear(), d.getMonth()-1, 1) : d, months=[...new Set(S.bs.map(b=>b.month))].sort().reverse();
+  const known=new Set(S.members.filter(m=>m.role==="creator").map(m=>hnorm(m.handle)));
+  return `<div class="panel stack"><h2>Backstage-Liste</h2>
+    <p class="muted">Export „Creator*innen verwalten“ aus dem LIVE Backstage hochladen. Die Zahlen gelten für die letzten 30 Tage, also am besten am 1. des Monats für den Vormonat. Daraus kommen die XP für Live-Tage, die Plätze und die zwei Top-5-Listen.${months.length?` Hochgeladen: ${months.map(ymLabel).join(", ")}.`:""}</p>
+    <div class="grid2"><label class="f" for="bs-month">Monat<input id="bs-month" type="month" value="${P?.month||`${def.getFullYear()}-${pad(def.getMonth()+1)}`}"></label>
+    <label class="f" for="bs-file">Excel-Datei (.xlsx)<input id="bs-file" type="file" accept=".xlsx"></label></div>
+    ${P?`<div class="bsprev"><p><b>${P.rows.length} Creator</b> erkannt, davon ${P.rows.filter(r=>known.has(r.handle)).length} mit Konto in der App.</p>
+      <div class="top2">${[["Diamanten","rank_d"],["Fleißigste","rank_t"]].map(([t,k])=>`<div class="tl5"><span class="tl5h">${t}</span><ol>${P.rows.filter(r=>r[k]&&r[k]<=5).sort((a,b)=>a[k]-b[k]).map(r=>`<li><span class="pl">${r[k]}</span><b>@${esc(r.handle)}</b><small class="muted">${k==="rank_d"?fmtN(r.diamonds)+" 💎":r.days+" Tage"}</small></li>`).join("")}</ol></div>`).join("")}</div>
+      <div class="actions"><button class="btn small" id="bs-save">Für ${esc(ymLabel(P.month))} speichern</button><button class="btn small ghost" id="bs-cancel">Abbrechen</button></div></div>`:""}</div>`;
+}
+async function backstageRead(){
+  const f=$("#bs-file").files[0]; if (!f) return;
+  try{ const rows=parseBackstage(await readXlsx(f)); S.bsPrev={ month:$("#bs-month").value, rows }; render(true); }
+  catch(e){ toast(e.message||String(e)); }
+}
+async function backstageSave(){
+  const P=S.bsPrev; if (!P) return; P.month=$("#bs-month").value||P.month;
+  if (!/^\d{4}-\d{2}$/.test(P.month)) return toast("Bitte den Monat wählen.");
+  $("#bs-save").disabled=true;
+  let r=await sb.from("backstage").delete().eq("month",P.month); if (r.error) return fail(r.error);
+  r=await sb.from("backstage").insert(P.rows.map(x=>({ month:P.month, handle:x.handle, days:x.days, hours:x.hours, diamonds:x.diamonds, rank_d:x.rank_d||null, rank_t:x.rank_t||null })));
+  if (r.error) return fail(r.error);
+  S.bsPrev=null; await refresh(); render(true); toast("Backstage-Liste gespeichert.");
+}
 
 /* ---------- Sag's uns (anonym) ---------- */
 const KK_KINDS = [["frage","❓ Frage"],["kritik","💬 Kritik"],["wunsch","✨ Wunsch"]];
@@ -1170,6 +1405,7 @@ function calendarView(){
 }
 function openCal(id){
   const c=S.cal.find(x=>x.id===id); if (!c) return;
+  if (c.audience==="all") award("camp", String(c.id)).then(n=>{ if(n) render(true); });
   const lead=S.me.role==="lead" && !S.viewAs;
   sheet(`${c.image?`<a data-chref="${esc(c.image)}" target="_blank" rel="noopener"><img class="calimg" data-cimg="${esc(c.image)}" alt=""></a>`:""}
     <div class="sh"><span class="eyebrow">${KIND[c.kind]||""}${c.audience==="lead"?" · nur Führung":""}</span><h2>${esc(c.title)}</h2></div>
@@ -1355,7 +1591,7 @@ function rosterPanel(){
 function peopleView(){
   const m = S.editMember ? member(S.editMember) : null;
   const managers = S.members.filter(x=>x.role!=="creator");
-  let h = `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1><em>Teilnehmer</em></h1></div>${rosterPanel()}
+  let h = `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1><em>Teilnehmer</em></h1></div>${backstagePanel()}${rosterPanel()}
   <div class="panel stack"><h2>${m?"Person bearbeiten":"Person hinzufügen"}</h2>
   <div class="grid2">
     <label class="f" for="pm-email">E-Mail-Adresse<input id="pm-email" type="email" value="${esc(m?.email||"")}"></label>
@@ -1428,12 +1664,12 @@ async function addExtra(pre="ex"){
   const q=id=>$(`#${pre}-${id}`);
   const title=q("title").value.trim(), note=q("note").value.trim()||null, f=q("file").files[0];
   if (!title || !f) return toast("Bitte Titel und Datei auswählen.");
-  const vid=/^video\//.test(f.type)||isVid(f.name), ext=(f.name.match(/\.([a-z0-9]{2,5})$/i)?.[1]||(vid?"mp4":"pdf")).toLowerCase(), area=+(q("area")?.value)||null, kind=q("kind")?.value||"extra", audience=q("aud")?.value||null, category=q("cat")?.value.trim()||null;
+  const vid=/^video\//.test(f.type)||isVid(f.name), ext=(f.name.match(/\.([a-z0-9]{2,5})$/i)?.[1]||(vid?"mp4":"pdf")).toLowerCase(), area=+(q("area")?.value)||null, kind=q("kind")?.value||"extra", audience=q("aud")?.value||null, category=q("cat")?.value.trim()||null, level=+(q("level")?.value)||null;
   if (f.size>MAX_FILE) return toast("Die Datei ist größer als 50 MB.");
   try{
     q("add").disabled=true; q("add").textContent="Wird hochgeladen …";
     const path=`extra-${Date.now()}.${ext}`; let r=await sb.storage.from("unterlagen").upload(path,f,{contentType:f.type||"application/octet-stream"}); if(r.error) throw r.error;
-    r=await sb.from("extras").insert(Object.assign({ title, note, path, area, sort:S.extras.length }, kind==="reward"?{kind}:{}, audience?{audience, category}:{})); if(r.error) throw r.error;
+    r=await sb.from("extras").insert(Object.assign({ title, note, path, area, sort:S.extras.length }, kind==="reward"?{kind}:{}, audience?{audience, category}:{}, level?{level, category:"Freischaltungen"}:{})); if(r.error) throw r.error;
     await refresh(); render(true); toast("Extra hinzugefügt.");
   } catch(e){ fail(e); render(true); }
 }
@@ -1563,6 +1799,19 @@ document.addEventListener("click", async e => {
   if (t.id==="rw-open") return sheet(`<div class="stack">${rewardsBlock(S.me.email)}</div>`);
   if (t.dataset.qza) return quizAnswer(+t.dataset.qza);
   if (t.id==="qz-quit"){ S.qz=null; return render(); }
+  if (t.id==="hook-open") return openHook();
+  if (t.id==="hook-copy"){ navigator.clipboard?.writeText(t.dataset.txt).then(()=>toast("Kopiert. Viel Erfolg mit deinem Video!"),()=>toast("Kopieren ging nicht, bitte markieren.")); return; }
+  if (t.id==="imp-open") return openImpuls();
+  if (t.dataset.iq) return answerImpuls(+t.dataset.iq, +t.dataset.ia);
+  if (t.id==="gl-save") return goalProgress();
+  if (t.dataset.goalnew){ S.goalOpen=true; return render(true); }
+  if (t.id==="g-cancel"){ S.goalOpen=false; return render(true); }
+  if (t.dataset.goalsave) return goalSave(t.dataset.goalsave);
+  if (t.dataset.goaldone) return goalSet(t.dataset.goaldone,{ done:true });
+  if (t.dataset.goalundo) return goalSet(t.dataset.goalundo,{ done:false });
+  if (t.dataset.goaldel) return goalDelete(t.dataset.goaldel);
+  if (t.id==="bs-save") return backstageSave();
+  if (t.id==="bs-cancel"){ S.bsPrev=null; return render(true); }
   if (t.dataset.kk){ S.kkDraft=$("#qbox")?.value||""; S.kkKind=t.dataset.kk; return openKK(); }
   if (t.dataset.cal){ return openCal(t.dataset.cal); }
   if (t.dataset.calnav){ const m=calMonth(); S.calMonth=new Date(m.getFullYear(), m.getMonth()+ +t.dataset.calnav, 1); return render(true); }
@@ -1590,6 +1839,7 @@ document.addEventListener("click", async e => {
   if (t.dataset.quiz) return answerQuiz(+t.dataset.quiz, +t.dataset.j);
   if (t.dataset.seen) return markStep(+t.dataset.seen,"video_at");
   if (t.dataset.extra){ if (!t.href) { e.preventDefault(); toast("Lädt noch, bitte gleich nochmal tippen."); return; }
+    award("extra", t.dataset.extra);
     if (!S.viewAs){ const k="ldb-extras-"+S.me.email, seen=storeGet(k)||[]; if(!seen.includes(t.dataset.extra)){ seen.push(t.dataset.extra); storeSet(k,seen); setTimeout(()=>render(true),400); } } return; }
   if (t.dataset.handout && t.dataset.n){ if (!t.href) { e.preventDefault(); toast("Handout lädt noch, bitte gleich nochmal tippen."); return; } setTimeout(()=>markStep(+t.dataset.n,"handout_at"),300); return; }
   if (t.dataset.unpend){ const n=+t.dataset.unpend; (S.pending[n]||[]).splice(+t.dataset.i,1); $("#pend").innerHTML=pendList(n); return; }
@@ -1629,6 +1879,7 @@ document.addEventListener("change", e => {
     S.pending[n]=[...(S.pending[n]||[]), ...fs.filter(f=>f.size<=MAX_FILE)];
     e.target.value=""; $("#pend").innerHTML=pendList(n);
   }
+  if (e.target.id==="bs-file") return backstageRead();
   if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"start":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
   if (e.target.id==="ro-file"){ const f=e.target.files[0]; if(f) f.text().then(tx=>{ $("#ro-text").value=tx; toast("Datei eingelesen. Jetzt „Vorschau“ tippen."); }); return; }
   if (e.target.dataset.snap) return uploadSnap(e.target.dataset.snap, e.target.files[0]);
