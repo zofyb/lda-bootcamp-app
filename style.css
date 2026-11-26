@@ -733,9 +733,14 @@ button.tslot:hover{border-color:var(--rose);box-shadow:0 0 0 1px var(--rose) ins
 .trule .tx,.titem .tx{width:26px;height:26px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--muted);font-size:15px;cursor:pointer}
 button.row.tnext{display:grid;gap:2px;text-align:left;width:100%;font:inherit;color:var(--fg);cursor:pointer}
 @media (max-width:420px){.trule{grid-template-columns:1fr auto}.trule span{grid-column:1}.trule .tx{grid-row:1/3;grid-column:2}}
-/* Leitung/Manager: Kacheln so klein wie bei Creatorn */
-@media (min-width:700px){.wrap.wide .tiles{grid-template-columns:repeat(5,minmax(0,1fr))}}
-@media (min-width:560px) and (max-width:699px){.wrap.wide .tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* Leitung/Manager: kompakte Kacheln in der Größe der Kennzahl-Kreise */
+.wrap.wide .tiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 6px}
+@media (min-width:700px){.wrap.wide .tiles{grid-template-columns:repeat(8,minmax(0,1fr))}}
+.wrap.wide .tile{aspect-ratio:auto;background:none;border:0;box-shadow:none;padding:0;gap:6px;font:500 11.5px/1.25 var(--body);color:var(--soft);text-align:center;justify-content:flex-start}
+.wrap.wide .tile .tic{width:62px;height:62px;border-radius:20px;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line2);color:var(--lilac);box-shadow:0 6px 16px -8px #000}
+.wrap.wide .tile .tic .ico{width:24px;height:24px}
+.wrap.wide .tile:hover .tic{border-color:var(--rose)}
+.wrap.wide .tile .dot{top:-4px;right:calc(50% - 38px)}
 /* TikTok-Videos verwalten */
 .ttlist{display:grid;gap:8px}
 .ttli{display:grid;grid-template-columns:40px 1fr auto auto;gap:10px;align-items:center;padding:8px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
@@ -747,3 +752,4 @@ button.row.tnext{display:grid;gap:2px;text-align:left;width:100%;font:inherit;co
 .ttmini img:not([src]){display:none}
 .ttli .chip{cursor:pointer;white-space:nowrap}
 @media (max-width:460px){.ttli{grid-template-columns:40px 1fr}.ttli .chip{grid-column:span 1}.ttli label.chip{grid-column:1/2;grid-row:2;justify-self:start}.ttli button.chip{grid-column:2;grid-row:2;justify-self:start}}
+.pendl{display:flex;flex-wrap:wrap;gap:6px}

@@ -265,7 +265,7 @@ async function refresh(){
   S.noExtras = !!ex.error; S.extras = ex.data || [];
   const [sn,qu,sv,tp] = await Promise.all([ sb.from("snapshots").select("*"), sb.from("questions").select("*").order("created_at",{ascending:false}), sb.from("survey").select("*"), sb.rpc("top5") ]);
   S.noUpd5 = !!(sn.error || qu.error || sv.error);
-  if (S.real?.role==="lead" || S.me?.role==="lead"){ const ro=await sb.from("roster").select("*").order("handle"); S.noRoster=!!ro.error; S.roster=ro.data||[]; }
+  if (S.real?.role==="lead" || S.me?.role==="lead" || S.real?.role==="manager"){ const ro=await sb.from("roster").select("*").order("handle"); S.noRoster=!!ro.error; S.roster=ro.data||[]; }
   const qr=await sb.from("quiz_results").select("*"); S.noUpd8=!!qr.error; S.qres=qr.data||[];
   const [xe,bs,gl,bt,rf]=await Promise.all([ sb.from("xp_events").select("*"), sb.from("backstage").select("*"), sb.from("goals").select("*"), sb.rpc("backstage_top",{ m:null }), sb.from("referrals").select("*").order("created_at",{ ascending:false }) ]);
   if (S.me?.role!=="creator"){ const [gc,gn]=await Promise.all([ sb.from("guide_checks").select("*"), sb.from("guide_notes").select("*") ]); S.noUpd13=!!(gc.error||gn.error); S.gchk=gc.data||[]; S.gnote=gn.data||[]; }
@@ -835,10 +835,18 @@ function creatorRow(c){
   return `<button class="row" data-creator="${esc(c.email)}"><div class="head">${L?`<span class="rwho">${lvRing(c.email,40,{badge:false})}<span><b>${esc(label(c))}</b><small class="lvt" style="${lvVars(L.i)}">Stufe ${L.n} · ${esc(L.name)}</small></span></span>`:`<b>${esc(label(c))}</b>`}<span class="tag ${t>=10?"gold":""}">${t} / ${maxPts()}</span></div>${dots(c.email)}
     ${st||b.length||qt?`<div class="mini">${qt?`<span class="chip gold">${ic(TYPE_IC[qt.key]||"i-star")} ${esc(qt.name)}</span>`:""}${st?`<span class="chip">${ic("i-fire")} ${st}</span>`:""}${b.length?`<span class="chip">${ic("i-star")} ${b.length} Abzeichen</span>`:""}${guideChip(c.email)}</div>`:`<div class="mini">${guideChip(c.email)}</div>`}</button>`;
 }
+/* Alle Creator eines Managers: registrierte (auch ohne Bootcamp) + auf der Liste, aber noch nicht registriert */
+const myPeople = () => allCreators().filter(c => c.manager_email === S.me.email);
+const myPending = () => { const reg=new Set(allCreators().map(c=>normH(c.handle))); return (S.roster||[]).filter(r => r.manager_email === S.me.email && !reg.has(normH(r.handle))); };
 function managerList(){
-  const cs=myCreators();
-  return `<div class="stack"><span class="eyebrow">Manager</span><h1>Meine <em>Creator</em></h1></div>${LEGEND}
-    ${cs.length?`<div class="list">${cs.map(creatorRow).join("")}</div>`:`<div class="panel"><p class="muted">Dir sind noch keine Creator zugeordnet.</p></div>`}`;
+  const cs=myPeople(), pend=myPending();
+  return `<div class="stack"><span class="eyebrow">Betreuung</span><h1>Meine <em>Creator</em></h1>
+    <p class="muted">${cs.length} in der App${pend.length?` · ${pend.length} noch nicht registriert`:""}</p></div>${cs.length?LEGEND:""}
+    ${cs.length?`<div class="list">${cs.map(creatorRow).join("")}</div>`:""}
+    ${pend.length?`<div class="sec"><span>Noch nicht in der App</span><small>${pend.length}</small></div>
+      <p class="muted" style="margin:0 0 8px">Stehen auf der Liste, haben sich aber noch nicht registriert. Schick ihnen den Link zur App.</p>
+      <div class="pendl">${pend.map(r=>`<span class="chip">@${esc(r.handle)}${r.name?` · ${esc(r.name)}`:""}</span>`).join("")}</div>`:""}
+    ${!cs.length&&!pend.length?`<div class="panel"><p class="muted" style="margin:0">Dir sind noch keine Creator zugeordnet.</p></div>`:""}`;
 }
 function creatorDetail(email){
   const c=member(email); if(!c){ S.creator=null; return ""; }
