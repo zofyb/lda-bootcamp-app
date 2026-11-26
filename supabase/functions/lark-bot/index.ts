@@ -130,7 +130,9 @@ function parse(text: string) {
   const link = t.match(/https?:\/\/[^\s)\]>]+/); if (link) out.link = link[0];
   const lines = t.split(/\n/).map((l) => l.replace(/[*#_`【】\[\]]/g, "").replace(/^[^\p{L}\p{N}]+/u, "").trim())
     .filter((l) => l && !/^https?:/.test(l) && !/^merged and forwarded/i.test(l));
-  out.title = (lines[0] || "Kampagne aus Lark").replace(/\s*[:：]\s*$/, "").slice(0, 120);
+  // Begrüßungen und Datumszeilen überspringen (z. B. "Hi! Es gibt eine neue Kampagne!")
+  const skip = /^(hi|hallo|hey|liebe|hello)\b|neue kampagne|new campaign|^(start|end)datum|^zeitraum|^für wen|^from\b/i;
+  out.title = (lines.find((l) => !skip.test(l) && l.length > 2) || lines[0] || "Kampagne aus Lark").replace(/\s*[:：]\s*$/, "").slice(0, 120);
   const now = berlinToday(), ds: Date[] = [];
   const add = (y: number, m: number, d: number) => {
     if (m < 0 || m > 11 || d < 1 || d > 31) return;

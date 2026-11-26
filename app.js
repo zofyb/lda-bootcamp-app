@@ -1689,7 +1689,8 @@ function parseLark(text){
   const t=String(text||""), out={ body:t.trim() };
   const link=t.match(/https?:\/\/[^\s)\]>]+/); if (link) out.link=link[0];
   const lines=t.split(/\n/).map(l=>l.replace(/[*#_`【】\[\]]/g,"").replace(/^[^\p{L}\p{N}]+/u,"").trim()).filter(l=>l && !/^https?:/.test(l));
-  if (lines[0]) out.title=lines[0].replace(/\s*[:：]\s*$/,"").slice(0,120);
+  const skip=/^(hi|hallo|hey|liebe|hello)\b|neue kampagne|new campaign|^(start|end)datum|^zeitraum|^für wen|^from\b/i, tl=lines.find(l=>!skip.test(l)&&l.length>2)||lines[0];
+  if (tl) out.title=tl.replace(/\s*[:：]\s*$/,"").slice(0,120);
   const now=new Date(), ds=[];
   const add=(y,m,d)=>{ if (m<0||m>11||d<1||d>31) return; let yy=y?(y<100?2000+y:y):now.getFullYear(); let dt=new Date(yy,m,d); if (!y && dt<new Date(now.getFullYear(),now.getMonth()-2,1)) dt=new Date(yy+1,m,d); ds.push({ dt, i:ds.length }); };
   let mm; const rx=/(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\.\s?(\d{1,2})\.(\d{2,4})?|(\d{1,2})\.?\s+([A-Za-zÄÖÜäöü]{3,9})\.?(?:\s+(\d{4}))?|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?!\d)(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?|(\d{4})\/(\d{1,2})\/(\d{1,2})|(\d{1,2})\/(\d{1,2})\/(\d{4})/g;
