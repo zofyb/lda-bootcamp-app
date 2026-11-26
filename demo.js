@@ -14,7 +14,7 @@ const db = {
     {email:"demo@demo", role:"lead", name:"Demo-Leitung"},
     {email:"lena@demo", role:"manager", name:"Lena"},
     {email:"max@demo", role:"manager", name:"Max"},
-    {email:"c1@demo", role:"creator", name:"Luna Beispiel", handle:"luna.live", manager_email:"lena@demo"},
+    {email:"c1@demo", role:"creator", name:"Luna Beispiel", handle:"luna.live", manager_email:"lena@demo", avatar:"demo-av-luna"},
     {email:"c2@demo", role:"creator", name:"Kevin Beispiel", handle:"gamer_kevin", manager_email:"lena@demo"},
     {email:"c3@demo", role:"creator", name:"Jenny Beispiel", handle:"jenny.mama", manager_email:"max@demo"},
     {email:"c4@demo", role:"creator", name:"Tim Beispiel", handle:"tim.talks", manager_email:"max@demo"},
@@ -102,7 +102,7 @@ window.supabase = { createClient(){ return {
   from:q,
   storage:{ from(){ return {
     upload:async()=>({ error:{ message:"In der Demo wird nichts hochgeladen." } }), remove:async()=>({}),
-    createSignedUrls:async p=>({ data:p.map(x=>({ path:x, signedUrl:null })) }), createSignedUrl:async()=>({ data:null })
+    createSignedUrls:async p=>({ data:p.map(x=>({ path:x, signedUrl:/^demo-av/.test(x)?"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f7b2d9'/%3E%3Cstop offset='1' stop-color='%236a2a9a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3Ccircle cx='50' cy='40' r='18' fill='%23fff' fill-opacity='.85'/%3E%3Cpath d='M18 100c4-22 18-32 32-32s28 10 32 32z' fill='%23fff' fill-opacity='.85'/%3E%3C/svg%3E":null })) }), createSignedUrl:async()=>({ data:null })
   }; } },
   rpc:async(n,a)=>{
     if (n==="top5") return { data:top5(), error:null };

@@ -125,6 +125,7 @@ function fileLinks(files){
   return `<div class="files">${list(files).map(f=>`<a data-path="${esc(f.path)}" target="_blank" rel="noopener">${esc(f.name)}</a>`).join("") || '<span>Keine Dateien</span>'}</div>`;
 }
 async function hydrate(){
+  hydrateAvatars().catch(console.error);
   const els=[...document.querySelectorAll("a[data-path]:not([href])")];
   if (els.length){
     const paths=[...new Set(els.map(e=>e.dataset.path))];
@@ -371,7 +372,7 @@ function render(keepScroll){
   const sw=$("#switch"); sw.innerHTML = switcher(); sw.hidden = !sw.innerHTML.trim();
   const st = me.role==="creator" && !me.preview ? streakInfo(me.email).cur : 0;
   who.innerHTML = me.role==="creator"
-    ? `${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}<button class="avabtn" data-tab="profil" aria-label="Mein Profil">${esc(initialOf(me))}</button>`
+    ? `${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}${S.noUpd9?`<button class="avabtn" data-tab="profil" aria-label="Mein Profil">${esc(initialOf(me))}</button>`:`<button class="avabtn rg" data-tab="profil" aria-label="Mein Profil">${lvRing(me.email,46,{badge:false})}</button>`}`
     : `<span class="chip">${esc(S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
   if (me.role==="creator"){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
@@ -788,7 +789,8 @@ function pendingView(){
 }
 function creatorRow(c){
   const t=total(c.email), st=streakInfo(c.email).cur, b=badgesFor(c.email).filter(x=>x.on), qr=qzRes(c.email,"streamer"), qt=qr&&qzType("streamer",qr.result);
-  return `<button class="row" data-creator="${esc(c.email)}"><div class="head"><b>${esc(label(c))}</b><span class="tag ${t>=10?"gold":""}">${t} / ${maxPts()}</span></div>${dots(c.email)}
+  const L=S.noUpd9?null:levelOf(xpOf(c.email));
+  return `<button class="row" data-creator="${esc(c.email)}"><div class="head">${L?`<span class="rwho">${lvRing(c.email,40,{badge:false})}<span><b>${esc(label(c))}</b><small class="lvt" style="${lvVars(L.i)}">Stufe ${L.n} · ${esc(L.name)}</small></span></span>`:`<b>${esc(label(c))}</b>`}<span class="tag ${t>=10?"gold":""}">${t} / ${maxPts()}</span></div>${dots(c.email)}
     ${st||b.length||qt?`<div class="mini">${qt?`<span class="chip gold">${ic(TYPE_IC[qt.key]||"i-star")} ${esc(qt.name)}</span>`:""}${st?`<span class="chip">${ic("i-fire")} ${st}</span>`:""}${b.length?`<span class="chip">${ic("i-star")} ${b.length} Abzeichen</span>`:""}</div>`:""}</button>`;
 }
 function managerList(){
@@ -801,7 +803,7 @@ function creatorDetail(email){
   let h=`<button class="btn ghost small back" id="back">← Zurück</button>
     <div class="stack"><span class="eyebrow">${esc(member(c.manager_email)?.name?"Manager: "+member(c.manager_email).name:"ohne Manager")}</span><h1>${esc(label(c))}</h1>
     <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p><div class="titles">${titleChips(email,false)}</div></div>
-    ${S.noUpd9?"":levelPanel(email)}${liveStand(email)}${goalAdmin(email)}
+    ${S.noUpd9?"":lvHero(email,false)}${liveStand(email)}${goalAdmin(email)}
     <div class="hexes">${allBadges(email).map(hexBadge).join("")}</div>
     ${snapOf(email,"vorher")||snapOf(email,"nachher")?`<div class="panel stack"><h2>Vorher-Nachher</h2><div class="snaps">${["vorher","nachher"].map(k=>{const x=snapOf(email,k); return `<div class="snap">${x?`<a data-path="${esc(x.path)}" target="_blank" rel="noopener"><img data-img="${esc(x.path)}" alt="${k}"></a>`:`<div class="ph">–</div>`}<small>${k==="vorher"?"Vorher":"Nachher"}</small></div>`;}).join("")}</div></div>`:""}
     <div class="list">`;
@@ -1015,7 +1017,8 @@ function startView(){
   const camps=[...now,...soon].slice(0,4);
   checkLevelUp(e);
   const hk=hookToday(), im=impulsNow(), hkDone=S.xp.some(x=>x.creator_email===e&&x.kind==="hook"&&x.ref===todayKey()), imDone=S.xp.some(x=>x.creator_email===e&&x.kind==="impuls"&&x.ref===weekKey());
-  return `<div class="hi"><h1>${hello}, <em>${esc(firstName(me))}</em></h1><div class="hirow">${S.noUpd9?"":levelChip(e)}${mt?`<button class="title" data-qzshow="${main.quiz}" data-who="${esc(e)}"><i>${ic(TYPE_IC[mt.key]||"i-star")}</i>${esc(mt.name)}</button>`:""}</div></div>
+  return `<div class="hi"><h1>${hello}, <em>${esc(firstName(me))}</em></h1><div class="hirow">${mt?`<button class="title" data-qzshow="${main.quiz}" data-who="${esc(e)}"><i>${ic(TYPE_IC[mt.key]||"i-star")}</i>${esc(mt.name)}</button>`:""}</div></div>
+  ${S.noUpd9?"":lvHero(e,true)}
   ${nextCard(e)}
   ${hk||im?`<div class="daily">${hk?`<button class="dcard ${hkDone?"done":""}" id="hook-open"><span class="dic">${ic("i-spark")}</span><b>Hook des Tages</b><small>${hkDone?"Erledigt ✓":"+10 XP"}</small></button>`:""}${im?`<button class="dcard ${imDone?"done":""}" id="imp-open"><span class="dic">${ic("i-bulb")}</span><b>Impuls der Woche</b><small>${imDone?"Angesehen ✓":"bis +50 XP"}</small></button>`:""}</div>`:""}
   ${goalCard(e,true)}
@@ -1046,10 +1049,12 @@ function quizPage(){
 function profileView(email){
   const m=member(email)||S.me, mg=member(m.manager_email), boot=inBootcamp(m), own=email===S.me.email;
   const bs=allBadges(email), on=bs.filter(b=>b.on).length;
-  return `<div class="prof"><span class="ava">${esc(initialOf(m))}</span><b>${esc(m.name||label(m))}</b>
+  const me2=own && S.me.role==="creator";
+  return `<div class="prof">${S.noUpd9?`<span class="ava">${esc(initialOf(m))}</span>`:`<button class="ringbtn" data-lvsheet="${esc(email)}" aria-label="Level-Details">${lvRing(email,170)}</button>`}
+    ${me2&&!S.viewAs?`<label class="avup" for="av-file">${ic("i-cam")} Profilbild ${m.avatar?"ändern":"hochladen"}<input id="av-file" type="file" accept="image/*" hidden></label>`:""}<b>${esc(m.name||label(m))}</b>
     <small class="muted">${m.handle?"@"+esc(String(m.handle).replace(/^@/,"")):""}${mg?` · Manager: ${esc(mg.name)}`:""}</small>
-    <div class="titles">${titleChips(email, own && S.me.role==="creator")}</div></div>
-  ${S.noUpd9?"":levelPanel(email)}
+    ${S.noUpd9?"":lvPill(email)}<div class="titles">${titleChips(email, own && S.me.role==="creator")}</div></div>
+  ${S.noUpd9?"":mixRow(xpParts(email), me2)}
   <div class="stats"><div><b>${fmtN(xpOf(email))}</b><small>XP</small></div>${boot?`<div><b>${total(email)}</b><small>Bootcamp-Punkte</small></div>`:""}<div><b>${on}</b><small>Abzeichen</small></div></div>
   ${goalCard(email, own)}
   ${liveStand(email)}
@@ -1093,14 +1098,6 @@ function levelOf(xp){
   const [min,name]=LEVELS[i], next=LEVELS[i+1];
   return { i, n:i+1, name, min, next:next?.[0], nextName:next?.[1], pct: next ? Math.round((xp-min)/(next[0]-min)*100) : 100 };
 }
-function levelChip(email){ const L=levelOf(xpOf(email)); return `<button class="lvchip" data-tab="profil"><b>${L.n}</b><span>${esc(L.name)}</span><i style="--p:${L.pct}%"></i></button>`; }
-function levelPanel(email){
-  const xp=xpOf(email), L=levelOf(xp), P=xpParts(email);
-  return `<div class="panel lvpanel"><div class="lvhex"><span>Stufe</span><b>${L.n}</b></div>
-    <div class="lvinfo"><b>${esc(L.name)}</b><small class="muted">${fmtN(xp)} XP${L.next!=null?` · noch ${fmtN(L.next-xp)} bis ${esc(L.nextName)}`:" · höchste Stufe"}</small>
-    <span class="lvbar"><i style="width:${L.pct}%"></i></span>
-    <small class="lvsrc">${[["App",P.app],["Lernen",P.lernen],["Live",P.live],["Monatsziel",P.ziel]].filter(x=>x[1]).map(([l,v])=>`${l} ${fmtN(v)}`).join(" · ")||"Sammle XP mit Hook des Tages, Impuls der Woche und deinen Lives."}</small></div></div>`;
-}
 let levelSeen=null;
 function checkLevelUp(email){
   if (S.viewAs || S.me.preview || S.me.role!=="creator") return;
@@ -1119,6 +1116,121 @@ async function award(kind, ref){
   return pts;
 }
 function xpToast(n){ const t=document.createElement("div"); t.className="xpfly"; t.textContent="+"+n+" XP"; document.body.appendChild(t); setTimeout(()=>t.remove(),1800); }
+
+/* Level-Ring: eigene Farbwelt je Stufe, Ring ums Profilbild, persönliches XP-Kreisdiagramm */
+const LV_STYLE = [
+  { c:["#c9d0dc","#6b7385"], ic:"i-spark",  rw:"Start in der Academy" },
+  { c:["#ffc2ad","#d0607a"], ic:"i-rocket", rw:"Eigener Profilrahmen" },
+  { c:["#ffd0ea","#ff3fa8"], ic:"i-star",   rw:"Erstes Stream-Overlay" },
+  { c:["#e3b8ff","#8a2fd9"], ic:"i-mic",    rw:"Live-Ziel-Vorlagen und Begrüßungstexte" },
+  { c:["#b7c4ff","#5a3be0"], ic:"i-gem",    rw:"Animation für PC-Streamer" },
+  { c:["#ffe08a","#c24fe0"], ic:"i-crown",  rw:"Zweites Overlay und kleine Live-Einblendungen" },
+  { c:["#fff3c4","#FFB017"], ic:"i-trophy", rw:"Persönliches Overlay und Shoutout" }
+];
+const MIX = [["live","Live","#FFB017"],["lernen","Lernen","#ff5fb8"],["app","App","#c24fe0"],["ziel","Ziel","#5fe3a8"]];
+const MIX_SAY = { live:"deine Lives", lernen:"Lernen", app:"deine App-Aktivität", ziel:"deine Monatsziele" };
+const AVURL = {};
+let rgid = 0;
+const lvVars = i => `--la:${LV_STYLE[i].c[0]};--lb:${LV_STYLE[i].c[1]}`;
+function avaInner(m){
+  const p=m?.avatar;
+  return `<span class="avl">${esc(initialOf(m||{}))}</span>${p?`<img class="avimg" data-avatar="${esc(p)}" ${AVURL[p]?`src="${esc(AVURL[p])}"`:""} alt="">`:""}`;
+}
+function lvHex(i, size, locked){
+  return `<span class="lvhx${locked?" off":""}" style="${lvVars(i)};--s:${size}px">${ic(LV_STYLE[i].ic)}</span>`;
+}
+function lvRing(email, size, opt={}){
+  const m=member(email) || (S.me?.email===email ? S.me : null);
+  const L=levelOf(xpOf(email)), [a,b]=LV_STYLE[L.i].c, id="lr"+(rgid++), h=size/2;
+  const sw=Math.max(3, size*.06), r=h-sw-(size>=90?size*.05:1), C=2*Math.PI*r, p=L.pct/100;
+  let ticks="";
+  if (size>=90) for (let k=0;k<40;k++){ const an=k/40*2*Math.PI-Math.PI/2, r1=r+sw*.95, r2=r1+size*.02;
+    ticks+=`<line x1="${(h+r1*Math.cos(an)).toFixed(1)}" y1="${(h+r1*Math.sin(an)).toFixed(1)}" x2="${(h+r2*Math.cos(an)).toFixed(1)}" y2="${(h+r2*Math.sin(an)).toFixed(1)}" stroke="${k/40<p?a:"rgba(255,255,255,.12)"}" stroke-width="1.4" stroke-linecap="round"/>`; }
+  const circ=extra=>`<circle cx="${h}" cy="${h}" r="${r.toFixed(1)}" fill="none" stroke-width="${sw.toFixed(1)}" ${extra}/>`;
+  const arc=`stroke="url(#${id})" stroke-linecap="round" stroke-dasharray="${(C*p).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 ${h} ${h})"`;
+  const av=Math.round(2*r-sw-size*.04);
+  return `<span class="lring${opt.cls?" "+opt.cls:""}" style="width:${size}px;height:${size}px;${lvVars(L.i)}">
+    <svg width="${size}" height="${size}" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>
+    ${ticks}${circ('stroke="rgba(255,255,255,.09)"')}${p>0?circ(`class="lglow" ${arc}`)+circ(arc):""}
+    ${L.i===LEVELS.length-1?`<g class="lshine">${circ(`stroke="#fff" stroke-opacity=".85" stroke-linecap="round" stroke-dasharray="${(C*.035).toFixed(1)} ${C.toFixed(1)}" style="stroke-width:${(sw*.4).toFixed(1)}px"`)}</g>`:""}</svg>
+    <span class="lava" style="width:${av}px;height:${av}px;font-size:${Math.round(av*.38)}px">${avaInner(m)}</span>
+    ${opt.badge===false?"":`<span class="lnum" style="--s:${Math.max(18,Math.round(size*.24))}px">${L.n}</span>`}</span>`;
+}
+function donut(P, size){
+  const tot=MIX.reduce((s,[k])=>s+(P[k]||0),0), h=size/2, r=h-8, C=2*Math.PI*r, n=MIX.filter(([k])=>P[k]).length;
+  let off=0, seg="";
+  if (tot) MIX.forEach(([k,,c])=>{ const v=P[k]||0; if (!v) return; const len=v/tot*C;
+    seg+=`<circle cx="${h}" cy="${h}" r="${r.toFixed(1)}" fill="none" stroke="${c}" stroke-width="12" stroke-dasharray="${Math.max(.5,len-(n>1?3:0)).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 ${h} ${h})"/>`; off+=len; });
+  return `<svg class="donut" width="${size}" height="${size}" aria-hidden="true"><circle cx="${h}" cy="${h}" r="${r.toFixed(1)}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="12"/>${seg}
+    <text x="50%" y="48%" text-anchor="middle" class="dn">${fmtN(tot)}</text><text x="50%" y="64%" text-anchor="middle" class="du">XP</text></svg>`;
+}
+function mixRow(P, mine){
+  const top=MIX.filter(([k])=>P[k]).sort((x,y)=>P[y[0]]-P[x[0]])[0];
+  const say=!top ? (mine?"Sammle deine ersten XP mit dem Hook des Tages.":"Noch keine XP gesammelt.")
+    : `${mine?"Du wächst":"Wächst"} vor allem durch <b>${MIX_SAY[top[0]]}</b>.`;
+  return `<div class="mixrow">${donut(P,96)}<div class="mixr"><div class="legend">${MIX.map(([k,l,c])=>`<span><i style="background:${c}"></i>${l} <b>${fmtN(P[k])}</b></span>`).join("")}</div><div class="typeline">${say}</div></div></div>`;
+}
+function lvHero(email, mine){
+  const xp=xpOf(email), L=levelOf(xp), nx=LV_STYLE[L.i+1];
+  return `<div class="lvhero" style="${lvVars(L.i)}">
+    <div class="lvtop"><button class="ringbtn" data-lvsheet="${esc(email)}" aria-label="Level-Details">${lvRing(email,116)}</button>
+      <div class="lvtxt"><span class="eyebrow">Stufe ${L.n} von ${LEVELS.length}</span><b class="lvname">${esc(L.name)}</b>
+      <small><b>${fmtN(xp)}</b> XP${L.next!=null?` · noch ${fmtN(L.next-xp)} bis ${esc(L.nextName)}`:" · höchste Stufe"}</small></div></div>
+    ${nx?`<div class="nextun">${lvHex(L.i+1,30)}<div>Als Nächstes: <b>${esc(nx.rw)}</b><small>bei ${esc(L.nextName)}</small></div></div>`:""}
+    ${mixRow(xpParts(email), mine)}
+    <button class="lnk lvmore" data-lvsheet="${esc(email)}">${mine?"Wie bekomme ich mehr XP?":"Alle Stufen ansehen"} ›</button>
+  </div>`;
+}
+function lvPill(email){
+  const L=levelOf(xpOf(email));
+  return `<button class="lvpill" data-lvsheet="${esc(email)}" style="${lvVars(L.i)}">${ic(LV_STYLE[L.i].ic)} Stufe ${L.n} · ${esc(L.name)}</button>`;
+}
+function openLvSheet(email){
+  const mine=email===S.me.email && S.me.role==="creator", m=member(email)||S.me;
+  const xp=xpOf(email), L=levelOf(xp);
+  const ways=[["i-check","Täglich reinschauen","5 XP pro Tag"],["i-spark","Hook des Tages öffnen","10 XP pro Tag"],["i-bulb","Impuls der Woche","20 XP + 10 je richtige Antwort"],
+    ["i-cal","Kampagne durchlesen","15 XP je Kampagne"],["i-play","Akademie-Inhalt ansehen","15 XP je Inhalt"],["i-quiz","Quiz machen","50 XP je Quiz"],
+    ["i-fire","Live gehen","10 XP je gültigem Live-Tag im Monat"],["i-trophy","Top 10 der Agentur","bis 300 XP im Monat"],["i-star","Monatsziel erreichen","250 XP"]];
+  if (inBootcamp(m)) ways.push(["i-learn","Bootcamp","50 XP je Abgabe, 200 XP fürs Bestehen"]);
+  sheet(`<div class="sh lvsh" style="${lvVars(L.i)}">${lvRing(email,92)}<div><span class="eyebrow">Stufe ${L.n} · ${esc(L.name)}</span><h2>${fmtN(xp)} XP</h2>
+      <small class="muted">${L.next!=null?`noch ${fmtN(L.next-xp)} bis ${esc(L.nextName)}`:"höchste Stufe erreicht"}</small></div></div>
+    <div class="sec"><span>Woher ${mine?"deine":"die"} XP kommen</span></div>
+    ${mixRow(xpParts(email), mine)}
+    <div class="sec"><span>So ${mine?"bekommst du":"gibt es"} mehr XP</span></div>
+    <div class="ways">${ways.map(([i,t,x])=>`<div class="way"><span class="wic">${ic(i)}</span><div><b>${t}</b><small>${x}</small></div></div>`).join("")}</div>
+    <div class="sec"><span>${mine?"Dein":"Der"} Weg</span><small>${LEVELS.length} Stufen</small></div>
+    <div class="lvpath">${LEVELS.map((_,i)=>i).reverse().map(i=>{ const s=i<L.i?"done":i===L.i?"now":"locked";
+      return `<div class="lst ${s}" style="${lvVars(i)}">${lvHex(i,44,s==="locked")}<div><b>${esc(LEVELS[i][1])}${s==="now"?` <em>${mine?"Du bist hier":"Aktuell"}</em>`:""}</b><small>ab ${fmtN(LEVELS[i][0])} XP · ${esc(LV_STYLE[i].rw)}</small></div></div>`; }).join("")}</div>`);
+}
+async function shrinkImage(file, max=320){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("Bild konnte nicht gelesen werden.")); i.src=url; });
+    const s=Math.min(img.naturalWidth,img.naturalHeight), c=document.createElement("canvas"); c.width=c.height=Math.min(max,s);
+    c.getContext("2d").drawImage(img,(img.naturalWidth-s)/2,(img.naturalHeight-s)/2,s,s,0,0,c.width,c.height);
+    return await new Promise(r=>c.toBlob(r,"image/jpeg",.85));
+  } finally { URL.revokeObjectURL(url); }
+}
+async function avatarUpload(f){
+  if (!f) return;
+  if (!/^image\//.test(f.type)) return toast("Bitte ein Bild auswählen.");
+  if (S.viewAs || S.me.preview || window.__DEMO) return toast("In der Vorschau wird nichts gespeichert.");
+  try{
+    toast("Profilbild wird gespeichert …");
+    const blob=await shrinkImage(f), e=S.me.email, path=`${e}/avatar-${Date.now()}.jpg`;
+    const u=await sb.storage.from("profilbilder").upload(path, blob, { contentType:"image/jpeg" }); if (u.error) throw u.error;
+    const r=await sb.rpc("set_avatar",{ p:path }); if (r.error) throw r.error;
+    const old=S.me.avatar; [S.me, S.real, member(e)].forEach(x=>{ if (x && x.email===e) x.avatar=path; });
+    if (old && old!==path) sb.storage.from("profilbilder").remove([old]).catch(()=>{});
+    render(true); toast("Profilbild gespeichert.");
+  } catch(err){ fail(err); }
+}
+async function hydrateAvatars(){
+  const imgs=[...document.querySelectorAll("img[data-avatar]:not([src])")]; if (!imgs.length) return;
+  const need=[...new Set(imgs.map(i=>i.dataset.avatar))].filter(p=>!AVURL[p]);
+  if (need.length){ const { data }=await sb.storage.from("profilbilder").createSignedUrls(need, 6*3600); (data||[]).forEach(d=>{ if (d.signedUrl) AVURL[d.path]=d.signedUrl; }); }
+  imgs.forEach(i=>{ if (AVURL[i.dataset.avatar]) i.src=AVURL[i.dataset.avatar]; });
+}
 
 /* Hook des Tages */
 const HOOKS = () => window.LDA_HOOKS || [];
@@ -1726,21 +1838,26 @@ datenschutz: `<h1>Datenschutz&shy;erklärung</h1>
 <h2>1. Verantwortliche</h2>
 <p>Sophie Berger, c/o LIVEdream Agency UG (haftungsbeschränkt), Hardenbergstraße 83, 51373 Leverkusen. E-Mail: <a href="mailto:zofy_creates@web.de">zofy_creates@web.de</a></p>
 <h2>2. Wofür ist die App da?</h2>
-<p>Die LIVEdream Academy ist eine Schulungsplattform für Creator und Manager der LIVEdream Agency. Sie stellt Lehrvideos, Handouts und Aufgaben bereit und ermöglicht Abgaben, Bewertungen und Rückmeldungen.</p>
+<p>Die LIVEdream Academy ist eine Schulungsplattform für Creator und Manager der LIVEdream Agency. Sie stellt Lehrvideos, Handouts, Quizze und Aufgaben bereit, ermöglicht Abgaben, Bewertungen und Rückmeldungen und zeigt mit einem Level-System, Monatszielen und Ranglisten deinen Fortschritt.</p>
 <h2>3. Welche Daten wir verarbeiten</h2>
 <ul>
 <li><b>Konto:</b> E-Mail-Adresse, Name, TikTok-Name, Rolle (Creator, Manager, Agenturleitung) und zugeordneter Manager.</li>
 <li><b>Anmeldung:</b> Beim Login schicken wir dir einen Link oder Code per E-Mail. Dabei werden technisch nötige Daten wie Zeitpunkt und IP-Adresse kurz verarbeitet.</li>
 <li><b>Lernfortschritt:</b> ob du Video, Quiz und Handout eines Themas abgeschlossen hast, an welchen Tagen du die App geöffnet hast (für die Streak-Anzeige) und deine Abzeichen.</li>
 <li><b>Abgaben:</b> die Dateien, die du hochlädst (Fotos, Videos, PDFs), deine Nachricht an deinen Manager, Punkte und Rückmeldungen. Dazu deine Vorher-Nachher-Screenshots, falls du welche hochlädst.</li>
-<li><b>Fragenbox:</b> Fragen werden ohne Namen und ohne E-Mail-Adresse gespeichert.</li>
+<li><b>Profilbild:</b> falls du eins hochlädst. Es wird vorher auf eine kleine Größe verkleinert.</li>
+<li><b>Quizze:</b> deine Ergebnisse (z. B. Streamer-Typ und Nische), die als Titel in deinem Profil erscheinen.</li>
+<li><b>Level und XP:</b> welche Aktionen dir XP gebracht haben (z. B. Einloggen, Hook des Tages, Impuls der Woche, gelesene Kampagnen) und deine Stufe.</li>
+<li><b>Live-Daten aus dem TikTok-Backstage:</b> Die Agentur lädt monatlich die Backstage-Liste hoch. Daraus speichern wir zu deinem TikTok-Namen die gültigen Live-Tage, die Live-Stunden und die Diamanten der letzten 30 Tage sowie deine Plätze in den Agentur-Ranglisten.</li>
+<li><b>Monatsziel:</b> das Ziel, das du mit deinem Manager vereinbarst, und dein eingetragener Stand.</li>
+<li><b>Sag's uns:</b> Nachrichten werden ohne Namen und ohne E-Mail-Adresse gespeichert.</li>
 <li><b>Umfrage:</b> deine Antworten. Sie sieht nur die Agenturleitung.</li>
-<li><b>Bestenliste:</b> In den Top 5 erscheint dein TikTok-Name für die anderen Teilnehmer, ohne Punkte.</li>
+<li><b>Ranglisten:</b> In den Top 5 (Bootcamp, Diamanten, Fleißigste) erscheint nur dein TikTok-Name mit Platz, ohne Zahlen.</li>
 </ul>
 <h2>4. Wer sieht was?</h2>
-<p>Du siehst deine eigenen Daten. Dein Manager sieht die Daten seiner Creator. Die Agenturleitung sieht alle Daten. Andere Creator sehen deine Daten nicht, nur deinen TikTok-Namen in der Bestenliste, wenn du in den Top 5 bist.</p>
+<p>Du siehst deine eigenen Daten. Dein Manager sieht die Daten seiner Creator. Die Agenturleitung sieht alle Daten. Andere Creator sehen deine Daten nicht, nur deinen TikTok-Namen mit Platz, wenn du in einer Top-5-Liste stehst.</p>
 <h2>5. Rechtsgrundlagen</h2>
-<p>Wir verarbeiten deine Daten, um dir die Schulung im Rahmen deiner Zusammenarbeit mit der LIVEdream Agency anzubieten (Art. 6 Abs. 1 lit. b DSGVO). Die Bestenliste, die Streak-Anzeige und die Umfrage dienen unserem berechtigten Interesse, die Schulung motivierend zu gestalten und zu verbessern (Art. 6 Abs. 1 lit. f DSGVO).</p>
+<p>Wir verarbeiten deine Daten, um dir die Schulung im Rahmen deiner Zusammenarbeit mit der LIVEdream Agency anzubieten (Art. 6 Abs. 1 lit. b DSGVO). Level-System, Live-Daten aus dem Backstage, Ranglisten, Streak-Anzeige und Umfrage dienen unserem berechtigten Interesse, die Schulung motivierend zu gestalten und zu verbessern (Art. 6 Abs. 1 lit. f DSGVO).</p>
 <h2>6. Dienstleister</h2>
 <ul>
 <li><b>Supabase</b> (Supabase Inc., USA) speichert Datenbank, Login und Dateien. Die Server stehen in Frankfurt am Main (EU). Es besteht ein Vertrag zur Auftragsverarbeitung mit EU-Standardvertragsklauseln.</li>
@@ -1794,6 +1911,7 @@ document.addEventListener("click", async e => {
   if (t.id==="kk-fab" || t.id==="kk-open") return openKK();
   if (t.dataset.qz){ const r=S.me.role==="creator" && qzRes(S.me.email,t.dataset.qz); if (r){ const q=QZ().find(x=>x.id===t.dataset.qz); return sheet(quizResult(q, r.result, false, r.scores?._second)); } return quizStart(t.dataset.qz); }
   if (t.dataset.qzAgain){ closeSheet(); return quizStart(t.dataset.qzAgain); }
+  if (t.dataset.lvsheet) return openLvSheet(t.dataset.lvsheet);
   if (t.dataset.qzshow){ const q=QZ().find(x=>x.id===t.dataset.qzshow), r=qzRes(t.dataset.who||S.me.email, q?.id); if (q&&r) return sheet(quizResult(q, r.result, false, r.scores?._second)); return; }
   if (t.dataset.learn){ S.learn=t.dataset.learn; S.qz=null; return render(); }
   if (t.id==="rw-open") return sheet(`<div class="stack">${rewardsBlock(S.me.email)}</div>`);
@@ -1880,6 +1998,7 @@ document.addEventListener("change", e => {
     e.target.value=""; $("#pend").innerHTML=pendList(n);
   }
   if (e.target.id==="bs-file") return backstageRead();
+  if (e.target.id==="av-file"){ const f=e.target.files[0]; e.target.value=""; return avatarUpload(f); }
   if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"start":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
   if (e.target.id==="ro-file"){ const f=e.target.files[0]; if(f) f.text().then(tx=>{ $("#ro-text").value=tx; toast("Datei eingelesen. Jetzt „Vorschau“ tippen."); }); return; }
   if (e.target.dataset.snap) return uploadSnap(e.target.dataset.snap, e.target.files[0]);
