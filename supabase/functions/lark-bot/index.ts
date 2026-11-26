@@ -136,7 +136,7 @@ function parse(text: string) {
     if (!y && dt < new Date(now.getFullYear(), now.getMonth() - 2, 1)) dt = new Date(yy + 1, m, d);
     ds.push(dt);
   };
-  const rx = /(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\.\s?(\d{1,2})\.(\d{2,4})?|(\d{1,2})\.?\s+([A-Za-zÄÖÜäöü]{3,9})\.?(?:\s+(\d{4}))?|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?|(\d{4})\/(\d{1,2})\/(\d{1,2})/g;
+  const rx = /(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\.\s?(\d{1,2})\.(\d{2,4})?|(\d{1,2})\.?\s+([A-Za-zÄÖÜäöü]{3,9})\.?(?:\s+(\d{4}))?|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?!\d)(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?|(\d{4})\/(\d{1,2})\/(\d{1,2})|(\d{1,2})\/(\d{1,2})\/(\d{4})/g;
   let mm: RegExpExecArray | null;
   while ((mm = rx.exec(t))) {
     if (mm[1]) add(+mm[1], +mm[2] - 1, +mm[3]);
@@ -144,6 +144,7 @@ function parse(text: string) {
     else if (mm[7]) { const k = MONTH[mm[8].toLowerCase()]; if (k !== undefined) add(mm[9] ? +mm[9] : 0, k, +mm[7]); }
     else if (mm[10]) { const k = MONTH[mm[10].toLowerCase()]; if (k !== undefined) add(mm[12] ? +mm[12] : 0, k, +mm[11]); }
     else if (mm[13]) add(+mm[13], +mm[14] - 1, +mm[15]);
+    else if (mm[16]) add(+mm[18], +mm[17] - 1, +mm[16]);
   }
   out.dated = ds.length > 0;
   if (ds.length) { ds.sort((a, b) => +a - +b); out.starts = iso(ds[0]); out.ends = iso(ds[ds.length - 1]); }

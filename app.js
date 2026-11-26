@@ -1692,13 +1692,14 @@ function parseLark(text){
   if (lines[0]) out.title=lines[0].replace(/\s*[:：]\s*$/,"").slice(0,120);
   const now=new Date(), ds=[];
   const add=(y,m,d)=>{ if (m<0||m>11||d<1||d>31) return; let yy=y?(y<100?2000+y:y):now.getFullYear(); let dt=new Date(yy,m,d); if (!y && dt<new Date(now.getFullYear(),now.getMonth()-2,1)) dt=new Date(yy+1,m,d); ds.push({ dt, i:ds.length }); };
-  let mm; const rx=/(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\.\s?(\d{1,2})\.(\d{2,4})?|(\d{1,2})\.?\s+([A-Za-zÄÖÜäöü]{3,9})\.?(?:\s+(\d{4}))?|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?|(\d{4})\/(\d{1,2})\/(\d{1,2})/g;
+  let mm; const rx=/(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\.\s?(\d{1,2})\.(\d{2,4})?|(\d{1,2})\.?\s+([A-Za-zÄÖÜäöü]{3,9})\.?(?:\s+(\d{4}))?|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?!\d)(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?|(\d{4})\/(\d{1,2})\/(\d{1,2})|(\d{1,2})\/(\d{1,2})\/(\d{4})/g;
   while ((mm=rx.exec(t))){
     if (mm[1]) add(+mm[1],+mm[2]-1,+mm[3]);
     else if (mm[4]) add(mm[6]?+mm[6]:0,+mm[5]-1,+mm[4]);
     else if (mm[7]){ const k=MONTH_RX[mm[8].toLowerCase()]; if (k!==undefined) add(mm[9]?+mm[9]:0,k,+mm[7]); }
     else if (mm[10]){ const k=MONTH_RX[mm[10].toLowerCase()]; if (k!==undefined) add(mm[12]?+mm[12]:0,k,+mm[11]); }
     else if (mm[13]) add(+mm[13],+mm[14]-1,+mm[15]);
+    else if (mm[16]) add(+mm[18],+mm[17]-1,+mm[16]);
   }
   if (ds.length){ const s=ds.map(x=>x.dt).sort((a,b)=>a-b); out.starts=isoDay(s[0]); out.ends=isoDay(s[s.length-1]); }
   out.kind=/livedream|agentur intern|unsere eigene/i.test(t)?"livedream":"tiktok";
