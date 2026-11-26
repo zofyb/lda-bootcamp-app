@@ -52,7 +52,7 @@ async function reply(chatId: string, text: string) {
 
 // ---------- Inhalt einer Nachricht lesen ----------
 type Msg = { message_id: string; msg_type?: string; message_type?: string; content?: string; body?: { content: string } };
-type Got = { text: string[]; images: { msg: string; key: string }[]; trace: string[] };
+type Got = { text: string[]; images: { msg: string; key: string }[]; trace: string[]; raw?: string };
 
 function readOne(m: Msg, got: Got) {
   const type = m.msg_type || m.message_type || "";
@@ -76,6 +76,7 @@ function readOne(m: Msg, got: Got) {
     }
     got.text.push(lines.join("\n"));
   } else if (type === "interactive") {
+    got.raw = String(m.content ?? m.body?.content ?? "").slice(0, 400);
     // Karten-Nachricht: alle Texte und Links einsammeln
     const seen = new Set<string>(), out: string[] = [];
     const walk = (v: any, k = "") => {
@@ -103,7 +104,7 @@ async function readMessage(ev: any): Promise<Got> {
     if (type !== "merge_forward") { got.trace.push(type); return readOne(m, got); }
     if (depth > 3 || seen.has(m.message_id)) return;
     seen.add(m.message_id);
-    const r = await lark(`/im/v1/messages/${m.message_id}`);
+    const r = await lark(`/im/v1/messages/${m.message_id}?card_msg_content_type=raw_card_content`);
     const j = await r.json().catch(() => ({}));
     if (j.code) { got.trace.push(`Fehler ${j.code} ${String(j.msg || "").slice(0, 60)}`); return; }
     const items = (j?.data?.items || []).filter((it: any) => it.message_id !== m.message_id);
@@ -196,7 +197,7 @@ async function handle(ev: any) {
     status: "draft", source: "lark", lark_msg_id: m.message_id, created_by: "Lark-Bot" };
   imgErr = "";
   if (got.images.length) row.image = await saveImage(got.images[0], safe(m.message_id));
-  if (imgErr) got.trace.push(imgErr);
+  if (imgErr) got.trace.push(imgErr.includes("234043") ? "Bild aus Karte nicht ladbar, Bild bitte einzeln hinterherschicken" : imgErr);
   const r = await db(`calendar?on_conflict=lark_msg_id`, {
     method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify(row),
   });
@@ -206,7 +207,7 @@ async function handle(ev: any) {
   const d = (s: string) => s.split("-").reverse().join(".");
   await reply(chat, `✅ Entwurf angelegt: „${p.title}“ · ${p.starts === p.ends ? d(p.starts) : `${d(p.starts)} bis ${d(p.ends)}`}` +
     (p.dated ? "" : " (kein Datum erkannt, bitte prüfen)") + (row.image ? " · mit Bild" : "") + "\nIn der App unter Kalender > Neu aus Lark prüfen und freigeben." +
-    `\n(Gelesen: ${got.trace.join(", ")})`);
+    `\n(Gelesen: ${got.trace.join(", ")})` + (!p.dated && got.raw ? `\nRohdaten: ${got.raw}` : ""));
 }
 
 // ---------- Eingang ----------
