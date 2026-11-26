@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), bnav = $("#bnav");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, refs:[], noUpd11:false, gchk:[], gnote:[], noUpd13:false,  gOpen:new Set(), impAns:null,
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, refs:[], noUpd11:false, gchk:[], gnote:[], noUpd13:false, mp:[], ml:[], wins:[], wr:[], noUpd16:false, mpForm:false, wForm:false,  gOpen:new Set(), impAns:null,
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -125,7 +125,7 @@ function fileLinks(files){
   return `<div class="files">${list(files).map(f=>`<a data-path="${esc(f.path)}" target="_blank" rel="noopener">${esc(f.name)}</a>`).join("") || '<span>Keine Dateien</span>'}</div>`;
 }
 async function hydrate(){
-  hydrateAvatars().catch(console.error); hydrateCovers().catch(console.error);
+  hydrateAvatars().catch(console.error); hydrateCovers().catch(console.error); hydrateWins().catch(console.error);
   const els=[...document.querySelectorAll("a[data-path]:not([href])")];
   if (els.length){
     const paths=[...new Set(els.map(e=>e.dataset.path))];
@@ -272,6 +272,8 @@ async function refresh(){
   S.noUpd11=!!rf.error; S.refs=rf.data||[];
   S.noUpd9=!!(xe.error||bs.error||gl.error); S.xp=xe.data||[]; S.bs=bs.data||[]; S.goals=gl.data||[]; S.bsTop=bt.error?[]:(bt.data||[]);
   const [av,ao,bk]=await Promise.all([ sb.from("avail").select("*").order("weekday"), sb.from("avail_off").select("*"), sb.from("bookings").select("*").gte("starts_at", new Date(Date.now()-DAY).toISOString()).order("starts_at") ]);
+  const [mp,ml,wi,wr]=await Promise.all([ sb.from("match_posts").select("*").gte("live_at", new Date(Date.now()-3*36e5).toISOString()).order("live_at"), sb.from("match_likes").select("*").gte("created_at", new Date(Date.now()-16*DAY).toISOString()), sb.from("wins").select("*").order("created_at",{ ascending:false }).limit(60), sb.from("win_reacts").select("*") ]);
+  S.noUpd16=!!(mp.error||ml.error||wi.error||wr.error); S.mp=mp.data||[]; S.ml=ml.data||[]; S.wins=wi.data||[]; S.wr=wr.data||[];
   S.noUpd14=!!(av.error||ao.error||bk.error); S.av=av.data||[]; S.avOff=ao.data||[]; S.bk=bk.data||[];
   if (!S.noUpd14 && S.real?.role==="creator"){ const bz=await sb.rpc("busy_times"); S.busy=new Set(Array.isArray(bz.data)?bz.data.map(x=>+new Date(x)):[]); }
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
@@ -352,7 +354,7 @@ async function verifyCode(){
 
 /* ---------- Rahmen ---------- */
 const ic = (n, cls="") => `<svg class="ico ${cls}" aria-hidden="true"><use href="#${n}"/></svg>`;
-const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim"];
+const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","match","erfolge"];
 function navItems(){
   const me=S.me;
   if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],["anim","i-spark","Animation"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
@@ -395,20 +397,20 @@ function render(keepScroll){
   if (me.role==="creator"){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
-    if (!["start","lernen","kalender","profil","anim","termine"].includes(S.tab)) S.tab="start";
+    if (!["start","lernen","kalender","profil","anim","termine","match","erfolge"].includes(S.tab)) S.tab="start";
   } else if (["start","lernen","profil","themen"].includes(S.tab) || (S.tab==="fuehrung" && S.real.role!=="lead") || S.tab==="mehr") S.tab = "uebersicht";
   if (me.role==="lead" && S.tab==="mehr") S.tab="uebersicht";
   bnav.innerHTML = navHtml(); bnav.hidden = !!S.openArea || !!(S.qz && !S.qz.done);
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
   if (S.qz && !S.creator) html = quizView();
-  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : ({ lernen:learnView, kalender:calendarView, profil:()=>profileView(me.email), anim:animView, termine:termView }[S.tab] || startView)();
+  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : ({ lernen:learnView, kalender:calendarView, profil:()=>profileView(me.email), anim:animView, termine:termView, match:matchView, erfolge:winsView }[S.tab] || startView)();
   else if (S.creator) html = creatorDetail(S.creator);
   else if (S.tab==="akademie") html = academyView();
   else if (S.tab==="kalender") html = calendarView();
   else if (S.tab==="termine") html = termView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
-  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView }[S.tab] || pendingView)();
+  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView }[S.tab] || pendingView)();
   view.innerHTML = html;
   if (!keepScroll) window.scrollTo(0,0);
   afterRender(); watchAni(); fab();
@@ -1095,6 +1097,7 @@ function startView(){
     ${tile("i-play","Akademie",'data-tab="lernen" data-learn="akademie"',dot(newAk))}
     ${tile("i-quiz","Quizze",'data-tab="lernen" data-learn="quiz"',dot(openQz))}
     ${tile("i-cal","Kalender",'data-tab="kalender"',dot(now.length))}
+    ${S.noUpd16||S.me.preview?"":tile("i-sword","Match-Börse",'data-tab="match"',dot(matchDot()))+tile("i-trophy","Erfolge-Wand",'data-tab="erfolge"',dot(winDot()))}
     ${S.noUpd14||S.me.preview?"":tile("i-clock","1:1-Termin",'data-tab="termine"',myBooking()?`<i class="dot">✓</i>`:"")}
     ${boot?tile("i-gift","Belohnungen",'id="rw-open"',ok?`<i class="dot">!</i>`:`<small class="tl">ab 10 P</small>`):""}
     ${tile("i-user","Profil",'data-tab="profil"')}
@@ -1139,7 +1142,7 @@ function profileView(email){
 }
 function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
-  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
+  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
   return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${partnerTiles()}</div>`;
 }
 function leadStart(){ if (S.me.role==="manager") return mgrStart(); return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
@@ -1468,7 +1471,7 @@ function mgrStart(){
     <div class="sec"><span>Neuigkeiten</span><small>letzte 7 Tage</small></div>
     ${news.length?`<div class="news">${news.map(n=>`<button class="nrow" ${n.go}><span class="kic">${ic(n.ic)}</span><span>${n.t}</span><small>${ago(n.at)}</small></button>`).join("")}</div>`:`<p class="muted">Gerade nichts Neues von deinen Creatorn.</p>`}
     <div class="sec"><span>Bereiche</span></div>
-    <div class="tiles">${tile("creator","i-people","Betreuung")}${tile("bewerten","i-check","Bewerten",open)}${S.noUpd14?"":tile("termine","i-clock","1:1-Termine",soonBooked())}${tile("kalender","i-cal","Kalender")}${tile("akademie","i-learn","Akademie")}${tile("fragen","i-mail","Sag's uns")}</div>`;
+    <div class="tiles">${tile("creator","i-people","Betreuung")}${tile("bewerten","i-check","Bewerten",open)}${S.noUpd14?"":tile("termine","i-clock","1:1-Termine",soonBooked())}${tile("kalender","i-cal","Kalender")}${tile("akademie","i-learn","Akademie")}${tile("fragen","i-mail","Sag's uns")}${S.noUpd16?"":tile("match","i-sword","Match-Börse",matchDot())+tile("erfolge","i-trophy","Erfolge-Wand",winDot())}</div>`;
 }
 
 /* ---------- Partner (Kooperationen): Kachel + Infoblatt, Leitung pflegt Text und Link ---------- */
@@ -2576,6 +2579,154 @@ function showLegal(){
 window.addEventListener("hashchange", showLegal);
 
 /* ---------- Ereignisse ---------- */
+/* ---------- Match-Börse + Erfolge-Wand ---------- */
+const EMOJIS = ["🔥","👏","😍","💪","🎉"];
+const cleanH = h => String(h||"").replace(/^@/,"");
+const whoOf = (h,email) => { const m=S.members.find(x=>x.email===email), hh=cleanH(h||m?.handle); return hh ? "@"+hh : (m?.name || "Jemand"); };
+const whoLink = (h,email,cls="") => { const m=S.members.find(x=>x.email===email), hh=cleanH(h||m?.handle);
+  return hh ? `<a class="${cls}" href="https://www.tiktok.com/@${encodeURIComponent(hh)}" target="_blank" rel="noopener">@${esc(hh)}</a>` : `<span class="${cls}">${esc(whoOf(h,email))}</span>`; };
+const openMatches = () => S.mp.filter(p=>+new Date(p.live_at) > Date.now()-3*36e5).sort((a,b)=>new Date(a.live_at)-new Date(b.live_at));
+const likesOf = id => S.ml.filter(l=>l.post_id===id);
+const dayWord = d => { const x=isoDay(d); return x===isoDay(new Date())?"Heute":x===isoDay(new Date(Date.now()+DAY))?"Morgen":fmtDayS(d); };
+const agoTxt = d => { const m=Math.round((Date.now()-new Date(d))/6e4); return m<1?"gerade eben":m<60?`vor ${m} Min.`:m<1440?`vor ${Math.round(m/60)} Std.`:`vor ${Math.round(m/1440)} Tg.`; };
+function matchDot(){
+  if (S.noUpd16) return 0;
+  const seen=storeGet("ldb-mseen-"+S.me.email)||0, open=openMatches();
+  return open.filter(p=>p.author_email!==S.me.email && +new Date(p.created_at)>seen).length
+       + S.ml.filter(l=>l.email!==S.me.email && +new Date(l.created_at)>seen && open.some(p=>p.id===l.post_id && p.author_email===S.me.email)).length;
+}
+function winDot(){ if (S.noUpd16) return 0; const seen=storeGet("ldb-wseen-"+S.me.email)||0; return S.wins.filter(w=>w.author_email!==S.me.email && +new Date(w.created_at)>seen).length; }
+const soonUpd16 = (a,b) => `<div class="stack"><span class="eyebrow">LIVEdream</span><h1>${a} <em>${b}</em></h1><p class="muted">Kommt mit dem nächsten Update.</p></div>`;
+
+function matchView(){
+  if (S.noUpd16) return soonUpd16("Match-","Börse");
+  if (!S.viewAs) storeSet("ldb-mseen-"+S.me.email, Date.now());
+  const list=openMatches(), def=new Date(Date.now()+36e5), now=new Date();
+  return `<div class="stack"><span class="eyebrow">Zusammen live</span><h1>Match-<em>Börse</em></h1>
+    <p class="muted">Sag Bescheid, wann du live bist und Lust auf ein Match hast. Wer auch Lust hat, tippt „Bin dabei“. Dann folgt euch auf TikTok und legt los.</p></div>
+    ${S.mpForm ? `<div class="panel stack">
+      <h2>Neues Inserat</h2>
+      <div class="two"><label class="f" for="mp-day">Tag<input id="mp-day" type="date" value="${isoDay(def)}" min="${isoDay(now)}" max="${isoDay(new Date(Date.now()+13*DAY))}"></label>
+      <label class="f" for="mp-time">Uhrzeit<input id="mp-time" type="time" value="${pad(def.getHours())}:00"></label></div>
+      <label class="f" for="mp-rules">Regeln<input id="mp-rules" type="text" maxlength="200" placeholder="z. B. 3 Runden, wer verliert, macht eine Strafe"></label>
+      <label class="f" for="mp-note">Noch was? (optional)<input id="mp-note" type="text" maxlength="300" placeholder="z. B. Ich bin neu und freue mich über jede Runde"></label>
+      <div class="btns"><button class="btn small" id="mp-add">Veröffentlichen</button><button class="btn ghost small" id="mp-cancel">Abbrechen</button></div></div>`
+    : `<button class="btn" id="mp-new">Inserat erstellen</button>`}
+    <div class="sec"><span>Wer hat Lust?</span><small>${list.length}</small></div>
+    ${list.length ? `<div class="mlist">${list.map(matchCard).join("")}</div>` : `<p class="muted">Gerade gibt es kein Inserat. Mach den Anfang!</p>`}`;
+}
+function matchCard(p){
+  const d=new Date(p.live_at), mine=p.author_email===S.me.email, likes=likesOf(p.id), iLike=likes.some(l=>l.email===S.me.email);
+  const live=d<=new Date(), canDel=mine || S.me.role==="lead";
+  return `<div class="mcard ${mine?"mine":""}">
+    <div class="mtop"><span class="mwhen ${live?"live":""}">${live?"Jetzt live":`${dayWord(d)}, ${fmtTime(d)} Uhr`}</span>${whoLink(p.handle,p.author_email,"mwho")}</div>
+    ${p.rules?`<p class="mrules">${ic("i-sword")}<span>${esc(p.rules)}</span></p>`:""}
+    ${p.note?`<p class="mnote">${esc(p.note)}</p>`:""}
+    <div class="mact">${mine?`<span class="chip">Dein Inserat</span>`:`<button class="chip mlike ${iLike?"on":""}" data-mlike="${esc(p.id)}">${iLike?"✓ Bin dabei":"Bin dabei"}</button>`}
+      ${canDel?`<button class="chip" data-mdel="${esc(p.id)}">${S.confirmDelete==="mp"+p.id?"Wirklich löschen?":"Löschen"}</button>`:""}</div>
+    ${likes.length?`<div class="mlikes"><small>Dabei:</small>${likes.map(l=>whoLink(l.handle,l.email,"chip")).join("")}</div>`:""}
+  </div>`;
+}
+async function mpAdd(){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const day=$("#mp-day").value, tm=$("#mp-time").value, rules=$("#mp-rules").value.trim(), note=$("#mp-note").value.trim();
+  if (!day || !tm) return toast("Bitte Tag und Uhrzeit wählen.");
+  const at=new Date(`${day}T${tm}`);
+  if (isNaN(at) || +at < Date.now()-36e5) return toast("Dieser Zeitpunkt liegt in der Vergangenheit.");
+  if (+at > Date.now()+14*DAY) return toast("Bitte höchstens 2 Wochen im Voraus.");
+  if (!rules) return toast("Schreib kurz deine Regeln dazu.");
+  $("#mp-add").disabled=true;
+  const r=await sb.from("match_posts").insert({ author_email:S.me.email, handle:S.me.handle||null, name:S.me.name, live_at:at.toISOString(), rules, note:note||null });
+  if (r.error){ $("#mp-add").disabled=false; return /3 offene/.test(r.error.message)?toast("Du hast schon 3 offene Inserate."):fail(r.error); }
+  S.mpForm=false; await refresh(); render(true); toast("Inserat ist online.");
+}
+async function mpLike(id){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const on=likesOf(id).some(l=>l.email===S.me.email);
+  const r = on ? await sb.from("match_likes").delete().eq("post_id",id).eq("email",S.me.email)
+               : await sb.from("match_likes").insert({ post_id:id, email:S.me.email, handle:S.me.handle||null });
+  if (r.error) return fail(r.error);
+  await refresh(); render(true); if (!on) toast("Super! Folge der Person auf TikTok und schreib ihr.");
+}
+async function mpDel(id){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  if (S.confirmDelete!=="mp"+id){ S.confirmDelete="mp"+id; return render(true); }
+  S.confirmDelete=null; const r=await sb.from("match_posts").delete().eq("id",id); if (r.error) return fail(r.error);
+  await refresh(); render(true); toast("Inserat gelöscht.");
+}
+
+function winsView(){
+  if (S.noUpd16) return soonUpd16("Erfolge-","Wand");
+  if (!S.viewAs) storeSet("ldb-wseen-"+S.me.email, Date.now());
+  const ws=[...S.wins].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  return `<div class="stack"><span class="eyebrow">Gemeinsam feiern</span><h1>Erfolge-<em>Wand</em></h1>
+    <p class="muted">Neuer Rekord, erstes Geschenk, Top 5 im Match? Teil deinen Erfolg mit einem Screenshot und feier die anderen mit.</p></div>
+    ${S.wForm ? `<div class="panel stack">
+      <h2>Erfolg teilen</h2>
+      <label class="f" for="w-text">Was hast du geschafft?<textarea id="w-text" maxlength="300" placeholder="z. B. Heute zum ersten Mal 10.000 Diamanten in einem Live!"></textarea></label>
+      <label class="f" for="w-img">Screenshot (optional)<input id="w-img" type="file" accept="image/*"></label>
+      <div class="btns"><button class="btn small" id="w-add">Teilen</button><button class="btn ghost small" id="w-cancel">Abbrechen</button></div></div>`
+    : `<button class="btn" id="w-new">Erfolg teilen</button>`}
+    ${ws.length ? `<div class="wlist">${ws.map(winCard).join("")}</div>` : `<p class="muted">Noch keine Erfolge. Sei die erste Person!</p>`}`;
+}
+function winCard(w){
+  const rs=S.wr.filter(r=>r.win_id===w.id), canDel=w.author_email===S.me.email || S.me.role==="lead";
+  return `<div class="wcard">
+    <div class="wtop">${whoLink(w.handle,w.author_email,"mwho")}<small>${agoTxt(w.created_at)}</small></div>
+    <p class="wtext">${esc(w.body)}</p>
+    ${w.path?`<img class="wimg" data-win="${esc(w.path)}" alt="Screenshot von ${esc(whoOf(w.handle,w.author_email))}">`:""}
+    <div class="wre">${EMOJIS.map(e=>{ const n=rs.filter(r=>r.emoji===e).length, me=rs.some(r=>r.emoji===e && r.email===S.me.email);
+      return `<button class="wemo ${me?"on":""}" data-wreact="${esc(w.id)}" data-emo="${e}" aria-label="${e} ${n}">${e}${n?`<b>${n}</b>`:""}</button>`; }).join("")}
+      ${canDel?`<button class="chip wdel" data-wdel="${esc(w.id)}">${S.confirmDelete==="wi"+w.id?"Wirklich löschen?":"Löschen"}</button>`:""}</div>
+  </div>`;
+}
+async function shrinkShot(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("Bild konnte nicht gelesen werden.")); i.src=url; });
+    const sc=Math.min(1, 1080/Math.max(img.naturalWidth, img.naturalHeight)), w=Math.round(img.naturalWidth*sc), h=Math.round(img.naturalHeight*sc);
+    const c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(img,0,0,w,h);
+    for (const q of [.82,.7,.55,.4]){ const b=await new Promise(r=>c.toBlob(r,"image/jpeg",q)); if (b && b.size<580000) return b; }
+    throw new Error("Bild ist zu groß.");
+  } finally { URL.revokeObjectURL(url); }
+}
+async function wAdd(){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const body=$("#w-text").value.trim(), f=$("#w-img").files[0];
+  if (!body) return toast("Schreib kurz, was du geschafft hast.");
+  $("#w-add").disabled=true;
+  try{
+    let path=null;
+    if (f){ toast("Bild wird hochgeladen …"); const blob=await shrinkShot(f); path=`${S.me.email}/${Date.now()}.jpg`;
+      const u=await sb.storage.from("erfolge").upload(path,blob,{ contentType:"image/jpeg" }); if (u.error) throw u.error; }
+    const r=await sb.from("wins").insert({ author_email:S.me.email, handle:S.me.handle||null, name:S.me.name, path, body });
+    if (r.error){ if (path) sb.storage.from("erfolge").remove([path]).catch(()=>{}); throw r.error; }
+    S.wForm=false; await refresh(); render(true); toast("Geteilt! 🎉");
+  } catch(e){ $("#w-add") && ($("#w-add").disabled=false); /5 Erfolge/.test(e?.message||"")?toast("Heute hast du schon 5 Erfolge geteilt."):fail(e); }
+}
+async function wReact(id, emo){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const on=S.wr.some(r=>r.win_id===id && r.emoji===emo && r.email===S.me.email);
+  const r = on ? await sb.from("win_reacts").delete().eq("win_id",id).eq("email",S.me.email).eq("emoji",emo)
+               : await sb.from("win_reacts").insert({ win_id:id, email:S.me.email, emoji:emo });
+  if (r.error) return fail(r.error);
+  await refresh(); render(true);
+}
+async function wDel(id){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  if (S.confirmDelete!=="wi"+id){ S.confirmDelete="wi"+id; return render(true); }
+  S.confirmDelete=null; const w=S.wins.find(x=>x.id===id);
+  const r=await sb.from("wins").delete().eq("id",id); if (r.error) return fail(r.error);
+  if (w?.path) sb.storage.from("erfolge").remove([w.path]).catch(()=>{});
+  await refresh(); render(true); toast("Gelöscht.");
+}
+async function hydrateWins(){
+  const imgs=[...document.querySelectorAll("img[data-win]:not([src])")]; if (!imgs.length) return;
+  const need=[...new Set(imgs.map(i=>i.dataset.win))].filter(p=>!AVURL["w:"+p]);
+  if (need.length){ const { data }=await sb.storage.from("erfolge").createSignedUrls(need, 6*3600); (data||[]).forEach(d=>{ if (d.signedUrl) AVURL["w:"+d.path]=d.signedUrl; }); }
+  imgs.forEach(i=>{ const u=AVURL["w:"+i.dataset.win]; if (u) i.src=u; });
+}
+
 document.addEventListener("click", async e => {
   if (e.target.closest("#cert-png")) { dl(S._cert.url, S._cert.base+".png"); return; }
   if (e.target.closest("#cert-pdf")) { certPdf(); return; }
@@ -2627,6 +2778,16 @@ document.addEventListener("click", async e => {
   if (t.dataset.partner) return openPartner(t.dataset.partner);
   if (t.id==="pt-save") return savePartner(t.dataset.pk);
   if (t.dataset.ttdel) return ttDelete(t.dataset.ttdel);
+  if (t.id==="mp-new"){ S.mpForm=true; return render(true); }
+  if (t.id==="mp-cancel"){ S.mpForm=false; return render(true); }
+  if (t.id==="mp-add") return mpAdd();
+  if (t.dataset.mlike) return mpLike(t.dataset.mlike);
+  if (t.dataset.mdel) return mpDel(t.dataset.mdel);
+  if (t.id==="w-new"){ S.wForm=true; return render(true); }
+  if (t.id==="w-cancel"){ S.wForm=false; return render(true); }
+  if (t.id==="w-add") return wAdd();
+  if (t.dataset.wreact) return wReact(t.dataset.wreact, t.dataset.emo);
+  if (t.dataset.wdel) return wDel(t.dataset.wdel);
   if (t.id==="av-add") return addRule();
   if (t.id==="sl-book") return bookSlot();
   if (t.dataset.tnav){ const m=tMonth(); S.tMonth=new Date(m.getFullYear(), m.getMonth()+ +t.dataset.tnav, 1); return render(true); }

@@ -97,12 +97,23 @@ db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootc
     {id:"bk2", owner_email:"demo@demo", creator_email:"c5@demo", starts_at:nextDow(3,18), minutes:30, how:"WhatsApp-Anruf", topic:"Wie komme ich in die Top 5?"},
     {id:"bk4", owner_email:"lena@demo", creator_email:"c1@demo", starts_at:(()=>{ const x=new Date(); x.setDate(x.getDate()+1); x.setHours(18,0,0,0); return x.toISOString(); })(), minutes:30, how:"WhatsApp-Anruf", topic:"Fragen zum Adventskalender"},
     {id:"bk3", owner_email:"max@demo", creator_email:"c3@demo", starts_at:nextDow(2,19,30), minutes:30, how:"WhatsApp-Anruf", topic:"Kampagne im Dezember"}];
+  const hAgo=h=>new Date(Date.now()-h*36e5).toISOString(), hIn=h=>{ const x=new Date(Date.now()+h*36e5); x.setMinutes(0,0,0); return x.toISOString(); };
+  db.match_posts=[
+    {id:"mp1", author_email:"c3@demo", handle:"jenny.mama", live_at:hAgo(0.5), rules:"Best of 3, wer verliert, singt ein Lied", note:"Bin gerade live, komm rein!", created_at:hAgo(1)},
+    {id:"mp2", author_email:"c5@demo", handle:"sofia.sings", live_at:hIn(3), rules:"5 Runden, Verlierer macht eine Strafe", note:null, created_at:hAgo(2)},
+    {id:"mp3", author_email:"c2@demo", handle:"gamer_kevin", live_at:hIn(26), rules:"Ganz entspannt, 3 Runden", note:"Ich bin neu und freue mich über jede Runde", created_at:hAgo(5)}];
+  db.match_likes=[{post_id:"mp2", email:"c1@demo", handle:"luna.live", created_at:hAgo(1)},{post_id:"mp2", email:"c4@demo", handle:"tim.talks", created_at:hAgo(0.5)},{post_id:"mp1", email:"c5@demo", handle:"sofia.sings", created_at:hAgo(0.6)}];
+  db.wins=[
+    {id:"w1", author_email:"c1@demo", handle:"luna.live", body:"Zum ersten Mal über 10.000 Diamanten in einem Live! 💜", path:"demo-w1", created_at:hAgo(3)},
+    {id:"w2", author_email:"c4@demo", handle:"tim.talks", body:"Platz 1 im Match gegen 3 andere Streamer.", path:null, created_at:hAgo(20)},
+    {id:"w3", author_email:"c5@demo", handle:"sofia.sings", body:"Mein Video hat 50.000 Aufrufe!", path:"demo-w2", created_at:hAgo(50)}];
+  db.win_reacts=[{win_id:"w1",email:"c2@demo",emoji:"🔥"},{win_id:"w1",email:"c3@demo",emoji:"🔥"},{win_id:"w1",email:"c4@demo",emoji:"🎉"},{win_id:"w2",email:"c1@demo",emoji:"💪"},{win_id:"w3",email:"c1@demo",emoji:"😍"}];
 }
 const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"], goals:["creator_email","month"], referrals:["recruit_handle"], guide_checks:["creator_email","item"], guide_notes:["creator_email","chapter"] };
 function q(t){
   let rows = db[t] || (db[t]=[]), op = null, payload = null; const flt = [];
   const o = {
-    select(){ return o }, order(){ return o }, gte(){ return o }, eq(k,v){ flt.push([k,v]); return o },
+    select(){ return o }, order(){ return o }, gte(){ return o }, limit(){ return o }, eq(k,v){ flt.push([k,v]); return o },
     maybeSingle(){ return o.then(r => ({ data:(r.data||[])[0]||null, error:null })) },
     upsert(p){ op="up"; payload=p; return o }, insert(p){ op="ins"; payload=p; return o }, update(p){ op="upd"; payload=p; return o }, delete(){ op="del"; return o },
     then(res, rej){
@@ -128,7 +139,7 @@ window.supabase = { createClient(){ return {
   from:q,
   storage:{ from(){ return {
     upload:async()=>({ error:{ message:"In der Demo wird nichts hochgeladen." } }), remove:async()=>({}),
-    createSignedUrls:async p=>({ data:p.map(x=>({ path:x, signedUrl:/^demo-tt/.test(x)?TTCOVER(x):/^demo-av/.test(x)?"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f7b2d9'/%3E%3Cstop offset='1' stop-color='%236a2a9a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3Ccircle cx='50' cy='40' r='18' fill='%23fff' fill-opacity='.85'/%3E%3Cpath d='M18 100c4-22 18-32 32-32s28 10 32 32z' fill='%23fff' fill-opacity='.85'/%3E%3C/svg%3E":null })) }), createSignedUrl:async()=>({ data:null })
+    createSignedUrls:async p=>({ data:p.map(x=>({ path:x, signedUrl:/^demo-(tt|w)/.test(x)?TTCOVER(x):/^demo-av/.test(x)?"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f7b2d9'/%3E%3Cstop offset='1' stop-color='%236a2a9a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3Ccircle cx='50' cy='40' r='18' fill='%23fff' fill-opacity='.85'/%3E%3Cpath d='M18 100c4-22 18-32 32-32s28 10 32 32z' fill='%23fff' fill-opacity='.85'/%3E%3C/svg%3E":null })) }), createSignedUrl:async()=>({ data:null })
   }; } },
   rpc:async(n,a)=>{
     if (n==="top5") return { data:top5(), error:null };
