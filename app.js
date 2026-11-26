@@ -145,6 +145,13 @@ async function hydrate(){
   }
 }
 function watchVideos(){
+  const iv=$("video[data-intro]");
+  if (iv && !iv._w){ iv._w=true;
+    const ok=()=>{ if (S.introOk) return; S.introOk=true; const b=$("#intro-go"); if(b){ b.disabled=false; b.classList.add("pulse"); b.textContent="Weiter zum Bootcamp"; } const hnt=$("#intro-hint"); if(hnt) hnt.textContent="Super! Jetzt geht's los."; };
+    iv.addEventListener("timeupdate",()=>{ if (iv.duration && iv.currentTime/iv.duration>=0.9) ok(); });
+    iv.addEventListener("ended",ok);
+    iv.addEventListener("error",ok);
+  }
   for (const v of document.querySelectorAll("video[data-area]")){
     if (v._w) continue; v._w=true;
     const n=+v.dataset.area;
@@ -353,7 +360,7 @@ function render(keepScroll){
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
   if (S.tab==="akademie" && !S.creator) html = academyView();
-  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : creatorHome();
+  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : needIntro() ? introView() : creatorHome();
   else if (S.creator) html = creatorDetail(S.creator);
   else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor }[S.tab] || pendingView)();
   view.innerHTML = html;
@@ -373,6 +380,12 @@ function afterRender(){
     }
   }
   S.justUnlocked=null;
+  const pr=$(".path.prereveal");
+  if (pr){
+    const io=new IntersectionObserver(es=>{ if (es.some(x=>x.isIntersecting)){ io.disconnect(); pr.classList.add("reveal"); setTimeout(confetti, 500); } },{ threshold:.15 });
+    io.observe(pr);
+    setTimeout(()=>{ const r=pr.getBoundingClientRect(); if (r.top>innerHeight*.6) window.scrollTo({ top:scrollY+r.top-90, behavior:"smooth" }); }, 1300);
+  }
 }
 
 /* ---------- Creator: Start ---------- */
@@ -421,10 +434,11 @@ function creatorHome(){
   const doneCount=states.filter(s=>s==="done"||s==="wait").length;
   const fill=S.areas.length ? Math.round(doneCount/S.areas.length*100) : 0;
   let flipDone=false;
-  h += `<div class="path" style="--fill:${fill}%">`;
+  const rv=S.revealPath; S.revealPath=false; let ri=0;
+  h += `<div class="path ${rv?"prereveal":""}" style="--fill:${fill}%">`;
   for (const w of weeks()){
     const o=weekOpens(w), en=weekEnds(w), later=o && Date.now()<o.getTime();
-    h += `<div class="wkh"><span>WOCHE ${w}</span>${o?`<small class="muted">${fmtD(o)} bis ${fmtD(en)}</small>`:""}</div>`;
+    h += `<div class="wkh" style="--i:${ri++}"><span>WOCHE ${w}</span>${o?`<small class="muted">${fmtD(o)} bis ${fmtD(en)}</small>`:""}</div>`;
     if (later && !flipDone && !S.me.preview){ flipDone=true;
       h += `<div class="panel flipbox"><small class="muted">Woche ${w} öffnet in</small><div class="flip" data-flip="${o.getTime()}">${flipHtml(o.getTime()-Date.now())}</div></div>`; }
     for (const a of S.areas.filter(x=>x.week===w)){
@@ -433,7 +447,7 @@ function creatorHome(){
       const right = st==="done" ? `<span class="pts">${s.points} P</span>` : st==="wait" ? `<span class="waitlbl">wird geprüft</span>`
         : st==="open" ? `<span class="go">${i===curIdx?"Jetzt starten":"Öffnen"}</span>` : `<span class="muted" aria-hidden="true">🔒</span>`;
       const sub = st==="time" ? `Öffnet ${fmtD(weekOpens(a.week))} um 0 Uhr` : st==="lock" ? `Nach Thema ${S.areas[i-1]?.n}` : st==="wait" ? `Abgegeben ${fmtAgo(s.submitted_at)}` : st==="done" ? (s.points===2?"Volle Punktzahl":"Bewertet") : "Video, Handout, Aufgabe";
-      h += `<button class="stop ${cls}" data-area="${a.n}" data-state="${st}" ${st==="lock"||st==="time"?'aria-disabled="true"':""}>
+      h += `<button class="stop ${cls}" style="--i:${ri++}" data-area="${a.n}" data-state="${st}" ${st==="lock"||st==="time"?'aria-disabled="true"':""}>
         <span class="node">${st==="done"||st==="wait"?"✓":a.n}</span>
         <span class="t"><b>${esc(a.title)}</b><small>${esc(sub)}</small></span>${right}</button>`;
     }
@@ -442,6 +456,47 @@ function creatorHome(){
   if (!S.areas.length) h += `<p class="muted">Noch keine Themen angelegt.</p>`;
   h += surveyBlock(e) + topBlock() + (snapOf(e,"vorher")||S.noUpd5 ? snapBlock(e) : "") + extrasBlock(e) + questionBlock();
   return h;
+}
+
+/* ---------- Begrüßung beim ersten Öffnen ---------- */
+function welcomeExtra(){
+  const vs=S.extras.filter(x=>x.kind!=="reward" && audOf(x)==="bootcamp" && x.area==null && isVid(x.path));
+  return vs.find(x=>/begr/i.test(x.title)) || vs[0];
+}
+function introKey(){ return "ldb-intro-"+S.me.email; }
+function needIntro(){
+  if (S.tab!=="themen" || !welcomeExtra()) return false;
+  if (S.showIntro) return true;
+  const e=S.me.email;
+  if (S.viewAs ? S.introSeenView?.[e] : storeGet(introKey())) return false;
+  return !S.progress.some(p=>p.creator_email===e) && !S.subs.some(s=>s.creator_email===e);
+}
+function introView(){
+  const w=welcomeExtra(), e=S.me.email;
+  const more=S.extras.filter(x=>x.kind!=="reward" && x.id!==w.id && ((audOf(x)==="bootcamp") || (audOf(x)==="all" && x.area==null)));
+  const seen=storeGet("ldb-extras-"+e)||[], ok=S.introOk || S.showIntro || S.me.preview || !!S.viewAs;
+  return `<div class="intro">
+  <div class="stack"><span class="eyebrow">Willkommen im LIVEdream Creator Bootcamp</span><h1>Schön, dass du da bist, <em>${esc(firstName(S.me))}</em></h1>
+    <p class="muted">Bevor dein Weg startet: Schau dir kurz die Begrüßung an. Da erfährst du, wie das Bootcamp abläuft.</p></div>
+  <div class="panel stack"><div class="video"><video data-video="${esc(w.path)}" data-intro="1" controls playsinline preload="metadata"></video></div>
+    <ol class="introsteps"><li><b>8 Themen in 4 Wochen</b><small class="muted">Jeden Montag um 0 Uhr öffnen 2 neue Themen.</small></li>
+      <li><b>Video, Quiz, Handout, Aufgabe</b><small class="muted">So läuft jedes Thema ab.</small></li>
+      <li><b>Bis Sonntag 24 Uhr abgeben</b><small class="muted">Bis zu 2 Punkte pro Thema, ab 10 Punkten bestanden.</small></li></ol></div>
+  ${more.length?`<div class="stack"><div class="wkh"><span>EXTRAS</span><small class="muted">Gut zu wissen, ohne Punkte</small></div><div class="extras">${more.map(x=>extraCard(x,seen)).join("")}</div></div>`:""}
+  <div class="introgo"><button class="btn ${ok?"pulse":""}" id="intro-go" ${ok?"":"disabled"}>${ok?"Weiter zum Bootcamp":"Erst das Video ansehen"}</button>
+    <small class="muted" id="intro-hint">${ok?"":"Der Knopf geht auf, sobald du das Video fast ganz gesehen hast."}</small></div></div>`;
+}
+function introFinish(){
+  if (S.viewAs) (S.introSeenView ||= {})[S.me.email]=true; else storeSet(introKey(), new Date().toISOString());
+  const again=S.showIntro; S.showIntro=false;
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (again || reduce){ S.ringShown=false; render(); return; }
+  const fx=document.createElement("div"); fx.className="introfx";
+  fx.innerHTML=`<div class="fxin"><span class="eyebrow">Dein Weg beginnt</span><b>Woche <em>1</em></b><i></i></div>`;
+  document.body.appendChild(fx);
+  requestAnimationFrame(()=>fx.classList.add("on"));
+  setTimeout(()=>{ S.revealPath=true; S.ringShown=false; render(); fx.classList.add("out"); }, 1500);
+  setTimeout(()=>fx.remove(), 2200);
 }
 
 const fileKind = p => isVid(p)?"Video":/\.pdf$/i.test(p||"")?"PDF":/\.(png|jpe?g|webp|gif)$/i.test(p||"")?"Bild":/\.zip$/i.test(p||"")?"Paket (ZIP)":"Datei";
@@ -453,7 +508,8 @@ function extrasBlock(e){
   const xs=S.extras.filter(x=>x.kind!=="reward" && audOf(x)==="bootcamp"); if (!xs.length) return "";
   const seen = storeGet("ldb-extras-"+e) || [];
   return `<div class="stack"><div class="wkh"><span>EXTRAS</span><small class="muted">Zusatz-Infos, ohne Punkte</small></div>
-    <div class="extras">${xs.map(x=>extraCard(x,seen)).join("")}</div></div>`;
+    <div class="extras">${xs.map(x=>extraCard(x,seen)).join("")}</div>
+    ${welcomeExtra()?`<button class="btn ghost small" id="intro-again">Begrüßung nochmal ansehen</button>`:""}</div>`;
 }
 
 /* ---------- Erinnerung, Belohnungen, Vorher-Nachher, Top 5, Fragen, Umfrage ---------- */
@@ -1074,6 +1130,8 @@ document.addEventListener("click", async e => {
     S.openArea=+t.dataset.area; return render();
   }
   if (t.id==="cert") return certificate();
+  if (t.id==="intro-go") return introFinish();
+  if (t.id==="intro-again"){ S.showIntro=true; return render(); }
   if (t.id==="qsend") return sendQuestion();
   if (t.dataset.star){ keepSurveyDraft(); S.survDraft.rating=+t.dataset.star; return render(true); }
   if (t.id==="sv-send") return sendSurvey();

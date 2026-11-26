@@ -257,3 +257,32 @@ fieldset.qedit legend{font-size:12px;font-weight:600;color:var(--lilac);padding:
 .legaltext h1{font-size:22px}.legaltext h2{font-size:14.5px;margin-top:8px}
 .legaltext p,.legaltext li{font-size:13.5px;color:var(--soft);line-height:1.6}
 .legaltext ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+
+/* Begrüßung beim ersten Öffnen */
+.intro{display:flex;flex-direction:column;gap:22px;animation:introIn .6s ease both}
+@keyframes introIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.introsteps{list-style:none;margin:0;padding:0;display:grid;gap:12px;counter-reset:st}
+.introsteps li{counter-increment:st;display:grid;grid-template-columns:34px 1fr;column-gap:12px;align-items:center}
+.introsteps li::before{content:counter(st);grid-row:span 2;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:linear-gradient(135deg,var(--rose),var(--plum))}
+.introsteps small{display:block}
+.introgo{display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;padding-bottom:10px}
+.introgo .btn.pulse{animation:goPulse 1.8s ease-out infinite}
+@keyframes goPulse{0%{box-shadow:0 0 0 0 rgba(214,64,159,.65)}100%{box-shadow:0 0 0 16px rgba(214,64,159,0)}}
+.introfx{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:radial-gradient(circle at 50% 45%,#3a0c3a,#060208 70%);opacity:0;transition:opacity .45s ease}
+.introfx.on{opacity:1}
+.introfx.out{opacity:0;transition:opacity .7s ease}
+.introfx .fxin{position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;transform:scale(.7);opacity:0;transition:transform .9s cubic-bezier(.2,1.4,.4,1),opacity .5s}
+.introfx.on .fxin{transform:scale(1);opacity:1}
+.introfx.out .fxin{transform:scale(1.25);opacity:0}
+.introfx b{font:700 clamp(44px,13vw,88px)/1 var(--head,inherit);letter-spacing:-.02em}
+.introfx b em{font-style:normal;color:var(--gold)}
+.introfx i{position:absolute;left:50%;top:50%;width:260px;height:260px;margin:-130px 0 0 -130px;border-radius:50%;border:2px solid rgba(230,168,247,.5);animation:fxRing 1.4s ease-out .2s both}
+@keyframes fxRing{from{transform:scale(.3);opacity:1}to{transform:scale(2.4);opacity:0}}
+.path.prereveal:not(.reveal)>*,.path.prereveal:not(.reveal)::before{opacity:0}
+.path.reveal::before{animation:pathGrow 1.4s ease .1s both}
+@keyframes pathGrow{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+.path.reveal>.wkh,.path.reveal>.stop,.path.reveal>.flipbox{animation:stopIn .55s cubic-bezier(.2,1.3,.4,1) both;animation-delay:calc(var(--i,0)*90ms + 150ms)}
+.path.reveal>.flipbox{animation-delay:.6s}
+@keyframes stopIn{from{opacity:0;transform:translateX(-22px) scale(.96)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.intro,.path.reveal>*,.path.prereveal:not(.reveal)>*,.path.prereveal:not(.reveal)::before{opacity:0}
+.path.reveal::before{animation:none}}

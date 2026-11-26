@@ -32,6 +32,7 @@ const db = {
   ],
   progress: [], snapshots: [],
   extras: [
+    {id:"e0", title:"Begrüßung zum Bootcamp", note:"So läuft das Bootcamp", path:"demo-0.mp4", audience:"bootcamp", kind:"extra"},
     {id:"e1", title:"Richtlinien & Tabus", note:"Was im Live erlaubt ist", path:"demo-1.pdf", audience:"all", category:"Infos", kind:"extra"},
     {id:"e2", title:"Geschenke mit Extra-Wirkung", note:"Beschützer, Superfan, Schatzkiste", path:"demo-2.pdf", audience:"all", category:"Infos", kind:"extra"},
     {id:"e3", title:"Schulung Videoproduktion", note:"Aufzeichnung der Agentur-Schulung", path:"demo-3.mp4", audience:"all", category:"Schulungen", kind:"extra"},
