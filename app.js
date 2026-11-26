@@ -1173,9 +1173,15 @@ function aniSend(){
   closeSheet(); window.open(url,"_blank","noopener") || (location.href=url);
 }
 async function aniWaSave(){
-  const v=$("#an-wa").value.trim();
-  const { error }=await sb.from("settings").upsert({ key:"anim_whatsapp", value:v||null }); if (error) return fail(error);
-  S.settings.anim_whatsapp=v; render(true); toast(v?"Nummer gespeichert.":"Nummer entfernt.");
+  const v=$("#an-wa").value.trim(), btn=$("#an-wa-save");
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  if (v && v.replace(/\D/g,"").length<8) return toast("Bitte die ganze Handynummer eingeben, z. B. 0170 1234567.");
+  btn.disabled=true; btn.textContent="Speichert …";
+  try{
+    const res=await Promise.race([ sb.from("settings").upsert({ key:"anim_whatsapp", value:v||null }, { onConflict:"key" }), new Promise(r=>setTimeout(()=>r({ error:{ message:"Keine Antwort vom Server. Bitte die Seite neu laden und nochmal versuchen." } }),12000)) ]);
+    if (res.error) throw res.error;
+    S.settings.anim_whatsapp=v; render(true); toast(v?"Nummer gespeichert ✓":"Nummer entfernt.");
+  } catch(e){ fail(e); btn.disabled=false; btn.textContent="Speichern"; }
 }
 let aniIO=null;
 function watchAni(){
@@ -2574,6 +2580,7 @@ document.addEventListener("keydown", e => {
   if (e.key!=="Enter") return;
   if (e.target.id==="email") (S._loginMode==="register" ? register() : sendLink());
   if (e.target.id==="code") verifyCode();
+  if (e.target.id==="an-wa") aniWaSave();
 });
 
 showLegal();
