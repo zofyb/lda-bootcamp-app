@@ -8,7 +8,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), tabsEl = $("#tabs");
 
 let sb = null;
-const S = { session:null, me:null, areas:[], members:[], subs:[], tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null, busy:false };
+const S = { session:null, me:null, areas:[], members:[], subs:[], tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null, busy:false, real:null, viewAs:"" };
 
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,3200); }
 function fail(e){ console.error(e); toast("Fehler: " + (e?.message || e)); }
@@ -34,7 +34,7 @@ function areaState(n){
   const s = subOf(S.me.email, n);
   if (s && s.points != null) return "ok";
   if (s) return "wait";
-  if (n === S.areas[0]?.n || subOf(S.me.email, n-1)) return "open";
+  if (S.me.preview || n === S.areas[0]?.n || subOf(S.me.email, n-1)) return "open";
   return "lock";
 }
 function videoEmbed(url){
@@ -84,7 +84,7 @@ async function load(){
     const { data: me, error } = await sb.from("members").select("*").eq("email", email).maybeSingle();
     if (error) throw error;
     if (!me) { who.innerHTML = `${esc(email)}<br><button id="logout">Abmelden</button>`; view.innerHTML = `<h2>Kein Zugang</h2><p class="lead-text">Diese E-Mail-Adresse steht nicht auf der Teilnehmerliste. Bitte melde dich bei deinem Manager.</p>`; return; }
-    S.me = me; await refresh();
+    S.real = me; S.me = me; S.viewAs = ""; await refresh();
     S.tab = S.tab || (me.role === "creator" ? "themen" : me.role === "manager" ? "bewerten" : "uebersicht");
     render();
   } catch(e){ fail(e); }
@@ -136,9 +136,28 @@ const TABS = {
   manager: [["bewerten","Zu bewerten"],["creator","Meine Creator"]],
   lead:    [["uebersicht","Übersicht"],["bewerten","Zu bewerten"],["personen","Teilnehmer"],["themenedit","Themen"]]
 };
+const ROLE_NAME = { lead:"Agenturleitung", manager:"Manager", creator:"Creator" };
+function applyView(){
+  const v=S.viewAs;
+  if (!v) S.me = S.real;
+  else if (v==="__preview") S.me = { email:"__preview", role:"creator", name:"Vorschau", handle:"creator-vorschau", preview:true };
+  else S.me = member(v) || S.real;
+}
+function switcher(){
+  if (S.real?.role!=="lead") return "";
+  const ms=S.members.filter(m=>m.role==="manager"||(m.role==="lead"&&creators().some(c=>c.manager_email===m.email)&&m.email!==S.real.email));
+  const opt=(v,l)=>`<option value="${esc(v)}" ${S.viewAs===v?"selected":""}>${esc(l)}</option>`;
+  return `<label class="f viewas" for="viewas">Ansicht<select id="viewas">
+    ${opt("","Agenturleitung (alles)")}
+    <optgroup label="Manager">${ms.map(m=>opt(m.email,"Manager: "+m.name)).join("")}</optgroup>
+    <optgroup label="Creator">${opt("__preview","Creator: Vorschau (alle Themen offen)")}${creators().map(c=>opt(c.email,"Creator: "+label(c))).join("")}</optgroup>
+  </select></label>${S.viewAs?`<p class="viewnote">Du siehst die App gerade so wie ${S.viewAs==="__preview"?"ein Creator":esc(S.me.role==="creator"?label(S.me):S.me.name)}.${S.me.role==="creator"?" Abgeben ist in dieser Ansicht gesperrt.":""}</p>`:""}`;
+}
 function render(){
+  applyView();
   const me=S.me, mgr = member(me.manager_email);
-  who.innerHTML = `${esc(me.role==="creator" ? label(me) : me.name)}<br>${me.role==="creator" && mgr ? "Manager: "+esc(mgr.name)+"<br>" : ""}<button id="logout">Abmelden</button>`;
+  $("#switch").innerHTML = switcher();
+  who.innerHTML = `${esc(S.real.name)}<br>${me.role==="creator" && mgr ? "Manager: "+esc(mgr.name)+"<br>" : ""}<button id="logout">Abmelden</button>`;
   const t = TABS[me.role];
   tabsEl.hidden = t.length < 2;
   tabsEl.innerHTML = t.map(([k,l]) => `<button data-tab="${k}" aria-pressed="${S.tab===k}">${l}</button>`).join("");
@@ -175,7 +194,9 @@ function areaDetail(a, st, s){
   let h = `<div class="detail">${videoEmbed(a.video_url)}
     ${a.handout_path?`<a data-handout="${esc(a.handout_path)}" target="_blank" rel="noopener">Handout öffnen (PDF)</a>`:""}
     <h3>Deine Aufgabe</h3>${taskBlock(a)}`;
-  if (st==="open" || st==="wait"){
+  if (S.viewAs && S.me.role==="creator"){
+    h += s ? `<h3>${s.points!=null?`Bewertet: ${s.points} von 2 Punkten`:`Abgegeben ${fmtAgo(s.submitted_at)}`}</h3>${fileLinks(s.files)}` : `<p class="meta">Hier lädt der Creator seinen Nachweis hoch und gibt ab.</p>`;
+  } else if (st==="open" || st==="wait"){
     h += `${s?`<h3>Abgegeben ${fmtAgo(s.submitted_at)}</h3>${fileLinks(s.files)}${s.note?`<p class="feedback">${esc(s.note)}</p>`:""}<p class="meta">Dein Manager vergibt die Punkte. Bis dahin kannst du noch Dateien ergänzen.</p>`:""}
       <label class="drop" for="up-${a.n}"><strong>${s?"Weitere Datei hinzufügen":"Nachweis hochladen"}</strong>Screenshot oder Bildschirmaufnahme, je max. 50 MB<input id="up-${a.n}" data-up="${a.n}" type="file" accept="image/*,video/*,application/pdf" multiple></label>
       ${pend.length?`<div class="files">${pend.map(f=>`<span>${esc(f.name)}</span>`).join("")}</div>`:""}
@@ -266,7 +287,7 @@ function exportCsv(){
 function peopleView(){
   const m = S.editMember ? member(S.editMember) : null;
   const managers = S.members.filter(x=>x.role!=="creator");
-  const roleName = {lead:"Geschäftsführung",manager:"Manager",creator:"Creator"};
+  const roleName = ROLE_NAME;
   let h = `<h2>${m?"Person bearbeiten":"Person hinzufügen"}</h2>
   <div class="grid2">
     <label class="f" for="pm-email">E-Mail-Adresse<input id="pm-email" type="email" value="${esc(m?.email||"")}"></label>
@@ -334,7 +355,7 @@ document.addEventListener("click", async e => {
   if (t.id==="send-link") return sendLink();
   if (t.id==="verify") return verifyCode();
   if (t.id==="restart") return loginView();
-  if (t.id==="logout"){ await sb.auth.signOut(); S.me=null; S.tab=null; S.creator=null; return loginView(); }
+  if (t.id==="logout"){ await sb.auth.signOut(); S.me=null; S.real=null; S.viewAs=""; S.tab=null; S.creator=null; return loginView(); }
   if (t.dataset.tab){ S.tab=t.dataset.tab; S.creator=null; S.editMember=null; return render(); }
   if (t.dataset.area){ if (t.getAttribute("aria-disabled")) return toast("Gib zuerst das Thema davor ab."); const n=+t.dataset.area; S.openArea = S.openArea===n?null:n; return render(); }
   if (t.dataset.submit) return submitArea(+t.dataset.submit);
@@ -363,6 +384,7 @@ document.addEventListener("change", e => {
     if (big.length) toast(`${big.map(f=>f.name).join(", ")} ist größer als 50 MB. Bitte kürzer aufnehmen.`);
     S.pending[n]=[...(S.pending[n]||[]), ...fs.filter(f=>f.size<=MAX_FILE)]; render();
   }
+  if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.creator=null; S.openArea=null; S.editMember=null; applyView(); S.tab = S.me.role==="creator"?"themen":S.me.role==="manager"?"bewerten":"uebersicht"; window.scrollTo(0,0); return render(); }
   if (e.target.id==="ae-n"){ S.editArea=+e.target.value; render(); }
 });
 document.addEventListener("keydown", e => {
