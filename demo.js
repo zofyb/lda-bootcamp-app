@@ -47,7 +47,7 @@ const db = {
   ],
   roster: ["luna.live","gamer_kevin","jenny.mama","tim.talks","sofia.sings","mia.vibes","neu.creator"].map(h=>({ handle:h, bootcamp:h!=="mia.vibes"&&h!=="neu.creator", manager_email:{"luna.live":"lena@demo","gamer_kevin":"lena@demo","jenny.mama":"max@demo","tim.talks":"max@demo","mia.vibes":"max@demo"}[h]||null })),
   activity: ["c1@demo","c1@demo","c1@demo","c3@demo","c5@demo"].map((e,i)=>({creator_email:e, day:day(i<3?i:0)})),
-  settings: [{key:"start", value:start}],
+  settings: [{key:"start", value:start}, {key:"anim_whatsapp", value:"0170 0000000"}],
   questions: [
     {id:"q1", body:"Wie oft sollte ich pro Woche live gehen?", created_at:iso(now-3*D), published:true, answer:"Empfehlung: mindestens 3 Lives pro Woche, die du sicher schaffst."},
     {id:"q2", body:"Was mache ich, wenn jemand im Live nur stänkert?", created_at:iso(now-D), published:false}
@@ -78,8 +78,6 @@ const db = {
   referrals: [{recruit_handle:"neu.creator", recruiter_email:"c1@demo", status:"ok", gun_sent:true, source:"registrierung", created_at:iso(now-12*D)},
     {recruit_handle:"lisa.sparkle", recruiter_email:"c1@demo", status:"offen", gun_sent:false, source:"creator", created_at:iso(now-D)},
     {recruit_handle:"ben.gaming", recruiter_email:"c2@demo", status:"offen", gun_sent:false, source:"registrierung", created_at:iso(now-2*D)}],
-  anim_orders: [{id:"ao1", creator_email:"c1@demo", item:"gs15", wish:"Ein leuchtender Drache mit meinem Namen, wenn jemand eine Galaxy schickt.", sound:false, status:"angebot", reply:"Mega Idee! Ich schick dir morgen ein Referenzbild.", created_at:iso(now-2*D)},
-    {id:"ao2", creator_email:"c2@demo", item:"bg3", wish:"Hintergrund-Loop im Weltraum-Look mit Sternen und meinem Logo.", sound:true, status:"neu", created_at:iso(now-5*36e5)}],
   goals: [{creator_email:"c1@demo", month:YM, title:"50.000 Diamanten", target:50000, unit:"Diamanten", current:31200, done:false, set_by:"lena@demo"},
           {creator_email:"c3@demo", month:YM, title:"15 Lives im Monat", target:15, unit:"Lives", current:15, done:true, set_by:"max@demo"}]
 };
