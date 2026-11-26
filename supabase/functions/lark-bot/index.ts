@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
     // Selbsttest im Browser: .../lark-bot?check zeigt, welche Geheimnisse gesetzt sind (ohne Werte)
     const t = env("LARK_VERIFICATION_TOKEN").trim();
     return Response.json({ bot: "LIVEdream Lark-Bot läuft", LARK_APP_ID: !!env("LARK_APP_ID"), LARK_APP_SECRET: !!env("LARK_APP_SECRET"),
-      LARK_VERIFICATION_TOKEN: t ? `gesetzt, ${t.length} Zeichen, beginnt mit ${t.slice(0, 3)}` : "FEHLT", LARK_ENCRYPT_KEY: !!env("LARK_ENCRYPT_KEY"),
+      LARK_VERIFICATION_TOKEN: t ? `gesetzt, ${t.length} Zeichen` : "FEHLT", LARK_ENCRYPT_KEY: !!env("LARK_ENCRYPT_KEY"),
       service_key: !!SBKEY });
   }
   let body: any;
