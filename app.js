@@ -1694,15 +1694,16 @@ async function ttThumb(link){
 const ttTried=new Set();
 async function ttBackfill(){
   if (S.me?.role!=="lead" || S.viewAs || window.__DEMO) return;
+  let changed=false;
   for (const el of document.querySelectorAll("[data-ttfix]")){
     const x=S.extras.find(y=>y.id===el.dataset.ttfix); if (!x || ttTried.has(x.id)) continue; ttTried.add(x.id);
     const src=await ttThumb(x.link); if (!src) continue;
     try{ const blob=await shrinkCover(src), path=`tiktok-${Date.now()}.jpg`;
       const u=await sb.storage.from("unterlagen").upload(path,blob,{ contentType:"image/jpeg" }); if (u.error) throw u.error;
-      const r=await sb.from("extras").update({ path }).eq("id",x.id); if (r.error) throw r.error; x.path=path; }
+      const r=await sb.from("extras").update({ path }).eq("id",x.id); if (r.error) throw r.error; x.path=path; changed=true; }
     catch(e){ console.warn("TikTok-Vorschau", e); }
   }
-  if ([...ttTried].some(id=>S.extras.find(y=>y.id===id)?.path!=="tiktok")) render(true);
+  if (changed) render(true);
 }
 async function hydrateCovers(){
   ttBackfill().catch(console.error);
