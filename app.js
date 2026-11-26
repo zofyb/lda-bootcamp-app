@@ -416,7 +416,27 @@ function render(keepScroll){
   afterRender(); watchAni(); fab();
   hydrate().catch(console.error);
 }
+function initSortables(){
+  if (!window.Sortable || S.viewAs || S.me?.role!=="lead") return;
+  document.querySelectorAll("[data-sortable]").forEach(el=>{
+    if (el._sortable) return;
+    el._sortable=Sortable.create(el,{ handle:".drag", animation:150, ghostClass:"sghost", chosenClass:"schosen", delay:0,
+      onEnd:()=>saveOrder([...el.children].map(c=>c.dataset.sid).filter(Boolean)) });
+  });
+}
+async function saveOrder(ids){
+  if (ids.length<2) return;
+  const cur=ids.map(id=>S.extras.find(x=>x.id===id)?.sort??0), base=Math.min(...cur);
+  const ch=ids.map((id,i)=>[id,base+i]).filter(([id,v])=>(S.extras.find(x=>x.id===id)?.sort??0)!==v || new Set(cur).size<cur.length);
+  if (!ch.length) return;
+  const rs=await Promise.all(ch.map(([id,v])=>sb.from("extras").update({ sort:v }).eq("id",id)));
+  const bad=rs.find(r=>r.error); if (bad) { fail(bad.error); await refresh(); return render(true); }
+  ch.forEach(([id,v])=>{ const x=S.extras.find(y=>y.id===id); if (x) x.sort=v; });
+  S.extras.sort((a,b)=>(a.sort??0)-(b.sort??0) || String(a.created_at||"").localeCompare(String(b.created_at||"")));
+  render(true); toast("Reihenfolge gespeichert.");
+}
 function afterRender(){
+  initSortables();
   watchVideos();
   const ring=$(".ring .arc");
   if (ring){
@@ -961,8 +981,8 @@ function academyView(){
   const cats=Object.keys(groups).sort((a,b)=>a.localeCompare(b));
   if (!cats.length) h += `<div class="panel"><p class="muted">Hier kommen bald Schulungen und Infos rein.</p></div>`;
   for (const c of cats){
-    h += `<div class="wkh"><span>${esc(c.toUpperCase())}</span></div><div class="extras">${groups[c].map(x=> lead
-      ? `<div class="row"><div class="head">${extraCard(x,seen)}</div><div class="actions"><span class="tag">${x.level!=null?"Freischaltung ab Stufe "+x.level:audOf(x)==="team"?"nur Team":"alle Creator"}</span>${isVid(x.path)?vCoverBtn(x.path):""}<button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></div></div>`
+    h += `<div class="wkh"><span>${esc(c.toUpperCase())}</span>${lead&&groups[c].length>1?`<small class="muted">Zum Sortieren am ⠿ ziehen</small>`:""}</div><div class="extras" ${lead&&!S.viewAs?"data-sortable":""}>${groups[c].map(x=> lead
+      ? `<div class="row" data-sid="${esc(x.id)}"><div class="head"><span class="drag" aria-label="Ziehen zum Sortieren">⠿</span>${extraCard(x,seen)}</div><div class="actions"><span class="tag">${x.level!=null?"Freischaltung ab Stufe "+x.level:audOf(x)==="team"?"nur Team":"alle Creator"}</span>${isVid(x.path)?vCoverBtn(x.path):""}<button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></div></div>`
       : extraCard(x,seen)).join("")}</div>`;
   }
   return h;
@@ -1774,7 +1794,7 @@ async function refAdd(){
   await refresh(); render(true); toast("Eingetragen.");
 }
 /* ---------- Zofys TikTok-Tippvideos (Vorschau, Klick führt zu TikTok) ---------- */
-const ttVideos = () => S.extras.filter(x=>x.kind==="tiktok" && x.link).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
+const ttVideos = () => S.extras.filter(x=>x.kind==="tiktok" && x.link).sort((a,b)=>(a.sort??0)-(b.sort??0) || String(b.created_at||"").localeCompare(String(a.created_at||"")));
 function ttCard(x){
   const cover=x.path && x.path!=="tiktok";
   return `<a class="ttcard" href="${esc(x.link)}" target="_blank" rel="noopener" data-tt="${esc(x.id)}">
@@ -1794,8 +1814,8 @@ function ttAdmin(){
     <label class="f" for="tt-cover">Vorschaubild (Screenshot vom Video, optional, geht auch später)<input id="tt-cover" type="file" accept="image/*"></label>
     <button class="btn small" id="tt-add">Hinzufügen</button>
     ${ttVideos().length?`<div class="sec" style="margin-top:6px"><span>Deine TikTok-Videos</span><small>${ttVideos().length}</small></div>
-    <div class="ttlist">${ttVideos().map(x=>{ const cover=x.path && x.path!=="tiktok";
-      return `<div class="ttli"><span class="ttmini">${cover?`<img data-tcover="${esc(x.path)}" alt="">`:""}</span><div><b>${esc(x.title)}</b><small>${cover?"Mit Vorschaubild":"Ohne Vorschaubild"}</small></div>
+    <div class="ttlist" data-sortable>${ttVideos().map(x=>{ const cover=x.path && x.path!=="tiktok";
+      return `<div class="ttli" data-sid="${esc(x.id)}"><span class="drag" aria-label="Ziehen zum Sortieren">⠿</span><span class="ttmini">${cover?`<img data-tcover="${esc(x.path)}" alt="">`:""}</span><div><b>${esc(x.title)}</b><small>${cover?"Mit Vorschaubild":"Ohne Vorschaubild"}</small></div>
         <label class="chip" for="ttc-${esc(x.id)}">${ic("i-cam")} Bild<input id="ttc-${esc(x.id)}" data-ttcover="${esc(x.id)}" type="file" accept="image/*" hidden></label>
         <button class="chip" data-ttdel="${esc(x.id)}">${S.confirmDelete==="tt"+x.id?"Wirklich löschen?":"Löschen"}</button></div>`; }).join("")}</div>`:""}</div>`;
 }
@@ -1836,7 +1856,7 @@ async function addTikTok(){
     $("#tt-add").disabled=true; let path="tiktok";
     const src=f || await ttThumb(link);
     if (src){ const blob=await shrinkCover(src); path=`tiktok-${Date.now()}.jpg`; const u=await sb.storage.from("unterlagen").upload(path,blob,{ contentType:"image/jpeg" }); if (u.error) throw u.error; }
-    const r=await sb.from("extras").insert({ title, path, link, kind:"tiktok", audience:"all", category:"TikTok-Tipps", sort:S.extras.length }); if (r.error) throw r.error;
+    const r=await sb.from("extras").insert({ title, path, link, kind:"tiktok", audience:"all", category:"TikTok-Tipps", sort:Math.min(0,...ttVideos().map(x=>x.sort??0))-1 }); if (r.error) throw r.error;
     await refresh(); render(true); toast("TikTok-Video hinzugefügt.");
   } catch(e){ fail(e); render(true); }
 }
