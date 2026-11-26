@@ -1,5 +1,6 @@
 -- Update 16: Match-Börse und Erfolge-Wand
 -- Match-Börse: Creator inserieren, wann sie live sind und Lust auf Matches haben; andere tippen "Bin dabei".
+-- Einmalig: verschwindet 3 Stunden nach Start. Wiederkehrend (Wochentage): läuft 4 Wochen oder bis zum Löschen.
 -- Erfolge-Wand: Creator teilen einen Erfolg (Screenshot + kurzer Text), andere reagieren mit Emojis.
 -- Alle in der App sehen alles; löschen dürfen nur die Verfasser und die Leitung.
 -- In Supabase: SQL Editor > New query > alles einfügen > Run
@@ -10,6 +11,8 @@ create table if not exists public.match_posts (
   handle       text,
   name         text,
   live_at      timestamptz not null,
+  days         int[] check (days <@ array[1,2,3,4,5,6,7]),   -- Wochentage bei Wiederholung (1 = Montag)
+  until        timestamptz,                                    -- bis wann das Inserat sichtbar ist (setzt die Datenbank)
   rules        text check (char_length(rules) <= 200),
   note         text check (char_length(note) <= 300),
   created_at   timestamptz not null default now()
@@ -47,7 +50,9 @@ begin
   new := jsonb_populate_record(new, jsonb_build_object(k, me, 'handle', h, 'name', n));
   if TG_TABLE_NAME = 'match_posts' then
     if new.live_at < now() - interval '1 hour' or new.live_at > now() + interval '14 days' then raise exception 'Zeitpunkt nicht möglich'; end if;
-    if (select count(*) from public.match_posts where author_email = me and live_at > now() - interval '3 hours') >= 3 then raise exception 'Höchstens 3 offene Inserate'; end if;
+    if new.days = '{}' then new.days := null; end if;
+    new.until := new.live_at + case when new.days is null then interval '3 hours' else interval '28 days' end;
+    if (select count(*) from public.match_posts where author_email = me and until > now()) >= 3 then raise exception 'Höchstens 3 offene Inserate'; end if;
   elsif TG_TABLE_NAME = 'wins' then
     if new.path is not null and new.path not like me || '/%' then raise exception 'ungültiger Pfad'; end if;
     if (select count(*) from public.wins where author_email = me and created_at > now() - interval '1 day') >= 5 then raise exception 'Höchstens 5 Erfolge pro Tag'; end if;

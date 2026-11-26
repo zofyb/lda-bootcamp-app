@@ -272,7 +272,7 @@ async function refresh(){
   S.noUpd11=!!rf.error; S.refs=rf.data||[];
   S.noUpd9=!!(xe.error||bs.error||gl.error); S.xp=xe.data||[]; S.bs=bs.data||[]; S.goals=gl.data||[]; S.bsTop=bt.error?[]:(bt.data||[]);
   const [av,ao,bk]=await Promise.all([ sb.from("avail").select("*").order("weekday"), sb.from("avail_off").select("*"), sb.from("bookings").select("*").gte("starts_at", new Date(Date.now()-DAY).toISOString()).order("starts_at") ]);
-  const [mp,ml,wi,wr]=await Promise.all([ sb.from("match_posts").select("*").gte("live_at", new Date(Date.now()-3*36e5).toISOString()).order("live_at"), sb.from("match_likes").select("*").gte("created_at", new Date(Date.now()-16*DAY).toISOString()), sb.from("wins").select("*").order("created_at",{ ascending:false }).limit(60), sb.from("win_reacts").select("*") ]);
+  const [mp,ml,wi,wr]=await Promise.all([ sb.from("match_posts").select("*").gte("until", new Date().toISOString()).order("live_at"), sb.from("match_likes").select("*").gte("created_at", new Date(Date.now()-16*DAY).toISOString()), sb.from("wins").select("*").order("created_at",{ ascending:false }).limit(60), sb.from("win_reacts").select("*") ]);
   S.noUpd16=!!(mp.error||ml.error||wi.error||wr.error); S.mp=mp.data||[]; S.ml=ml.data||[]; S.wins=wi.data||[]; S.wr=wr.data||[];
   S.noUpd14=!!(av.error||ao.error||bk.error); S.av=av.data||[]; S.avOff=ao.data||[]; S.bk=bk.data||[];
   if (!S.noUpd14 && S.real?.role==="creator"){ const bz=await sb.rpc("busy_times"); S.busy=new Set(Array.isArray(bz.data)?bz.data.map(x=>+new Date(x)):[]); }
@@ -2585,7 +2585,17 @@ const cleanH = h => String(h||"").replace(/^@/,"");
 const whoOf = (h,email) => { const m=S.members.find(x=>x.email===email), hh=cleanH(h||m?.handle); return hh ? "@"+hh : (m?.name || "Jemand"); };
 const whoLink = (h,email,cls="") => { const m=S.members.find(x=>x.email===email), hh=cleanH(h||m?.handle);
   return hh ? `<a class="${cls}" href="https://www.tiktok.com/@${encodeURIComponent(hh)}" target="_blank" rel="noopener">@${esc(hh)}</a>` : `<span class="${cls}">${esc(whoOf(h,email))}</span>`; };
-const openMatches = () => S.mp.filter(p=>+new Date(p.live_at) > Date.now()-3*36e5).sort((a,b)=>new Date(a.live_at)-new Date(b.live_at));
+const WDS = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+const mpUntil = p => p.until ? +new Date(p.until) : +new Date(p.live_at)+(p.days?.length?28*DAY:3*36e5);
+function nextAt(p){
+  const base=new Date(p.live_at); if (!p.days?.length) return base;
+  const start=new Date(base); start.setHours(0,0,0,0);
+  for (let i=-1;i<=8;i++){ const d=new Date(); d.setDate(d.getDate()+i); d.setHours(base.getHours(),base.getMinutes(),0,0);
+    if (d>=start && p.days.includes(isoDow(d)) && +d+3*36e5>Date.now() && +d<=mpUntil(p)) return d; }
+  return null;
+}
+const daysTxt = ds => ds.length===7 ? "Jeden Tag" : ds.length===5 && !ds.includes(6) && !ds.includes(7) ? "Mo bis Fr" : [...ds].sort().map(x=>WDS[x-1]).join(", ");
+const openMatches = () => S.mp.filter(p=>mpUntil(p)>Date.now() && nextAt(p)).sort((a,b)=>nextAt(a)-nextAt(b));
 const likesOf = id => S.ml.filter(l=>l.post_id===id);
 const dayWord = d => { const x=isoDay(d); return x===isoDay(new Date())?"Heute":x===isoDay(new Date(Date.now()+DAY))?"Morgen":fmtDayS(d); };
 const agoTxt = d => { const m=Math.round((Date.now()-new Date(d))/6e4); return m<1?"gerade eben":m<60?`vor ${m} Min.`:m<1440?`vor ${Math.round(m/60)} Std.`:`vor ${Math.round(m/1440)} Tg.`; };
@@ -2608,6 +2618,7 @@ function matchView(){
       <h2>Neues Inserat</h2>
       <div class="two"><label class="f" for="mp-day">Tag<input id="mp-day" type="date" value="${isoDay(def)}" min="${isoDay(now)}" max="${isoDay(new Date(Date.now()+13*DAY))}"></label>
       <label class="f" for="mp-time">Uhrzeit<input id="mp-time" type="time" value="${pad(def.getHours())}:00"></label></div>
+      <div class="f"><span>Jede Woche wiederholen? (optional)</span><div class="mdays">${WDS.map((w,i)=>`<button type="button" class="chip" data-mpday="${i+1}">${w}</button>`).join("")}</div><small class="muted">Wähle die Tage, an denen du immer zur gleichen Uhrzeit live bist. Das Inserat läuft dann 4 Wochen.</small></div>
       <label class="f" for="mp-rules">Regeln<input id="mp-rules" type="text" maxlength="200" placeholder="z. B. 3 Runden, wer verliert, macht eine Strafe"></label>
       <label class="f" for="mp-note">Noch was? (optional)<input id="mp-note" type="text" maxlength="300" placeholder="z. B. Ich bin neu und freue mich über jede Runde"></label>
       <div class="btns"><button class="btn small" id="mp-add">Veröffentlichen</button><button class="btn ghost small" id="mp-cancel">Abbrechen</button></div></div>`
@@ -2616,10 +2627,11 @@ function matchView(){
     ${list.length ? `<div class="mlist">${list.map(matchCard).join("")}</div>` : `<p class="muted">Gerade gibt es kein Inserat. Mach den Anfang!</p>`}`;
 }
 function matchCard(p){
-  const d=new Date(p.live_at), mine=p.author_email===S.me.email, likes=likesOf(p.id), iLike=likes.some(l=>l.email===S.me.email);
+  const d=nextAt(p)||new Date(p.live_at), mine=p.author_email===S.me.email, likes=likesOf(p.id), iLike=likes.some(l=>l.email===S.me.email);
   const live=d<=new Date(), canDel=mine || S.me.role==="lead";
   return `<div class="mcard ${mine?"mine":""}">
     <div class="mtop"><span class="mwhen ${live?"live":""}">${live?"Jetzt live":`${dayWord(d)}, ${fmtTime(d)} Uhr`}</span>${whoLink(p.handle,p.author_email,"mwho")}</div>
+    ${p.days?.length?`<p class="mrep">🔁 ${daysTxt(p.days)} um ${fmtTime(new Date(p.live_at))} Uhr</p>`:""}
     ${p.rules?`<p class="mrules">${ic("i-sword")}<span>${esc(p.rules)}</span></p>`:""}
     ${p.note?`<p class="mnote">${esc(p.note)}</p>`:""}
     <div class="mact">${mine?`<span class="chip">Dein Inserat</span>`:`<button class="chip mlike ${iLike?"on":""}" data-mlike="${esc(p.id)}">${iLike?"✓ Bin dabei":"Bin dabei"}</button>`}
@@ -2635,8 +2647,9 @@ async function mpAdd(){
   if (isNaN(at) || +at < Date.now()-36e5) return toast("Dieser Zeitpunkt liegt in der Vergangenheit.");
   if (+at > Date.now()+14*DAY) return toast("Bitte höchstens 2 Wochen im Voraus.");
   if (!rules) return toast("Schreib kurz deine Regeln dazu.");
+  const days=[...document.querySelectorAll("[data-mpday].on")].map(b=>+b.dataset.mpday);
   $("#mp-add").disabled=true;
-  const r=await sb.from("match_posts").insert({ author_email:S.me.email, handle:S.me.handle||null, name:S.me.name, live_at:at.toISOString(), rules, note:note||null });
+  const r=await sb.from("match_posts").insert({ author_email:S.me.email, handle:S.me.handle||null, name:S.me.name, live_at:at.toISOString(), days:days.length?days:null, until:new Date(+at+(days.length?28*DAY:3*36e5)).toISOString(), rules, note:note||null });
   if (r.error){ $("#mp-add").disabled=false; return /3 offene/.test(r.error.message)?toast("Du hast schon 3 offene Inserate."):fail(r.error); }
   S.mpForm=false; await refresh(); render(true); toast("Inserat ist online.");
 }
@@ -2781,6 +2794,7 @@ document.addEventListener("click", async e => {
   if (t.id==="mp-new"){ S.mpForm=true; return render(true); }
   if (t.id==="mp-cancel"){ S.mpForm=false; return render(true); }
   if (t.id==="mp-add") return mpAdd();
+  if (t.dataset.mpday){ t.classList.toggle("on"); return; }
   if (t.dataset.mlike) return mpLike(t.dataset.mlike);
   if (t.dataset.mdel) return mpDel(t.dataset.mdel);
   if (t.id==="w-new"){ S.wForm=true; return render(true); }
