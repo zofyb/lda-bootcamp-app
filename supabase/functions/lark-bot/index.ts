@@ -196,16 +196,26 @@ async function handle(ev: any) {
 
 // ---------- Eingang ----------
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("LIVEdream Lark-Bot läuft.", { status: 200 });
+  if (req.method !== "POST") {
+    // Selbsttest im Browser: .../lark-bot?check zeigt, welche Geheimnisse gesetzt sind (ohne Werte)
+    const t = env("LARK_VERIFICATION_TOKEN").trim();
+    return Response.json({ bot: "LIVEdream Lark-Bot läuft", LARK_APP_ID: !!env("LARK_APP_ID"), LARK_APP_SECRET: !!env("LARK_APP_SECRET"),
+      LARK_VERIFICATION_TOKEN: t ? `gesetzt, ${t.length} Zeichen, beginnt mit ${t.slice(0, 3)}` : "FEHLT", LARK_ENCRYPT_KEY: !!env("LARK_ENCRYPT_KEY"),
+      service_key: !!SBKEY });
+  }
   let body: any;
-  try { body = await req.json(); } catch (_) { return new Response("bad json", { status: 400 }); }
-  try { if (body.encrypt) body = await decrypt(body.encrypt, env("LARK_ENCRYPT_KEY")); }
-  catch (_) { return new Response("decrypt failed", { status: 400 }); }
+  try { body = await req.json(); } catch (_) { return Response.json({ error: "bad json" }, { status: 400 }); }
+  try { if (body.encrypt) body = await decrypt(body.encrypt, env("LARK_ENCRYPT_KEY").trim()); }
+  catch (_) { console.error("Entschlüsseln fehlgeschlagen: LARK_ENCRYPT_KEY prüfen"); return Response.json({ error: "decrypt failed" }, { status: 400 }); }
 
-  const tokenIn = body.token ?? body.header?.token;
-  if (!env("LARK_VERIFICATION_TOKEN") || tokenIn !== env("LARK_VERIFICATION_TOKEN")) return new Response("forbidden", { status: 403 });
-
+  // Adress-Prüfung von Lark: nur die Challenge zurückgeben (harmlos, enthält keine Daten)
   if (body.type === "url_verification") return Response.json({ challenge: body.challenge });
+
+  const want = env("LARK_VERIFICATION_TOKEN").trim(), tokenIn = String(body.token ?? body.header?.token ?? "").trim();
+  if (!want || tokenIn !== want) {
+    console.error(`Token passt nicht: Lark schickt ${tokenIn.length} Zeichen (${tokenIn.slice(0, 3)}…), Supabase hat ${want.length} (${want.slice(0, 3)}…)`);
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
 
   if (body.header?.event_type === "im.message.receive_v1" && body.event?.message) {
     const job = handle(body.event).catch((e) => console.error("Lark-Bot Fehler", e));
