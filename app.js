@@ -1099,7 +1099,7 @@ function startView(){
     ${boot?tile("i-gift","Belohnungen",'id="rw-open"',ok?`<i class="dot">!</i>`:`<small class="tl">ab 10 P</small>`):""}
     ${tile("i-user","Profil",'data-tab="profil"')}
     ${tile("i-spark","Animationen",'data-tab="anim"')}
-    <a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>
+    <a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${partnerTiles()}
   </div>
   ${ttStrip(6)}
   ${boot?reminderBlock(e):""}
@@ -1140,7 +1140,7 @@ function profileView(email){
 function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
   const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
-  return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a></div>`;
+  return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${partnerTiles()}</div>`;
 }
 function leadStart(){ if (S.me.role==="manager") return mgrStart(); return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
 
@@ -1469,6 +1469,32 @@ function mgrStart(){
     ${news.length?`<div class="news">${news.map(n=>`<button class="nrow" ${n.go}><span class="kic">${ic(n.ic)}</span><span>${n.t}</span><small>${ago(n.at)}</small></button>`).join("")}</div>`:`<p class="muted">Gerade nichts Neues von deinen Creatorn.</p>`}
     <div class="sec"><span>Bereiche</span></div>
     <div class="tiles">${tile("creator","i-people","Betreuung")}${tile("bewerten","i-check","Bewerten",open)}${S.noUpd14?"":tile("termine","i-clock","1:1-Termine",soonBooked())}${tile("kalender","i-cal","Kalender")}${tile("akademie","i-learn","Akademie")}${tile("fragen","i-mail","Sag's uns")}</div>`;
+}
+
+/* ---------- Partner (Kooperationen): Kachel + Infoblatt, Leitung pflegt Text und Link ---------- */
+const PARTNERS = [["tiktori","Tiktori","i-rocket"],["papaya","Papaya Given","i-spark"]];
+const partnerOf = k => { try { return JSON.parse(S.settings["partner_"+k]||"{}"); } catch(e){ return {}; } };
+function partnerTiles(){
+  const lead=S.real?.role==="lead" && !S.viewAs;
+  return PARTNERS.filter(([k])=>lead || partnerOf(k).info || partnerOf(k).link).map(([k,n,i])=>`<button class="tile" data-partner="${k}"><span class="tic">${ic(i)}</span>${n}</button>`).join("");
+}
+function openPartner(k){
+  const [,n]=PARTNERS.find(p=>p[0]===k)||[], d=partnerOf(k), lead=S.real?.role==="lead" && !S.viewAs;
+  sheet(`<div class="sh"><span class="eyebrow">Unser Partner</span><h2>${esc(n)}</h2></div>
+    ${d.info?`<p class="soft" style="margin:0;white-space:pre-line">${esc(d.info)}</p>`:`<p class="muted" style="margin:0">${lead?"Noch keine Infos eingetragen.":"Infos folgen bald."}</p>`}
+    ${d.link?`<a class="btn" href="${esc(d.link)}" target="_blank" rel="noopener">${ic("i-chev")} ${esc(d.label||"Mehr erfahren")}</a>`:""}
+    ${lead?`<div class="panel stack" style="margin-top:6px"><b>Bearbeiten (nur Leitung)</b>
+      <label class="f" for="pt-info">Infos für die Creator<textarea id="pt-info" maxlength="2000" placeholder="Was bietet ${esc(n)}? Wie läuft der Kontakt (z. B. über uns)?">${esc(d.info||"")}</textarea></label>
+      <label class="f" for="pt-link">Link (Webseite oder TikTok, optional)<input id="pt-link" type="url" value="${esc(d.link||"")}" placeholder="https://"></label>
+      <label class="f" for="pt-label">Text auf dem Knopf<input id="pt-label" type="text" maxlength="40" value="${esc(d.label||"")}" placeholder="Mehr erfahren"></label>
+      <button class="btn small" id="pt-save" data-pk="${k}">Speichern</button></div>`:""}`);
+}
+async function savePartner(k){
+  const link=$("#pt-link").value.trim();
+  if (link && !/^https:\/\//.test(link)) return toast("Der Link muss mit https:// anfangen.");
+  const v=JSON.stringify({ info:$("#pt-info").value.trim(), link, label:$("#pt-label").value.trim() });
+  const r=await sb.from("settings").upsert({ key:"partner_"+k, value:v }, { onConflict:"key" }); if (r.error) return fail(r.error);
+  S.settings["partner_"+k]=v; closeSheet(); render(true); toast("Gespeichert ✓");
 }
 
 /* ---------- Level-System: XP, Stufen, Hook des Tages, Impuls der Woche, Backstage, Monatsziel ---------- */
@@ -2510,7 +2536,7 @@ datenschutz: `<h1>Datenschutz&shy;erklärung</h1>
 <li><b>Netlify</b> (Netlify Inc., USA) stellt die Webseite bereit. Beim Aufruf werden technisch nötige Daten wie IP-Adresse und Zeitpunkt verarbeitet. Eine Übermittlung in die USA ist möglich. Sie ist durch EU-Standardvertragsklauseln bzw. das EU-US Data Privacy Framework abgesichert.</li>
 <li><b>Login-E-Mails</b> werden über den E-Mail-Dienst WEB.DE (1&amp;1 Mail &amp; Media GmbH, Deutschland) verschickt.</li>
 </ul>
-<p>Schriften und Programmbibliotheken liegen direkt auf unserem Server. Es werden keine Daten an Google oder andere Anbieter geschickt. Wir nutzen keine Werbe- oder Analyse-Cookies und kein Tracking. Links zu TikTok-Videos und zum Merch-Shop öffnen die Seiten dieser Anbieter. Erst dann gelten deren Datenschutzbestimmungen.</p>
+<p>Schriften und Programmbibliotheken liegen direkt auf unserem Server. Es werden keine Daten an Google oder andere Anbieter geschickt. Wir nutzen keine Werbe- oder Analyse-Cookies und kein Tracking. Links zu TikTok-Videos und zum Merch-Shop und zu unseren Partnern öffnen die Seiten dieser Anbieter. Erst dann gelten deren Datenschutzbestimmungen.</p>
 <h2>7. Speicher in deinem Browser</h2>
 <p>Die App speichert in deinem Browser deine Anmeldung und kleine Merkhilfen, etwa welche Abzeichen und Extras du schon gesehen hast. Das ist technisch nötig (§ 25 Abs. 2 TDDDG). Du kannst es jederzeit über die Browser-Einstellungen löschen.</p>
 <h2>8. Wie lange wir speichern</h2>
@@ -2571,6 +2597,8 @@ document.addEventListener("click", async e => {
   if (t.dataset.refno) return refDecide(t.dataset.refno,"nein");
   if (t.id==="rf-add") return refAdd();
   if (t.id==="tt-add") return addTikTok();
+  if (t.dataset.partner) return openPartner(t.dataset.partner);
+  if (t.id==="pt-save") return savePartner(t.dataset.pk);
   if (t.dataset.ttdel) return ttDelete(t.dataset.ttdel);
   if (t.id==="av-add") return addRule();
   if (t.id==="sl-book") return bookSlot();
