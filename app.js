@@ -1649,7 +1649,7 @@ function ttCard(x){
     <span class="ttimg ${cover?"":"nocov"}" ${cover?"":`data-ttfix="${esc(x.id)}"`}>${cover?`<img data-tcover="${esc(x.path)}" alt="">`:`<em>${esc(x.title)}</em>`}<span class="ttplay">${ic("i-play")}</span></span>
     <b>${esc(x.title)}</b><small>Auf TikTok ansehen ›</small></a>`;
 }
-function ttStrip(max, head="Tipps von Zofy auf TikTok"){
+function ttStrip(max, head="Tipps von uns auf TikTok"){
   const xs=ttVideos().slice(0,max||99); if (!xs.length) return "";
   return `<div class="sec"><span>${esc(head)}</span><small>+15 XP je Video</small></div><div class="ttrow">${xs.map(ttCard).join("")}</div>`;
 }
@@ -1658,8 +1658,33 @@ function ttAdmin(){
     <p class="muted" style="margin:0">In der App erscheint nur das Vorschaubild. Wer tippt, landet beim echten Video auf TikTok.</p>
     <label class="f" for="tt-link">Link zum TikTok-Video<input id="tt-link" type="url" placeholder="https://www.tiktok.com/@zofyb/video/…"></label>
     <label class="f" for="tt-title">Titel<input id="tt-title" type="text" placeholder="z. B. 3 Fehler beim ersten Live"></label>
-    <label class="f" for="tt-cover">Vorschaubild (optional: ohne Bild versucht die App, es von TikTok zu holen)<input id="tt-cover" type="file" accept="image/*"></label>
-    <button class="btn small" id="tt-add">Hinzufügen</button></div>`;
+    <label class="f" for="tt-cover">Vorschaubild (Screenshot vom Video, optional, geht auch später)<input id="tt-cover" type="file" accept="image/*"></label>
+    <button class="btn small" id="tt-add">Hinzufügen</button>
+    ${ttVideos().length?`<div class="sec" style="margin-top:6px"><span>Deine TikTok-Videos</span><small>${ttVideos().length}</small></div>
+    <div class="ttlist">${ttVideos().map(x=>{ const cover=x.path && x.path!=="tiktok";
+      return `<div class="ttli"><span class="ttmini">${cover?`<img data-tcover="${esc(x.path)}" alt="">`:""}</span><div><b>${esc(x.title)}</b><small>${cover?"Mit Vorschaubild":"Ohne Vorschaubild"}</small></div>
+        <label class="chip" for="ttc-${esc(x.id)}">${ic("i-cam")} Bild<input id="ttc-${esc(x.id)}" data-ttcover="${esc(x.id)}" type="file" accept="image/*" hidden></label>
+        <button class="chip" data-ttdel="${esc(x.id)}">${S.confirmDelete==="tt"+x.id?"Wirklich löschen?":"Löschen"}</button></div>`; }).join("")}</div>`:""}</div>`;
+}
+async function ttSetCover(id, f){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const x=S.extras.find(y=>y.id===id); if (!x || !f) return;
+  try{
+    toast("Bild wird hochgeladen …");
+    const blob=await shrinkCover(f), path=`tiktok-${Date.now()}.jpg`;
+    const u=await sb.storage.from("unterlagen").upload(path,blob,{ contentType:"image/jpeg" }); if (u.error) throw u.error;
+    const r=await sb.from("extras").update({ path }).eq("id",id); if (r.error) throw r.error;
+    if (x.path && x.path!=="tiktok") sb.storage.from("unterlagen").remove([x.path]).catch(()=>{});
+    await refresh(); render(true); toast("Vorschaubild gespeichert ✓");
+  } catch(e){ fail(e); }
+}
+async function ttDelete(id){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  if (S.confirmDelete!=="tt"+id){ S.confirmDelete="tt"+id; return render(true); }
+  S.confirmDelete=null; const x=S.extras.find(y=>y.id===id);
+  const r=await sb.from("extras").delete().eq("id",id); if (r.error) return fail(r.error);
+  if (x?.path && x.path!=="tiktok") sb.storage.from("unterlagen").remove([x.path]).catch(()=>{});
+  await refresh(); render(true); toast("Video gelöscht.");
 }
 async function shrinkCover(file){
   const url=URL.createObjectURL(file);
@@ -2468,6 +2493,7 @@ document.addEventListener("click", async e => {
   if (t.dataset.refno) return refDecide(t.dataset.refno,"nein");
   if (t.id==="rf-add") return refAdd();
   if (t.id==="tt-add") return addTikTok();
+  if (t.dataset.ttdel) return ttDelete(t.dataset.ttdel);
   if (t.id==="av-add") return addRule();
   if (t.id==="sl-book") return bookSlot();
   if (t.dataset.tnav){ const m=tMonth(); S.tMonth=new Date(m.getFullYear(), m.getMonth()+ +t.dataset.tnav, 1); return render(true); }
@@ -2559,6 +2585,7 @@ document.addEventListener("click", async e => {
   if (t.id==="ae-save") return saveArea();
 });
 document.addEventListener("change", e => {
+  if (e.target.dataset.ttcover) return ttSetCover(e.target.dataset.ttcover, e.target.files[0]);
   if (e.target.dataset.up){
     const n=+e.target.dataset.up, fs=[...e.target.files], big=fs.filter(f=>f.size>MAX_FILE);
     if (big.length) toast(`${big.map(f=>f.name).join(", ")} ist größer als 50 MB. Bitte kürzer aufnehmen.`);
