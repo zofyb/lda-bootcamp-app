@@ -82,6 +82,8 @@ function readOne(m: Msg, got: Got) {
     const walk = (v: any, k = "") => {
       if (typeof v === "string") {
         const s = v.trim();
+        // Lark packt die Karte manchmal als JSON-Text in ein Feld (z. B. json_card)
+        if ((s.startsWith("{") || s.startsWith("[")) && s.length > 20) { try { return walk(JSON.parse(s), k); } catch (_) { /* kein JSON */ } }
         if (s && (["content", "text", "title", "url", "href", "default_url"].includes(k)) && !seen.has(s)) { seen.add(s); out.push(s); }
       } else if (Array.isArray(v)) v.forEach((x) => walk(x, k));
       else if (v && typeof v === "object") {
@@ -182,7 +184,7 @@ async function handle(ev: any) {
 
   // Nur ein Bild: an den jüngsten Lark-Entwurf ohne Bild (letzte 15 Minuten) hängen
   if (!got.text.length) {
-    if (!got.images.length) return reply(chat, `⚠️ Kein Text gefunden. Gelesen: ${got.trace.join(", ") || "nichts"}`);
+    if (!got.images.length) return reply(chat, `⚠️ Kein Text gefunden. Gelesen: ${got.trace.join(", ") || "nichts"}` + (got.raw ? `\nRohdaten: ${got.raw}` : ""));
     const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
     const r = await db(`calendar?select=id,title&source=eq.lark&status=eq.draft&image=is.null&created_at=gte.${since}&order=created_at.desc&limit=1`);
     const last = (await r.json())?.[0];
