@@ -345,10 +345,10 @@ function navItems(){
   if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],["anim","i-spark","Animation"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
   const mine=new Set(myCreators().map(c=>c.email)), open=S.subs.filter(s=>s.points==null && mine.has(s.creator_email)).length;
   if (me.role==="manager") return [["bewerten","i-check","Bewerten",open],["creator","i-people","Creator"],["kalender","i-cal","Kalender"],["akademie","i-learn","Lernen"],["fragen","i-mail","Sag's uns"]];
-  return [["uebersicht","i-home","Start"],["bewerten","i-check","Bewerten",open],["kalender","i-cal","Kalender"],...(S.real.role==="lead"?[["fuehrung","i-list","Führung"]]:[]),["mehr","i-grid","Mehr"]];
+  return [["uebersicht","i-home","Start"],["bewerten","i-check","Bewerten",open],["kalender","i-cal","Kalender"],...(S.real.role==="lead"?[["fuehrung","i-list","Führung"]]:[]),["bootcamp","i-learn","Bootcamp"]];
 }
 function navHtml(){
-  const items=navItems(), cur = S.me.role!=="creator" && LEAD_MORE.includes(S.tab) && items.some(x=>x[0]==="mehr") ? "mehr" : S.tab;
+  const items=navItems(), cur = S.me.role!=="creator" && LEAD_MORE.includes(S.tab) && items.some(x=>x[0]==="uebersicht") ? "uebersicht" : S.tab;
   return `<div class="bn" style="--n:${items.length}">${items.map(([k,i,l,n])=>`<button ${k==="@kk"?'id="kk-open"':`data-tab="${k}"`} aria-current="${cur===k?"page":"false"}"><span class="bi">${ic(i)}${n?`<i class="dot">${n}</i>`:""}</span>${l}</button>`).join("")}</div>`;
 }
 const ROLE_NAME = { lead:"Agenturleitung", manager:"Manager", creator:"Creator" };
@@ -384,6 +384,7 @@ function render(keepScroll){
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
     if (!["start","lernen","kalender","profil","anim"].includes(S.tab)) S.tab="start";
   } else if (["start","lernen","profil","themen"].includes(S.tab) || (S.tab==="fuehrung" && S.real.role!=="lead") || (S.tab==="mehr" && me.role!=="lead")) S.tab = me.role==="manager"?"bewerten":"uebersicht";
+  if (me.role==="lead" && S.tab==="mehr") S.tab="uebersicht";
   bnav.innerHTML = navHtml(); bnav.hidden = !!S.openArea || !!(S.qz && !S.qz.done);
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
@@ -393,8 +394,7 @@ function render(keepScroll){
   else if (S.tab==="akademie") html = academyView();
   else if (S.tab==="kalender") html = calendarView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
-  else if (S.tab==="mehr") html = moreView();
-  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView }[S.tab] || pendingView)();
+  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView }[S.tab] || pendingView)();
   view.innerHTML = html;
   if (!keepScroll) window.scrollTo(0,0);
   afterRender(); watchAni(); fab();
@@ -822,7 +822,7 @@ function creatorDetail(email){
 }
 function leadOverview(){
   const cs=creators(), pass=cs.filter(c=>total(c.email)>=10).length, open=S.subs.filter(s=>s.points==null).length, s0=startDate();
-  let h=leadDash()+`<div class="stack" style="margin-top:8px"><span class="eyebrow">Bootcamp</span><h1>Bootcamp <em>Übersicht</em></h1>
+  let h=`<div class="stack"><span class="eyebrow">Bootcamp</span><h1>Bootcamp <em>Übersicht</em></h1>
     <p class="muted">${s0?`Start: ${fmtD(s0)}${s0.getFullYear()}. Woche 1 bis ${weeks().length}.`:`Noch kein Startdatum. Lege es unter „Themen & Start“ fest, dann öffnen sich die Wochen automatisch.`}</p></div>
     <div class="score"><div class="panel stat"><b>${cs.length}</b><small>Creator</small></div><div class="panel stat"><b>${pass}</b><small>ab 10 Punkten</small></div><div class="panel stat"><b>${open}</b><small>warten auf Bewertung</small></div></div>${LEGEND}`;
   const groups = {};
@@ -1074,12 +1074,12 @@ function profileView(email){
   ${unlocksBlock(email)}
   ${own && !S.viewAs ? `<button class="btn ghost small" id="logout">${ic("i-out")} Abmelden</button>` : ""}`;
 }
-function moreView(){
+function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
   const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"]];
-  return `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Mehr</h1></div>
-  <div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a></div>`;
+  return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a></div>`;
 }
+function leadStart(){ return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
 
 
 
