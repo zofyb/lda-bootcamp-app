@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), bnav = $("#bnav");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, refs:[], noUpd11:false, gchk:[], gnote:[], noUpd13:false, gOpen:new Set(), impAns:null,
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null, xp:[], bs:[], bsTop:[], goals:[], noUpd9:false, refs:[], noUpd11:false, gchk:[], gnote:[], noUpd13:false, anim:[], noUpd14:false, animOwner:false, gOpen:new Set(), impAns:null,
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -260,6 +260,7 @@ async function refresh(){
   const [xe,bs,gl,bt,rf]=await Promise.all([ sb.from("xp_events").select("*"), sb.from("backstage").select("*"), sb.from("goals").select("*"), sb.rpc("backstage_top",{ m:null }), sb.from("referrals").select("*").order("created_at",{ ascending:false }) ]);
   if (S.me?.role!=="creator"){ const [gc,gn]=await Promise.all([ sb.from("guide_checks").select("*"), sb.from("guide_notes").select("*") ]); S.noUpd13=!!(gc.error||gn.error); S.gchk=gc.data||[]; S.gnote=gn.data||[]; }
   S.noUpd11=!!rf.error; S.refs=rf.data||[];
+  { const [ao,ow]=await Promise.all([ sb.from("anim_orders").select("*").order("created_at",{ ascending:false }), sb.rpc("is_anim_owner") ]); S.noUpd14=!!ao.error; S.anim=ao.data||[]; S.animOwner=!ow.error && ow.data===true && !S.viewAs; }
   S.noUpd9=!!(xe.error||bs.error||gl.error); S.xp=xe.data||[]; S.bs=bs.data||[]; S.goals=gl.data||[]; S.bsTop=bt.error?[]:(bt.data||[]);
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
   if (!S.noUpd7 && S.real?.role==="lead"){ const tk=await sb.from("tasks").select("*").order("created_at"); S.tasks=tk.data||[]; }
@@ -339,10 +340,10 @@ async function verifyCode(){
 
 /* ---------- Rahmen ---------- */
 const ic = (n, cls="") => `<svg class="ico ${cls}" aria-hidden="true"><use href="#${n}"/></svg>`;
-const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit"];
+const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","animadmin"];
 function navItems(){
   const me=S.me;
-  if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
+  if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],["anim","i-spark","Animation"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
   const mine=new Set(myCreators().map(c=>c.email)), open=S.subs.filter(s=>s.points==null && mine.has(s.creator_email)).length;
   if (me.role==="manager") return [["bewerten","i-check","Bewerten",open],["creator","i-people","Creator"],["kalender","i-cal","Kalender"],["akademie","i-learn","Lernen"],["fragen","i-mail","Sag's uns"]];
   return [["uebersicht","i-home","Start"],["bewerten","i-check","Bewerten",open],["kalender","i-cal","Kalender"],...(S.real.role==="lead"?[["fuehrung","i-list","Führung"]]:[]),["mehr","i-grid","Mehr"]];
@@ -382,22 +383,22 @@ function render(keepScroll){
   if (me.role==="creator"){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
-    if (!["start","lernen","kalender","profil"].includes(S.tab)) S.tab="start";
+    if (!["start","lernen","kalender","profil","anim"].includes(S.tab)) S.tab="start";
   } else if (["start","lernen","profil","themen"].includes(S.tab) || (S.tab==="fuehrung" && S.real.role!=="lead") || (S.tab==="mehr" && me.role!=="lead")) S.tab = me.role==="manager"?"bewerten":"uebersicht";
   bnav.innerHTML = navHtml(); bnav.hidden = !!S.openArea || !!(S.qz && !S.qz.done);
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
   if (S.qz && !S.creator) html = quizView();
-  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : ({ lernen:learnView, kalender:calendarView, profil:()=>profileView(me.email) }[S.tab] || startView)();
+  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : ({ lernen:learnView, kalender:calendarView, profil:()=>profileView(me.email), anim:animView }[S.tab] || startView)();
   else if (S.creator) html = creatorDetail(S.creator);
   else if (S.tab==="akademie") html = academyView();
   else if (S.tab==="kalender") html = calendarView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
   else if (S.tab==="mehr") html = moreView();
-  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView }[S.tab] || pendingView)();
+  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView, animadmin:()=>S.animOwner?animAdmin():animView() }[S.tab] || pendingView)();
   view.innerHTML = html;
   if (!keepScroll) window.scrollTo(0,0);
-  afterRender(); fab();
+  afterRender(); watchAni(); fab();
   hydrate().catch(console.error);
 }
 function afterRender(){
@@ -822,7 +823,7 @@ function creatorDetail(email){
 }
 function leadOverview(){
   const cs=creators(), pass=cs.filter(c=>total(c.email)>=10).length, open=S.subs.filter(s=>s.points==null).length, s0=startDate();
-  let h=`<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Bootcamp <em>Übersicht</em></h1>
+  let h=leadDash()+`<div class="stack" style="margin-top:8px"><span class="eyebrow">Bootcamp</span><h1>Bootcamp <em>Übersicht</em></h1>
     <p class="muted">${s0?`Start: ${fmtD(s0)}${s0.getFullYear()}. Woche 1 bis ${weeks().length}.`:`Noch kein Startdatum. Lege es unter „Themen & Start“ fest, dann öffnen sich die Wochen automatisch.`}</p></div>
     <div class="score"><div class="panel stat"><b>${cs.length}</b><small>Creator</small></div><div class="panel stat"><b>${pass}</b><small>ab 10 Punkten</small></div><div class="panel stat"><b>${open}</b><small>warten auf Bewertung</small></div></div>${LEGEND}`;
   const groups = {};
@@ -1035,6 +1036,7 @@ function startView(){
     ${tile("i-cal","Kalender",'data-tab="kalender"',dot(now.length))}
     ${boot?tile("i-gift","Belohnungen",'id="rw-open"',ok?`<i class="dot">!</i>`:`<small class="tl">ab 10 P</small>`):""}
     ${tile("i-user","Profil",'data-tab="profil"')}
+    ${tile("i-spark","Animationen",'data-tab="anim"')}
     <a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>
   </div>
   ${ttStrip(6)}
@@ -1075,12 +1077,135 @@ function profileView(email){
 }
 function moreView(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
-  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"]];
+  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],S.animOwner?["animadmin","i-spark","Animations-Anfragen",aniNew()]:["anim","i-spark","Animationen"]];
   return `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Mehr</h1></div>
   <div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a></div>`;
 }
 
 
+
+/* ---------- Animationen von Zofy: Beispiele, Preise, Anfrage (nur die Verantwortliche sieht alle Anfragen) ---------- */
+const ANI = [
+  ["gs-thankyou","Thank you","gs"],["quer-falke","Falke","q"],["bg-loop","Dornen-Kreis","bg"],["quer-phoenix","Phönix","q"],["gs-levelup","Level Up","gs"],
+  ["quer-nuri","Nuri","q"],["quer-drache","Drache","q"],["gs-x2","x2 im Match","gs"],["quer-loewen","Löwenfamilie","q"],["loop-game","Dornen dunkel","bg"],
+  ["quer-pyramide","Pyramide","q"],["gs-logo","Logo","gs"],["quer-zeus","Zeus","q"],["quer-weltraumkatze","Weltraum-Katze","q"],["quer-gorilla","Gorilla","q"]
+];
+const ANI_KIND = { gs:"Greenscreen", bg:"Loop", q:"Animation" };
+const ANI_PRICES = [
+  ["gs15","Greenscreen, 15 Sek.","71,40","89,25","1 Korrekturrunde"],
+  ["gs20","Greenscreen / Loop, 20 Sek.","107,10","130,90","1 Korrekturrunde"],
+  ["gs30","Greenscreen / Loop, 30 Sek.","142,80","178,50","1 Korrekturrunde"],
+  ["logo60","Logo-Animation / Loop, ca. 1 Min.","184,45","226,10","keine Korrektur"],
+  ["bg3","Hintergrund-Loop, ca. 3 Min.","583,10","725,90","keine Korrektur"]
+];
+const ANI_ST = { neu:["Neu","gold"], angebot:["Rückfrage","gold"], bezahlt:["Bezahlt","ok"], arbeit:["In Arbeit",""], fertig:["Fertig","ok"], abgesagt:["Abgesagt","err"] };
+const aniItem = k => ANI_PRICES.find(p=>p[0]===k)?.[1] || (k==="offen"?"Weiß ich noch nicht":k);
+const aniNew = () => S.animOwner ? S.anim.filter(o=>o.status==="neu").length : 0;
+function aniPhone([f,t,k]){
+  const live = k==="gs" ? `<div class="aui"><span class="anm"><i></i>deinname</span><span class="alive">LIVE</span></div>` : "";
+  return `<figure class="aph"><div class="aphone"><div class="ascr" style="background-image:url(ani/${f}.jpg)"><video data-ani="ani/${f}.mp4" poster="ani/${f}.jpg" muted loop playsinline preload="none"></video>${live}</div></div>
+    <figcaption><small>${ANI_KIND[k]}</small><b>${esc(t)}</b></figcaption></figure>`;
+}
+function animView(){
+  const mine = S.me.role==="creator" ? S.anim.filter(o=>o.creator_email===S.me.email) : [];
+  const can = S.me.role==="creator" && !S.noUpd14;
+  return `<div class="stack"><span class="eyebrow">Von Zofy für dich</span><h1>Deine eigene <em>Animation</em></h1>
+    <p class="muted">Greenscreen-Einblendungen, Logo-Animationen und Hintergrund-Loops für dein Live. Alles individuell für dich gemacht.</p></div>
+    ${can?`<button class="btn" id="an-new">${ic("i-spark")} Animation anfragen</button>`:""}
+    ${mine.length?`<div class="sec"><span>Meine Anfragen</span></div><div class="list">${mine.map(o=>aniRow(o,false)).join("")}</div>`:""}
+    <div class="sec"><span>Beispiele</span></div>
+    <div class="agrid">${ANI.map(aniPhone).join("")}</div>
+    <div class="sec"><span>Preise für Agenturmitglieder</span></div>
+    <div class="aprices">${ANI_PRICES.map(([k,n,p,o,c])=>`<div class="panel aprice"><b>${n}</b><span class="ap">${p} €</span><small><s>${o} €</s> · ${c}</small></div>`).join("")}</div>
+    <p class="muted" style="margin:0">Alle Preise brutto inkl. 19 % MwSt. Der Normalpreis ist durchgestrichen.</p>
+    <div class="achips"><span>${ic("i-palette")} Referenzbild vorab</span><span>${ic("i-play")} erste Version mit Wasserzeichen</span><span>${ic("i-gem")} Bezahlung per Vorkasse</span><span>${ic("i-star")} 10 % Rabatt ab der 3. Animation</span><span>${ic("i-mic")} Sound auf Wunsch (+65,45 € ab 30 Sek.)</span><span>${ic("i-check")} lebenslange Nutzungsrechte</span></div>
+    ${can?`<button class="btn" id="an-new2">${ic("i-spark")} Animation anfragen</button>`:""}`;
+}
+function aniRow(o, admin){
+  const [st,cls]=ANI_ST[o.status]||[o.status,""], c=member(o.creator_email);
+  return `<div class="row"><div class="head"><b>${admin?esc(label(c)||o.creator_email)+" · ":""}${esc(aniItem(o.item))}</b><span class="tag ${cls}">${st}</span></div>
+    <small class="muted">${fmtAgo(o.created_at)}${o.sound?" · mit Sound":""}</small>
+    <p class="feedback">${esc(o.wish)}</p>
+    ${admin?`<div class="actions"><select data-anst="${o.id}" aria-label="Status">${Object.entries(ANI_ST).map(([k,[l]])=>`<option value="${k}" ${o.status===k?"selected":""}>${l}</option>`).join("")}</select></div>
+      <textarea id="anr-${o.id}" placeholder="Antwort an den Creator (nur dieser Creator sieht sie)">${esc(o.reply||"")}</textarea>
+      <div class="actions"><button class="btn small" data-anreply="${o.id}">Antwort speichern</button></div>`
+    : o.reply?`<p class="feedback gold"><b>Zofy:</b> ${esc(o.reply)}</p>`:`<small class="muted">Zofy meldet sich hier bei dir.</small>`}</div>`;
+}
+function animAdmin(){
+  const list=S.anim, open=list.filter(o=>!["fertig","abgesagt"].includes(o.status)), done=list.filter(o=>["fertig","abgesagt"].includes(o.status));
+  return `<div class="stack"><span class="eyebrow">Nur für dich sichtbar</span><h1>Animations-<em>Anfragen</em></h1>
+    <p class="muted">Status setzen und antworten. Der Creator sieht Status und Antwort bei seiner Anfrage.</p></div>
+    ${open.length?`<div class="list">${open.map(o=>aniRow(o,true)).join("")}</div>`:`<div class="panel"><p class="muted">Gerade keine offenen Anfragen.</p></div>`}
+    ${done.length?`<details class="adone"><summary>Erledigt (${done.length})</summary><div class="list">${done.map(o=>aniRow(o,true)).join("")}</div></details>`:""}
+    <button class="btn ghost" data-tab="anim">So sehen Creator den Bereich</button>`;
+}
+function openAniForm(){
+  if (S.viewAs || S.me.preview) return toast("In der Vorschau kann nichts angefragt werden.");
+  sheet(`<div class="sh"><span class="eyebrow">Animation anfragen</span><h2>Was wünschst du dir?</h2></div>
+    <label class="f" for="an-item">Art der Animation<select id="an-item">${ANI_PRICES.map(([k,n,p])=>`<option value="${k}">${n} · ${p} €</option>`).join("")}<option value="offen">Weiß ich noch nicht</option></select></label>
+    <label class="f" for="an-wish">Deine Idee (Motiv, Farben, Text, wofür im Live)<textarea id="an-wish" maxlength="2000" placeholder="Zum Beispiel: Ein Drache mit meinem Namen, wenn jemand eine Galaxy schickt"></textarea></label>
+    <label class="chk"><input type="checkbox" id="an-sound"> Mit Sound</label>
+    <p class="muted" style="margin:0">Zofy antwortet dir hier in der App. Beispielbilder kannst du danach direkt an Zofy schicken.</p>
+    <button class="btn" id="an-send">Anfrage senden</button>`);
+}
+async function aniSend(){
+  const item=$("#an-item").value, wish=$("#an-wish").value.trim(), sound=$("#an-sound").checked;
+  if (!wish) return toast("Bitte beschreib kurz deine Idee.");
+  if (window.__DEMO) { S.anim.unshift({ id:"n"+Date.now(), creator_email:S.me.email, item, wish, sound, status:"neu", created_at:new Date().toISOString() }); closeSheet(); render(true); return toast("Anfrage gesendet (Demo)."); }
+  const { error }=await sb.from("anim_orders").insert({ item, wish, sound }); if (error) return fail(error);
+  closeSheet(); await refresh(); render(true); toast("Anfrage gesendet. Zofy meldet sich bei dir.");
+}
+async function aniStatus(id, status){
+  const { error }=await sb.from("anim_orders").update({ status, updated_at:new Date().toISOString() }).eq("id",id); if (error) return fail(error);
+  const o=S.anim.find(x=>x.id===id); if (o) o.status=status; render(true); toast("Status gespeichert.");
+}
+async function aniReply(id){
+  const reply=$("#anr-"+id).value.trim()||null;
+  const { error }=await sb.from("anim_orders").update({ reply, updated_at:new Date().toISOString() }).eq("id",id); if (error) return fail(error);
+  const o=S.anim.find(x=>x.id===id); if (o) o.reply=reply; toast("Antwort gespeichert.");
+}
+let aniIO=null;
+function watchAni(){
+  aniIO?.disconnect(); const vs=document.querySelectorAll("video[data-ani]"); if (!vs.length) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  aniIO=new IntersectionObserver(es=>es.forEach(x=>{ const v=x.target;
+    if (x.isIntersecting){ if (!v.src) v.src=v.dataset.ani; v.play().catch(()=>{}); } else v.pause(); }),{ threshold:.35 });
+  vs.forEach(v=>aniIO.observe(v));
+}
+
+/* ---------- Leitung: Übersicht mit Monats-Erinnerungen ---------- */
+function monthReminders(){
+  const d=new Date(), day=d.getDate(), last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+  if (!(day>=Math.min(30,last) || day<=2)) return [];
+  const from=new Date(d); if (day<=2) from.setDate(0); from.setDate(Math.min(30,new Date(from.getFullYear(),from.getMonth()+1,0).getDate())); from.setHours(0,0,0,0);
+  const key="ldb-rem-"+isoDay(from), hidden=storeGet(key)||[];
+  const bsDone=S.bs.some(b=>new Date(b.uploaded_at)>=from), roDone=(S.roster||[]).some(r=>new Date(r.added_at)>=from);
+  return [
+    ["bs","Backstage-Export hochladen","Für Top 5, Live-Tage und XP. Backstage > Creator*innen verwalten > Export.","personen",bsDone],
+    ["ro","Zugangsliste aktualisieren","Neue Creator rein, Abgänge raus, Manager zuordnen.","personen",roDone]
+  ].filter(r=>!r[4] && !hidden.includes(r[0])).map(r=>({ id:r[0], t:r[1], s:r[2], tab:r[3], key }));
+}
+function leadDash(){
+  const t=isoDay(new Date()), lead=S.real?.role==="lead";
+  const rem=lead?monthReminders():[];
+  const qn=S.questions.filter(q=>!q.answer && !q.published).length, open=S.subs.filter(s=>s.points==null).length;
+  const rf=S.refs.filter(r=>r.status==="offen").length, drafts=(S.cal||[]).filter(c=>c.status==="draft").length;
+  const regs=allCreators().length, list=(S.roster||[]).length, live=(S.cal||[]).filter(c=>c.status!=="draft" && c.starts<=t && c.ends>=t).length;
+  const tasks=(S.tasks||[]).filter(x=>!x.done_at && x.due && x.due<=isoDay(new Date(Date.now()+3*DAY))).length;
+  const k=(i,n,l,tab,warn)=>`<button class="panel kpi ${warn&&n?"warn":""}" data-tab="${tab}"><span class="kic">${ic(i)}</span><b>${n}</b><small>${l}</small></button>`;
+  return `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Hallo, <em>${esc(firstName(S.real))}</em></h1></div>
+    ${rem.map(r=>`<div class="panel remind"><span class="kic">${ic("i-bell")}</span><div><b>${r.t}</b><small>${r.s}</small></div><div class="actions"><button class="btn small" data-tab="${r.tab}">Jetzt</button><button class="btn small ghost" data-remhide="${r.id}" data-remkey="${r.key}">Erledigt</button></div></div>`).join("")}
+    <div class="kpis">
+      ${k("i-check",open,"warten auf Bewertung","bewerten",1)}
+      ${k("i-mail",qn,"neue Sag's-uns","fragen",1)}
+      ${k("i-rocket",rf,"Recruiting offen","recruit",1)}
+      ${!S.noUpd7?k("i-cal",drafts,"Kampagnen zur Freigabe","kalender",1):""}
+      ${S.animOwner?k("i-spark",aniNew(),"neue Animations-Anfragen","animadmin",1):""}
+      ${lead&&!S.noUpd7?k("i-list",tasks,"Aufgaben fällig (3 Tage)","fuehrung",1):""}
+      ${k("i-people",regs,`registriert${list?" von "+list:""}`,"personen")}
+      ${!S.noUpd7?k("i-fire",live,"Kampagnen laufen","kalender"):""}
+    </div>`;
+}
 
 /* ---------- Level-System: XP, Stufen, Hook des Tages, Impuls der Woche, Backstage, Monatsziel ---------- */
 const LEVELS = [[0,"Newcomer"],[300,"Rookie"],[1000,"Rising Star"],[2500,"Performer"],[5000,"Pro"],[9000,"Elite"],[15000,"Legend"]];
@@ -2118,6 +2243,10 @@ document.addEventListener("click", async e => {
   if (t.dataset.lvsheet) return openLvSheet(t.dataset.lvsheet);
   if (t.dataset.gset) return guideSet(t.dataset.who, t.dataset.gset, t.dataset.gst);
   if (t.id==="inv-open" || t.id==="inv-open2") return openInvite();
+  if (t.id==="an-new" || t.id==="an-new2") return openAniForm();
+  if (t.id==="an-send") return aniSend();
+  if (t.dataset.anreply) return aniReply(t.dataset.anreply);
+  if (t.dataset.remhide){ const k=t.dataset.remkey, l=storeGet(k)||[]; l.push(t.dataset.remhide); storeSet(k,l); return render(true); }
   if (t.id==="inv-share") return shareInvite();
   if (t.id==="inv-copy") return copyInvite();
   if (t.id==="ref-send") return reportRef();
@@ -2217,6 +2346,7 @@ document.addEventListener("change", e => {
   if (e.target.dataset.gnote) return guideNote(e.target.dataset.who, e.target.dataset.gnote, e.target.value);
   if (e.target.dataset.refgun) return refGun(e.target.dataset.refgun, e.target.checked);
   if (e.target.id==="av-file"){ const f=e.target.files[0]; e.target.value=""; return avatarUpload(f); }
+  if (e.target.dataset.anst) return aniStatus(e.target.dataset.anst, e.target.value);
   if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"start":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
   if (e.target.id==="ro-file"){ const f=e.target.files[0]; if(f) f.text().then(tx=>{ $("#ro-text").value=tx; toast("Datei eingelesen. Jetzt „Vorschau“ tippen."); }); return; }
   if (e.target.dataset.snap) return uploadSnap(e.target.dataset.snap, e.target.files[0]);
