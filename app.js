@@ -391,7 +391,7 @@ function render(keepScroll){
   const st = me.role==="creator" && !me.preview ? streakInfo(me.email).cur : 0;
   who.innerHTML = me.role==="creator"
     ? `<button class="chip invchip" id="inv-open" aria-label="Streamer einladen">${ic("i-rocket")}<span>Einladen</span></button>${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}${S.noUpd9?`<button class="avabtn" data-tab="profil" aria-label="Mein Profil">${esc(initialOf(me))}</button>`:`<button class="avabtn rg" data-tab="profil" aria-label="Mein Profil">${lvRing(me.email,46,{badge:false})}</button>`}`
-    : `<button class="chip invchip" id="inv-open" aria-label="Streamer einladen">${ic("i-rocket")}<span>Einladen</span></button><span class="chip">${esc(S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
+    : `<button class="chip invchip" id="share-app" aria-label="App teilen">${ic("i-mail")}<span>App teilen</span></button><span class="chip">${esc(S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
   if (me.role==="creator"){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
@@ -1497,6 +1497,26 @@ async function savePartner(k){
   S.settings["partner_"+k]=v; closeSheet(); render(true); toast("Gespeichert ✓");
 }
 
+/* ---------- App teilen (Leitung + Manager): Link mit Text für Creator verschicken ---------- */
+const APP_URL = () => location.origin + "/";
+const shareText = () => `Hey! Hier ist die LIVEdream Academy, unsere App für dich als Creator der LIVEdream Agency: Lernvideos, Kampagnen-Kalender, 1:1-Termine mit deinem Manager und mehr.
+
+So kommst du rein: Link öffnen, auf „Neu hier? Registrieren“ tippen und Name, TikTok-Name und E-Mail eingeben.
+
+${APP_URL()}`;
+function openShare(){
+  sheet(`<div class="sh"><span class="eyebrow">App teilen</span><h2>Link an Creator schicken</h2></div>
+    <p class="muted" style="margin:0">Creator registrieren sich selbst mit ihrem TikTok-Namen. Reinkommen kann nur, wer auf eurer Liste steht.</p>
+    <label class="f" for="sh-text">Nachricht<textarea id="sh-text" rows="7">${esc(shareText())}</textarea></label>
+    <div class="actions" style="flex-wrap:wrap">
+      ${navigator.share?`<button class="btn small" id="sh-native">${ic("i-rocket")} Teilen</button>`:""}
+      <button class="btn small ${navigator.share?"ghost":""}" id="sh-wa">${ic("i-mail")} WhatsApp</button>
+      <button class="btn small ghost" id="sh-copy">Text kopieren</button>
+      <button class="btn small ghost" id="sh-link">Nur Link kopieren</button>
+    </div>`);
+}
+async function copyTxt(t, msg){ try{ await navigator.clipboard.writeText(t); toast(msg); } catch(e){ toast("Kopieren ging nicht. Bitte den Text markieren und kopieren."); } }
+
 /* ---------- Level-System: XP, Stufen, Hook des Tages, Impuls der Woche, Backstage, Monatsziel ---------- */
 const LEVELS = [[0,"Newcomer"],[300,"Rookie"],[1000,"Rising Star"],[2500,"Performer"],[5000,"Pro"],[9000,"Elite"],[15000,"Legend"]];
 const XP_LABEL = { login:"Reingeschaut", hook:"Hook des Tages", impuls:"Impuls der Woche", iq1:"Impuls-Frage", iq2:"Impuls-Frage", iq3:"Impuls-Frage", camp:"Kampagne gelesen", extra:"Akademie-Inhalt" };
@@ -2597,6 +2617,11 @@ document.addEventListener("click", async e => {
   if (t.dataset.refno) return refDecide(t.dataset.refno,"nein");
   if (t.id==="rf-add") return refAdd();
   if (t.id==="tt-add") return addTikTok();
+  if (t.id==="share-app") return openShare();
+  if (t.id==="sh-copy") return copyTxt($("#sh-text").value, "Text kopiert ✓");
+  if (t.id==="sh-link") return copyTxt(APP_URL(), "Link kopiert ✓");
+  if (t.id==="sh-wa"){ const u="https://wa.me/?text="+encodeURIComponent($("#sh-text").value); window.open(u,"_blank","noopener") || (location.href=u); return; }
+  if (t.id==="sh-native"){ navigator.share({ title:"LIVEdream Academy", text:$("#sh-text").value }).catch(()=>{}); return; }
   if (t.dataset.partner) return openPartner(t.dataset.partner);
   if (t.id==="pt-save") return savePartner(t.dataset.pk);
   if (t.dataset.ttdel) return ttDelete(t.dataset.ttdel);
