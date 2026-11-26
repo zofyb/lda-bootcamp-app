@@ -809,3 +809,8 @@ div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;
 .sghost{opacity:.35}
 .schosen{box-shadow:0 0 0 2px var(--rose);border-radius:14px}
 .wkh small.muted{font-size:11px;letter-spacing:0;text-transform:none}
+/* Fenster: X-Knopf immer oben, kein zweiter Rahmen im Fenster */
+.sheet .x{z-index:5}
+.sheet .panel{background:none;border:0;box-shadow:none;padding:0}
+.sheet .panel::before,.sheet .panel::after{content:none}
+.sheet>.panel:first-of-type .sh,.sheet .panel .sh{padding-right:44px}
