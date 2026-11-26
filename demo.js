@@ -101,7 +101,7 @@ db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootc
   db.match_posts=[
     {id:"mp1", author_email:"c3@demo", handle:"jenny.mama", live_at:hAgo(0.5), rules:"Best of 3, wer verliert, singt ein Lied", note:"Bin gerade live, komm rein!", created_at:hAgo(1)},
     {id:"mp2", author_email:"c5@demo", handle:"sofia.sings", live_at:hIn(3), rules:"5 Runden, Verlierer macht eine Strafe", note:null, created_at:hAgo(2)},
-    {id:"mp3", author_email:"c2@demo", handle:"gamer_kevin", live_at:(()=>{ const x=new Date(); x.setHours(20,0,0,0); return x.toISOString(); })(), days:[1,2,3,4,5], until:new Date(Date.now()+20*864e5).toISOString(), rules:"Ganz entspannt, 3 Runden", note:"Ich bin neu und freue mich über jede Runde", created_at:hAgo(5)}];
+    {id:"mp3", author_email:"c2@demo", handle:"gamer_kevin", live_at:(()=>{ const x=new Date(); x.setHours(20,0,0,0); return x.toISOString(); })(), days:[1,2,3,4,5], until:new Date(Date.now()+5*864e5).toISOString(), rules:"Ganz entspannt, 3 Runden", note:"Ich bin neu und freue mich über jede Runde", created_at:hAgo(5)}];
   db.match_likes=[{post_id:"mp2", email:"c1@demo", handle:"luna.live", created_at:hAgo(1)},{post_id:"mp2", email:"c4@demo", handle:"tim.talks", created_at:hAgo(0.5)},{post_id:"mp1", email:"c5@demo", handle:"sofia.sings", created_at:hAgo(0.6)}];
   db.wins=[
     {id:"w1", author_email:"c1@demo", handle:"luna.live", body:"Zum ersten Mal über 10.000 Diamanten in einem Live! 💜", path:"demo-w1", created_at:hAgo(3)},

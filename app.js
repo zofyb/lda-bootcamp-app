@@ -2586,7 +2586,7 @@ const whoOf = (h,email) => { const m=S.members.find(x=>x.email===email), hh=clea
 const whoLink = (h,email,cls="") => { const m=S.members.find(x=>x.email===email), hh=cleanH(h||m?.handle);
   return hh ? `<a class="${cls}" href="https://www.tiktok.com/@${encodeURIComponent(hh)}" target="_blank" rel="noopener">@${esc(hh)}</a>` : `<span class="${cls}">${esc(whoOf(h,email))}</span>`; };
 const WDS = ["Mo","Di","Mi","Do","Fr","Sa","So"];
-const mpUntil = p => p.until ? +new Date(p.until) : +new Date(p.live_at)+(p.days?.length?28*DAY:3*36e5);
+const mpUntil = p => p.until ? +new Date(p.until) : +new Date(p.live_at)+(p.days?.length?7*DAY:3*36e5);
 function nextAt(p){
   const base=new Date(p.live_at); if (!p.days?.length) return base;
   const start=new Date(base); start.setHours(0,0,0,0);
@@ -2618,7 +2618,7 @@ function matchView(){
       <h2>Neues Inserat</h2>
       <div class="two"><label class="f" for="mp-day">Tag<input id="mp-day" type="date" value="${isoDay(def)}" min="${isoDay(now)}" max="${isoDay(new Date(Date.now()+13*DAY))}"></label>
       <label class="f" for="mp-time">Uhrzeit<input id="mp-time" type="time" value="${pad(def.getHours())}:00"></label></div>
-      <div class="f"><span>Jede Woche wiederholen? (optional)</span><div class="mdays">${WDS.map((w,i)=>`<button type="button" class="chip" data-mpday="${i+1}">${w}</button>`).join("")}</div><small class="muted">Wähle die Tage, an denen du immer zur gleichen Uhrzeit live bist. Das Inserat läuft dann 4 Wochen.</small></div>
+      <div class="f"><span>Jede Woche wiederholen? (optional)</span><div class="mdays">${WDS.map((w,i)=>`<button type="button" class="chip" data-mpday="${i+1}">${w}</button>`).join("")}</div><small class="muted">Wähle die Tage, an denen du immer zur gleichen Uhrzeit live bist. Das Inserat läuft dann 1 Woche.</small></div>
       <label class="f" for="mp-rules">Regeln<input id="mp-rules" type="text" maxlength="200" placeholder="z. B. 3 Runden, wer verliert, macht eine Strafe"></label>
       <label class="f" for="mp-note">Noch was? (optional)<input id="mp-note" type="text" maxlength="300" placeholder="z. B. Ich bin neu und freue mich über jede Runde"></label>
       <div class="btns"><button class="btn small" id="mp-add">Veröffentlichen</button><button class="btn ghost small" id="mp-cancel">Abbrechen</button></div></div>`
@@ -2649,7 +2649,7 @@ async function mpAdd(){
   if (!rules) return toast("Schreib kurz deine Regeln dazu.");
   const days=[...document.querySelectorAll("[data-mpday].on")].map(b=>+b.dataset.mpday);
   $("#mp-add").disabled=true;
-  const r=await sb.from("match_posts").insert({ author_email:S.me.email, handle:S.me.handle||null, name:S.me.name, live_at:at.toISOString(), days:days.length?days:null, until:new Date(+at+(days.length?28*DAY:3*36e5)).toISOString(), rules, note:note||null });
+  const r=await sb.from("match_posts").insert({ author_email:S.me.email, handle:S.me.handle||null, name:S.me.name, live_at:at.toISOString(), days:days.length?days:null, until:new Date(+at+(days.length?7*DAY:3*36e5)).toISOString(), rules, note:note||null });
   if (r.error){ $("#mp-add").disabled=false; return /3 offene/.test(r.error.message)?toast("Du hast schon 3 offene Inserate."):fail(r.error); }
   S.mpForm=false; await refresh(); render(true); toast("Inserat ist online.");
 }

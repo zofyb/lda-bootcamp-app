@@ -1,6 +1,6 @@
 -- Update 16: Match-Börse und Erfolge-Wand
 -- Match-Börse: Creator inserieren, wann sie live sind und Lust auf Matches haben; andere tippen "Bin dabei".
--- Einmalig: verschwindet 3 Stunden nach Start. Wiederkehrend (Wochentage): läuft 4 Wochen oder bis zum Löschen.
+-- Einmalig: verschwindet 3 Stunden nach Start. Wiederkehrend (Wochentage): läuft 1 Woche oder bis zum Löschen.
 -- Erfolge-Wand: Creator teilen einen Erfolg (Screenshot + kurzer Text), andere reagieren mit Emojis.
 -- Alle in der App sehen alles; löschen dürfen nur die Verfasser und die Leitung.
 -- In Supabase: SQL Editor > New query > alles einfügen > Run
@@ -51,7 +51,7 @@ begin
   if TG_TABLE_NAME = 'match_posts' then
     if new.live_at < now() - interval '1 hour' or new.live_at > now() + interval '14 days' then raise exception 'Zeitpunkt nicht möglich'; end if;
     if new.days = '{}' then new.days := null; end if;
-    new.until := new.live_at + case when new.days is null then interval '3 hours' else interval '28 days' end;
+    new.until := new.live_at + case when new.days is null then interval '3 hours' else interval '7 days' end;
     if (select count(*) from public.match_posts where author_email = me and until > now()) >= 3 then raise exception 'Höchstens 3 offene Inserate'; end if;
   elsif TG_TABLE_NAME = 'wins' then
     if new.path is not null and new.path not like me || '/%' then raise exception 'ungültiger Pfad'; end if;
