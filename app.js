@@ -1068,6 +1068,7 @@ function startView(){
   checkLevelUp(e);
   const hk=hookToday(), im=impulsNow(), hkDone=S.xp.some(x=>x.creator_email===e&&x.kind==="hook"&&x.ref===todayKey()), imDone=S.xp.some(x=>x.creator_email===e&&x.kind==="impuls"&&x.ref===weekKey());
   return `<div class="hi"><h1>${hello}, <em>${esc(firstName(me))}</em></h1><div class="hirow">${mt?`<button class="title" data-qzshow="${main.quiz}" data-who="${esc(e)}"><i>${ic(TYPE_IC[mt.key]||"i-star")}</i>${esc(mt.name)}</button>`:""}</div></div>
+  ${remindRows(myReminders())}
   ${S.noUpd9?"":lvHero(e,true)}
   ${inviteBar()}
   ${nextCard(e)}
@@ -1214,14 +1215,14 @@ function monthReminders(){
 }
 function leadDash(){
   const t=isoDay(new Date()), lead=S.real?.role==="lead";
-  const rem=lead?monthReminders():[];
+  const rem=[...myReminders(), ...(lead?monthReminders():[])];
   const qn=S.questions.filter(q=>!q.answer && !q.published).length, open=S.subs.filter(s=>s.points==null).length;
   const rf=S.refs.filter(r=>r.status==="offen").length, drafts=(S.cal||[]).filter(c=>c.status==="draft").length;
   const regs=allCreators().length, list=(S.roster||[]).length, live=(S.cal||[]).filter(c=>c.status!=="draft" && c.starts<=t && c.ends>=t).length;
   const tasks=(S.tasks||[]).filter(x=>!x.done_at && x.due && x.due<=isoDay(new Date(Date.now()+3*DAY))).length;
   const k=(i,n,l,tab,warn)=>`<button class="kpi ${warn&&n?"warn":""}" data-tab="${tab}"><span class="kring"><b>${n}</b><i>${ic(i)}</i></span><small>${l}</small></button>`;
   return `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Hallo, <em>${esc(firstName(S.real))}</em></h1></div>
-    ${rem.map(r=>`<div class="remind"><span class="kic">${ic("i-bell")}</span><div><b>${r.t}</b><small>${r.s}</small></div><button class="rgo" data-tab="${r.tab}" aria-label="Jetzt erledigen">${ic("i-chev")}</button><button class="rx" data-remhide="${r.id}" data-remkey="${r.key}" aria-label="Als erledigt ausblenden">${ic("i-check")}</button></div>`).join("")}
+    ${remindRows(rem)}
     <div class="kpis">
       ${k("i-check",open,"Bewerten","bewerten",1)}
       ${k("i-mail",qn,"Sag's uns","fragen",1)}
@@ -1399,6 +1400,27 @@ async function freeBooking(id){
   if (S.confirmDelete!=="bf"+id){ S.confirmDelete="bf"+id; return render(true); }
   S.confirmDelete=null; const r=await sb.from("bookings").delete().eq("id",id); if (r.error) return fail(r.error);
   toast("Abgesagt. Sag dem Creator bitte kurz Bescheid."); await refresh(); render(true);
+}
+
+/* Erinnerungen: 1:1-Termine, eigene Kampagnen und Termine/Meetings heute und morgen (nicht TikTok-Kampagnen) */
+function myReminders(){
+  if (!S.me || S.me.preview) return [];
+  const t=isoDay(new Date()), tm=isoDay(new Date(Date.now()+DAY)), when=d=>d===t?"Heute":"Morgen", out=[], me=S.me;
+  const hidden=storeGet("ldb-crem-"+me.email)||[];
+  if (!S.noUpd14){
+    const bks = me.role==="creator" ? [myBooking()].filter(Boolean) : upBk().filter(b=>b.owner_email===me.email);
+    bks.filter(b=>[t,tm].includes(isoDay(bkAt(b)))).forEach(b=>{ const o=member(me.role==="creator"?b.owner_email:b.creator_email);
+      out.push({ id:"bk"+b.id, t:`${when(isoDay(bkAt(b)))}, ${fmtTime(bkAt(b))} Uhr: 1:1 mit ${esc(o?(me.role==="creator"?firstName(o):label(o)):"")}`, s:esc(b.how)+(me.role!=="creator"&&b.topic?" · „"+esc(b.topic)+"“":""), go:`data-tab="termine"` }); });
+  }
+  if (!S.noUpd7){
+    const items = me.role==="creator" ? calItems("all") : (S.cal||[]).filter(c=>!isDraft(c) && (c.audience==="all" || S.real?.role==="lead"));
+    items.filter(c=>c.kind!=="tiktok" && (c.starts===t || c.starts===tm)).forEach(c=>
+      out.push({ id:"cal"+c.id, t:`${when(c.starts)}${c.at_time?", "+esc(c.at_time)+" Uhr":""}: ${esc(c.title)}`, s:c.kind==="termin"?(c.audience==="lead"?"Termin der Leitung":"Termin"):"LIVEdream-Kampagne startet", go:`data-cal="${esc(c.id)}"` }));
+  }
+  return out.filter(x=>!hidden.includes(x.id)).map(x=>({ ...x, key:"ldb-crem-"+me.email }));
+}
+function remindRows(list){
+  return list.map(r=>`<div class="remind">${`<span class="kic">${ic(r.go?.includes("termine")?"i-clock":"i-bell")}</span>`}<div><b>${r.t}</b><small>${r.s}</small></div><button class="rgo" ${r.go||`data-tab="${r.tab}"`} aria-label="Öffnen">${ic("i-chev")}</button><button class="rx" data-remhide="${r.id}" data-remkey="${r.key}" aria-label="Ausblenden">${ic("i-check")}</button></div>`).join("");
 }
 
 /* ---------- Level-System: XP, Stufen, Hook des Tages, Impuls der Woche, Backstage, Monatsziel ---------- */
@@ -2063,10 +2085,10 @@ function calForm(scope){
     ${!e&&!termin?`<label class="f" for="cf-paste">Nachricht aus Lark einfügen (optional)<textarea id="cf-paste" placeholder="Einfach die ganze Nachricht hier reinkopieren. Titel, Daten und Link werden erkannt."></textarea></label>
     <button class="btn small ghost" id="cf-parse">Erkennen</button>`:""}
     <div class="grid2"><label class="f" for="cf-title">Titel<input id="cf-title" type="text" maxlength="200" value="${esc(d.title||"")}"></label>
-    <label class="f" for="cf-kind">Art<select id="cf-kind">${(termin?["termin","tiktok","livedream"]:["tiktok","livedream"]).map(k=>`<option value="${k}" ${(d.kind||(termin?"termin":"tiktok"))===k?"selected":""}>${KIND[k]}</option>`).join("")}</select></label>
+    <label class="f" for="cf-kind">Art<select id="cf-kind">${(termin?["termin","tiktok","livedream"]:["tiktok","livedream","termin"]).map(k=>`<option value="${k}" ${(d.kind||(termin?"termin":"tiktok"))===k?"selected":""}>${KIND[k]}</option>`).join("")}</select></label>
     <label class="f" for="cf-start">Von<input id="cf-start" type="date" value="${esc(d.starts||"")}"></label>
     <label class="f" for="cf-end">Bis<input id="cf-end" type="date" value="${esc(d.ends||"")}"></label>
-    ${termin?`<label class="f" for="cf-time">Uhrzeit (optional)<input id="cf-time" type="text" placeholder="z. B. 14:00" value="${esc(d.at_time||"")}"></label>`:""}
+    ${true?`<label class="f" for="cf-time">Uhrzeit (optional)<input id="cf-time" type="text" placeholder="z. B. 14:00" value="${esc(d.at_time||"")}"></label>`:""}
     <label class="f" for="cf-link">Link (optional)<input id="cf-link" type="url" value="${esc(d.link||"")}"></label></div>
     <label class="f" for="cf-body">Infos${termin?"":" für die Creator"}<textarea id="cf-body" maxlength="8000">${esc(d.body||"")}</textarea></label>
     <label class="f" for="cf-img">Bild (optional)${e?.image?" · ein Bild ist schon da":""}<input id="cf-img" type="file" accept="image/*"></label>

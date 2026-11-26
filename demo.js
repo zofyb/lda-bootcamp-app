@@ -57,6 +57,7 @@ const db = {
     {id:"k1", audience:"all", kind:"tiktok", title:"Winter-Glow Challenge", starts:dd(-3), ends:dd(10), body:"Geh in der Zeit mindestens 5x live und sammle Winter-Geschenke.\nDie Top 50 bekommen ein Profil-Abzeichen und Extra-Reichweite.", link:"https://www.tiktok.com"},
     {id:"k2", audience:"all", kind:"livedream", title:"LIVEdream Adventskalender", starts:dd(4), ends:dd(27), body:"Jeden Tag ein Türchen im Live öffnen. Wer an 10 Tagen dabei ist, bekommt einen Platz im Agentur-Special."},
     {id:"k3", audience:"all", kind:"tiktok", title:"Duett-Battle-Woche", starts:dd(12), ends:dd(18), body:"Matches mit Creatorn aus anderen Agenturen. Gewinner bekommen ein Banner auf der LIVE-Startseite."},
+    {id:"k5", audience:"all", kind:"termin", title:"Creator-Meeting: Dezember-Planung", starts:dd(1), ends:dd(1), at_time:"19:00", body:"Wir besprechen die Aktionen im Dezember. Link kommt per WhatsApp.", link:""},
     {id:"k4", audience:"all", kind:"tiktok", title:"Herbst-Talente", starts:dd(-30), ends:dd(-12), body:"Vorbei."},
     {id:"k6", audience:"all", kind:"tiktok", status:"draft", source:"lark", title:"Gift Gallery Dezember", starts:dd(6), ends:dd(13), created_at:iso(now), body:"Gift Gallery Dezember\nZeitraum: aus der Lark-Nachricht erkannt\nSammle die neuen Galerie-Geschenke und schalte das Dezember-Abzeichen frei.", link:"https://www.tiktok.com/live"},
     {id:"k5", audience:"lead", kind:"termin", title:"Manager-Meeting", starts:dd(2), ends:dd(2), at_time:"19:00", body:"Wochenrückblick und Planung Dezember."}
@@ -94,6 +95,7 @@ db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootc
   db.bookings=[
     {id:"bk1", owner_email:"lena@demo", creator_email:"c2@demo", starts_at:nextDow(1,11,30), minutes:30, how:"WhatsApp-Anruf", topic:"Meine Lives laufen gerade schlecht, ich brauche Ideen."},
     {id:"bk2", owner_email:"demo@demo", creator_email:"c5@demo", starts_at:nextDow(3,18), minutes:30, how:"WhatsApp-Anruf", topic:"Wie komme ich in die Top 5?"},
+    {id:"bk4", owner_email:"lena@demo", creator_email:"c1@demo", starts_at:(()=>{ const x=new Date(); x.setDate(x.getDate()+1); x.setHours(18,0,0,0); return x.toISOString(); })(), minutes:30, how:"WhatsApp-Anruf", topic:"Fragen zum Adventskalender"},
     {id:"bk3", owner_email:"max@demo", creator_email:"c3@demo", starts_at:nextDow(2,19,30), minutes:30, how:"WhatsApp-Anruf", topic:"Kampagne im Dezember"}];
 }
 const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"], goals:["creator_email","month"], referrals:["recruit_handle"], guide_checks:["creator_email","item"], guide_notes:["creator_email","chapter"] };
