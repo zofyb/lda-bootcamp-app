@@ -52,7 +52,7 @@ async function reply(chatId: string, text: string) {
 
 // ---------- Inhalt einer Nachricht lesen ----------
 type Msg = { message_id: string; msg_type?: string; message_type?: string; content?: string; body?: { content: string } };
-type Got = { text: string[]; images: { msg: string; key: string }[] };
+type Got = { text: string[]; images: { msg: string; key: string }[]; trace: string[]; raw?: string };
 
 function readOne(m: Msg, got: Got) {
   const type = m.msg_type || m.message_type || "";
@@ -76,11 +76,14 @@ function readOne(m: Msg, got: Got) {
     }
     got.text.push(lines.join("\n"));
   } else if (type === "interactive") {
+    got.raw = String(m.content ?? m.body?.content ?? "").slice(0, 400);
     // Karten-Nachricht: alle Texte und Links einsammeln
     const seen = new Set<string>(), out: string[] = [];
     const walk = (v: any, k = "") => {
       if (typeof v === "string") {
         const s = v.trim();
+        // Lark packt die Karte manchmal als JSON-Text in ein Feld (z. B. json_card)
+        if ((s.startsWith("{") || s.startsWith("[")) && s.length > 20) { try { return walk(JSON.parse(s), k); } catch (_) { /* kein JSON */ } }
         if (s && (["content", "text", "title", "url", "href", "default_url"].includes(k)) && !seen.has(s)) { seen.add(s); out.push(s); }
       } else if (Array.isArray(v)) v.forEach((x) => walk(x, k));
       else if (v && typeof v === "object") {
@@ -91,17 +94,26 @@ function readOne(m: Msg, got: Got) {
     };
     walk(c);
     got.text.push(out.join("\n"));
-  }
+  } else got.trace.push(`(nicht lesbar: ${type})`);
 }
 
 async function readMessage(ev: any): Promise<Got> {
-  const m = ev.message, got: Got = { text: [], images: [] };
-  if (m.message_type === "merge_forward") {
-    // Mehrere weitergeleitete Nachrichten: Unter-Nachrichten über die API holen
-    const r = await lark(`/im/v1/messages/${m.message_id}`);
-    const j = await r.json();
-    for (const it of j?.data?.items || []) if (it.message_id !== m.message_id) readOne(it, got);
-  } else readOne(m, got);
+  const got: Got = { text: [], images: [], trace: [] };
+  const seen = new Set<string>();
+  // Weitergeleitete Nachrichten (auch mehrfach weitergeleitet): Unter-Nachrichten über die API holen
+  const walk = async (m: Msg, depth: number) => {
+    const type = m.msg_type || m.message_type || "?";
+    if (type !== "merge_forward") { got.trace.push(type); return readOne(m, got); }
+    if (depth > 3 || seen.has(m.message_id)) return;
+    seen.add(m.message_id);
+    const r = await lark(`/im/v1/messages/${m.message_id}?card_msg_content_type=raw_card_content`);
+    const j = await r.json().catch(() => ({}));
+    if (j.code) { got.trace.push(`Fehler ${j.code} ${String(j.msg || "").slice(0, 60)}`); return; }
+    const items = (j?.data?.items || []).filter((it: any) => it.message_id !== m.message_id);
+    got.trace.push(`weitergeleitet (${items.length})`);
+    for (const it of items) await walk(it, depth + 1);
+  };
+  await walk(ev.message, 0);
   got.text = got.text.map((t) => t.trim()).filter(Boolean);
   return got;
 }
@@ -118,7 +130,9 @@ function parse(text: string) {
   const link = t.match(/https?:\/\/[^\s)\]>]+/); if (link) out.link = link[0];
   const lines = t.split(/\n/).map((l) => l.replace(/[*#_`【】\[\]]/g, "").replace(/^[^\p{L}\p{N}]+/u, "").trim())
     .filter((l) => l && !/^https?:/.test(l) && !/^merged and forwarded/i.test(l));
-  out.title = (lines[0] || "Kampagne aus Lark").replace(/\s*[:：]\s*$/, "").slice(0, 120);
+  // Begrüßungen und Datumszeilen überspringen (z. B. "Hi! Es gibt eine neue Kampagne!")
+  const skip = /^(hi|hallo|hey|liebe|hello)\b|neue kampagne|new campaign|^(start|end)datum|^zeitraum|^für wen|^from\b/i;
+  out.title = (lines.find((l) => !skip.test(l) && l.length > 2) || lines[0] || "Kampagne aus Lark").replace(/\s*[:：]\s*$/, "").slice(0, 120);
   const now = berlinToday(), ds: Date[] = [];
   const add = (y: number, m: number, d: number) => {
     if (m < 0 || m > 11 || d < 1 || d > 31) return;
@@ -127,7 +141,7 @@ function parse(text: string) {
     if (!y && dt < new Date(now.getFullYear(), now.getMonth() - 2, 1)) dt = new Date(yy + 1, m, d);
     ds.push(dt);
   };
-  const rx = /(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\.\s?(\d{1,2})\.(\d{2,4})?|(\d{1,2})\.?\s+([A-Za-zÄÖÜäöü]{3,9})\.?(?:\s+(\d{4}))?|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?|(\d{4})\/(\d{1,2})\/(\d{1,2})/g;
+  const rx = /(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\.\s?(\d{1,2})\.(\d{2,4})?|(\d{1,2})\.?\s+([A-Za-zÄÖÜäöü]{3,9})\.?(?:\s+(\d{4}))?|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?!\d)(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?|(\d{4})\/(\d{1,2})\/(\d{1,2})|(\d{1,2})\/(\d{1,2})\/(\d{4})/g;
   let mm: RegExpExecArray | null;
   while ((mm = rx.exec(t))) {
     if (mm[1]) add(+mm[1], +mm[2] - 1, +mm[3]);
@@ -135,6 +149,7 @@ function parse(text: string) {
     else if (mm[7]) { const k = MONTH[mm[8].toLowerCase()]; if (k !== undefined) add(mm[9] ? +mm[9] : 0, k, +mm[7]); }
     else if (mm[10]) { const k = MONTH[mm[10].toLowerCase()]; if (k !== undefined) add(mm[12] ? +mm[12] : 0, k, +mm[11]); }
     else if (mm[13]) add(+mm[13], +mm[14] - 1, +mm[15]);
+    else if (mm[16]) add(+mm[18], +mm[17] - 1, +mm[16]);
   }
   out.dated = ds.length > 0;
   if (ds.length) { ds.sort((a, b) => +a - +b); out.starts = iso(ds[0]); out.ends = iso(ds[ds.length - 1]); }
@@ -151,15 +166,17 @@ async function db(path: string, init: RequestInit = {}) {
 }
 async function saveImage(img: { msg: string; key: string }, name: string) {
   const r = await lark(`/im/v1/messages/${img.msg}/resources/${img.key}?type=image`);
-  if (!r.ok) return null;
+  if (!r.ok) { imgErr = `Bild ${r.status} ${(await r.text()).slice(0, 80)}`; return null; }
   const type = r.headers.get("content-type") || "image/jpeg";
   const ext = type.includes("png") ? "png" : type.includes("webp") ? "webp" : type.includes("gif") ? "gif" : "jpg";
   const path = `kalender-lark-${name}.${ext}`;
   const up = await fetch(`${SB}/storage/v1/object/${BUCKET}/${path}`, {
     method: "POST", headers: { apikey: SBKEY, authorization: `Bearer ${SBKEY}`, "content-type": type, "x-upsert": "true" }, body: await r.arrayBuffer(),
   });
-  return up.ok ? path : null;
+  if (!up.ok) { imgErr = `Bild-Upload ${up.status} ${(await up.text()).slice(0, 80)}`; return null; }
+  return path;
 }
+let imgErr = "";
 const safe = (s: string) => s.replace(/[^\w-]+/g, "_").slice(-60);
 
 async function handle(ev: any) {
@@ -169,7 +186,7 @@ async function handle(ev: any) {
 
   // Nur ein Bild: an den jüngsten Lark-Entwurf ohne Bild (letzte 15 Minuten) hängen
   if (!got.text.length) {
-    if (!got.images.length) return;
+    if (!got.images.length) return reply(chat, `⚠️ Kein Text gefunden. Gelesen: ${got.trace.join(", ") || "nichts"}` + (got.raw ? `\nRohdaten: ${got.raw}` : ""));
     const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
     const r = await db(`calendar?select=id,title&source=eq.lark&status=eq.draft&image=is.null&created_at=gte.${since}&order=created_at.desc&limit=1`);
     const last = (await r.json())?.[0];
@@ -182,7 +199,9 @@ async function handle(ev: any) {
   const p = parse(got.text.join("\n\n"));
   const row: any = { audience: "all", kind: p.kind, title: p.title, starts: p.starts, ends: p.ends, body: p.body, link: p.link || null,
     status: "draft", source: "lark", lark_msg_id: m.message_id, created_by: "Lark-Bot" };
+  imgErr = "";
   if (got.images.length) row.image = await saveImage(got.images[0], safe(m.message_id));
+  if (imgErr) got.trace.push(imgErr.includes("234043") ? "Bild aus Karte nicht ladbar, Bild bitte einzeln hinterherschicken" : imgErr);
   const r = await db(`calendar?on_conflict=lark_msg_id`, {
     method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify(row),
   });
@@ -191,7 +210,8 @@ async function handle(ev: any) {
   if (!saved?.length) return; // schon verarbeitet (Lark schickt manchmal doppelt)
   const d = (s: string) => s.split("-").reverse().join(".");
   await reply(chat, `✅ Entwurf angelegt: „${p.title}“ · ${p.starts === p.ends ? d(p.starts) : `${d(p.starts)} bis ${d(p.ends)}`}` +
-    (p.dated ? "" : " (kein Datum erkannt, bitte prüfen)") + "\nIn der App unter Kalender > Neu aus Lark prüfen und freigeben.");
+    (p.dated ? "" : " (kein Datum erkannt, bitte prüfen)") + (row.image ? " · mit Bild" : "") + "\nIn der App unter Kalender > Neu aus Lark prüfen und freigeben." +
+    `\n(Gelesen: ${got.trace.join(", ")})` + (!p.dated && got.raw ? `\nRohdaten: ${got.raw}` : ""));
 }
 
 // ---------- Eingang ----------
