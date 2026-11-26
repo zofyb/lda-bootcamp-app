@@ -47,6 +47,7 @@ const db = {
     {id:"q1", body:"Wie oft sollte ich pro Woche live gehen?", created_at:iso(now-3*D), published:true, answer:"Empfehlung: mindestens 3 Lives pro Woche, die du sicher schaffst."},
     {id:"q2", body:"Was mache ich, wenn jemand im Live nur stänkert?", created_at:iso(now-D), published:false}
   ],
+  quiz_results: [{creator_email:"c1@demo", quiz:"streamer", result:"community"},{creator_email:"c1@demo", quiz:"nische", result:"alltag"},{creator_email:"c2@demo", quiz:"streamer", result:"gamer"}],
   calendar: [
     {id:"k1", audience:"all", kind:"tiktok", title:"Winter-Glow Challenge", starts:dd(-3), ends:dd(10), body:"Geh in der Zeit mindestens 5x live und sammle Winter-Geschenke.\nDie Top 50 bekommen ein Profil-Abzeichen und Extra-Reichweite.", link:"https://www.tiktok.com"},
     {id:"k2", audience:"all", kind:"livedream", title:"LIVEdream Adventskalender", starts:dd(4), ends:dd(27), body:"Jeden Tag ein Türchen im Live öffnen. Wer an 10 Tagen dabei ist, bekommt einen Platz im Agentur-Special."},
@@ -63,7 +64,7 @@ const db = {
   survey: [{creator_email:"c5@demo", rating:5, helped:2, missing:"Mehr Beispiele für Hooks", wish:"Schulung zu Events", created_at:iso(now-D)}]
 };
 db.members.forEach(m=>{ if(m.role==="creator" && m.bootcamp===undefined) m.bootcamp=true; });
-const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"] };
+const keys = { roster:["handle"], progress:["creator_email","area"], activity:["creator_email","day"], settings:["key"], snapshots:["creator_email","kind"], quiz_results:["creator_email","quiz"] };
 function q(t){
   let rows = db[t] || (db[t]=[]), op = null, payload = null; const flt = [];
   const o = {

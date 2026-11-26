@@ -1,0 +1,88 @@
+/* LIVEdream Academy – Persönlichkeits-Quizze (Inhalt). Jede Antwort zählt für einen Ergebnis-Typ (Index in "types"). */
+window.LDA_QUIZZES = [
+{
+  id: "streamer",
+  title: "Welcher Streamer-Typ bist du?",
+  teaser: "8 Fragen, 2 Minuten. Danach weißt du, welche Live-Mechaniken zu dir passen.",
+  icon: "🎙️",
+  types: [
+    { key:"matcher", emoji:"⚔️", name:"Der Matcher", short:"Du lebst für den Wettkampf.",
+      text:"Du willst gewinnen und reißt deine Zuschauer mit. Wenn es spannend wird, bist du in deinem Element. Deine Community kämpft mit dir, nicht nur für dich.",
+      mech:["Matches (PK-Battles) mit anderen Creatorn","Live-Ziele mit Countdown","Team-Battles mit Creatorn aus der Agentur","Beschützer-Funktion für deine treuesten Unterstützer"],
+      tip:"Erklär vor jedem Match kurz das Ziel und bedank dich danach bei allen mit Namen, auch wenn ihr verliert." },
+    { key:"community", emoji:"💜", name:"Der Community-Typ", short:"Bei dir fühlen sich alle zu Hause.",
+      text:"Du bist nah dran an deinen Leuten, kennst Namen und Geschichten. Dein Live ist wie ein Wohnzimmer, in das man gerne zurückkommt.",
+      mech:["Fragerunden und Talk-Themen","Multi-Guest mit Zuschauern","Gemeinsame Live-Ziele für die Community","Superfan-Abo mit kleinen Extras"],
+      tip:"Begrüß jeden neuen Zuschauer mit Namen und stell eine offene Frage. So bleiben die Leute länger." },
+    { key:"entertainer", emoji:"🎭", name:"Der Entertainer", short:"Du bist die Show.",
+      text:"Bei dir ist immer was los. Du bringst Leute zum Lachen, hast spontane Ideen und machst aus jedem Live ein Erlebnis.",
+      mech:["Challenges: Geschenk = Aufgabe","Glücksrad und Abstimmungen","Spiele mit den Zuschauern","Themen-Lives mit Verkleidung oder Motto"],
+      tip:"Plan jedes Live um einen Höhepunkt herum und kündige ihn am Anfang an. Dann bleiben die Leute dran." },
+    { key:"gamer", emoji:"🎮", name:"Der Gamer", short:"Dein Spielfeld ist das Game.",
+      text:"Du zockst gern und gut und lässt andere daran teilhaben. Deine Zuschauer feiern deine Skills und wollen mitfiebern.",
+      mech:["Gaming-Lives (Handy oder PC)","Zuschauer spielen mit oder entscheiden mit","Live-Ziele für Level, Siege oder Rekorde","Overlay mit Zielen und Danksagungen"],
+      tip:"Sprich beim Spielen laut mit, was du denkst. Stille Gaming-Lives verlieren Zuschauer." },
+    { key:"talent", emoji:"🎨", name:"Das Talent", short:"Du zeigst, was du kannst.",
+      text:"Singen, Malen, Kochen, Tanzen: Du hast ein Können, das Leute staunen lässt. Deine Zuschauer kommen, um dir dabei zuzusehen.",
+      mech:["Wünsche per Geschenk (Song, Motiv, Rezept)","Fortschritts-Ziel: fertig, wenn das Ziel erreicht ist","Multi-Guest-Duette oder gemeinsame Projekte","Schatzkiste als Dankeschön am Ende"],
+      tip:"Zeig auch die Fehler und den Weg dahin. Das macht dich nahbar und hält die Leute bis zum Ergebnis." }
+  ],
+  questions: [
+    { q:"Was macht dir im Live am meisten Spaß?", a:["Gewinnen und mich mit anderen messen","Mit meinen Leuten quatschen","Die Leute zum Lachen bringen","Zocken","Zeigen, was ich kann (singen, malen, kochen …)"] },
+    { q:"Im Chat steht „langweilig“. Was tust du?", a:["Sofort ein Match starten","Fragen, worüber sie reden wollen","Eine spontane Challenge","Ein neues Spiel starten","Mein Lieblingsstück performen"] },
+    { q:"Wie sieht dein perfekter Live-Abend aus?", a:["Drei Matches hintereinander gewonnen","Alle Stammzuschauer sind da","Alle haben Tränen gelacht","Ein krasser Sieg im Game","Ein neuer Song oder ein fertiges Bild"] },
+    { q:"Was sagen deine Freunde über dich?", a:["Ehrgeizig","Kann super zuhören","Rampensau","Nerd, aber ein cooler","Kreativ"] },
+    { q:"Ein Geschenk kommt rein. Was machst du?", a:["Punkte fürs Team, weiter geht's!","Ich bedanke mich persönlich mit Namen","Ich mache eine kleine Show-Einlage","Kurzer Dank, dann zurück ins Game","Ich erfülle einen Wunsch"] },
+    { q:"Worauf bist du am meisten stolz?", a:["Meine Siege","Meine Community","Meine Ideen","Meine Skills im Game","Mein Talent"] },
+    { q:"Wie lange könntest du einfach nur reden?", a:["Lieber Action als Reden","Stundenlang","Solange es lustig ist","Nebenbei beim Zocken","Lieber machen als reden"] },
+    { q:"Was willst du in 3 Monaten erreicht haben?", a:["Oben in den Rankings stehen","Eine feste Familie aus Stammzuschauern","Bekannt sein für meine Formate","Eine feste Gaming-Community","Mit meinem Talent bekannt sein"] }
+  ]
+},
+{
+  id: "nische",
+  title: "Finde deine Nische",
+  teaser: "7 Fragen. Danach kennst du deine 3 Themen und hast 5 Videoideen.",
+  icon: "🧭",
+  types: [
+    { key:"alltag", emoji:"🏡", name:"Alltag & Familie", short:"Echt, nahbar, mitten aus dem Leben.",
+      text:"Deine Stärke ist, dass du echt bist. Leute schauen dir zu, weil sie sich in dir wiederfinden.",
+      mech:["Ein Tag mit mir","Ehrliche Momente und kleine Pannen","Routinen: Morgen, Abend, Wochenende"],
+      ideas:["„Was ich an einem Tag wirklich esse“","Meine Morgenroutine in 30 Sekunden","Erwartung vs. Realität bei uns zu Hause","3 Dinge, die meinen Alltag leichter machen","Storytime: das Peinlichste, was mir diese Woche passiert ist"],
+      tip:"Kaffee-Live am Morgen, alle erzählen, was heute ansteht." },
+    { key:"humor", emoji:"😂", name:"Humor & Unterhaltung", short:"Du bringst Leute zum Lachen.",
+      text:"Du siehst das Lustige überall. Kurze Sketche und schnelle Pointen sind deine Welt.",
+      mech:["Sketche und Rollenspiele","Reaktionen auf Trends","Lustige Alltagssituationen"],
+      ideas:["POV: Du gehst zum ersten Mal live","Typen von Zuschauern im Live","Wenn Mama einen Trend erklärt","Ich spiele beide Seiten eines Streits","Trend-Sound, aber mit eigener Wendung"],
+      tip:"Impro-Live, die Zuschauer geben dir Rollen und Situationen vor." },
+    { key:"beauty", emoji:"💄", name:"Beauty & Style", short:"Looks, Outfits und Verwandlungen.",
+      text:"Du hast ein Auge für Style. Verwandlungen und Looks sind perfekte Hooks, weil man bis zum Ende wissen will, wie es aussieht.",
+      mech:["Get ready with me","Verwandlungen vorher und nachher","Outfit- und Produkt-Tipps"],
+      ideas:["Get ready with me fürs Live","Ein Teil, drei Outfits","Vorher-Nachher in 10 Sekunden","Produkte, die ich nie wieder kaufe","Look nach Wunsch der Zuschauer"],
+      tip:"Die Zuschauer stimmen per Geschenk ab, welchen Look du als Nächstes machst." },
+    { key:"kreativ", emoji:"🎨", name:"Kreativ: Musik, Kunst, Kochen", short:"Du erschaffst etwas.",
+      text:"Bei dir entsteht etwas, das man vorher nicht gesehen hat. Prozess-Videos sind dein Gold, weil sie neugierig machen.",
+      mech:["Vom Anfang bis zum fertigen Ergebnis","Wünsche der Zuschauer umsetzen","Tipps aus deinem Handwerk"],
+      ideas:["Zeitraffer: vom leeren Blatt zum fertigen Bild","Euer Song-Wunsch in meiner Version","Rezept in 30 Sekunden","Anfänger vs. Profi: so geht's richtig","Ich verbessere ein Werk von vor einem Jahr"],
+      tip:"Wunsch-Live, jedes Geschenk ab einer bestimmten Größe ist ein Wunsch." },
+    { key:"gaming", emoji:"🎮", name:"Gaming & Technik", short:"Games, Gadgets und Skills.",
+      text:"Du kennst dich aus und hast Skills. Highlights, Fails und Tipps aus deinen Games ziehen Leute an, die genauso ticken.",
+      mech:["Highlights und Fails","Tipps und Tricks zu Games","Setup und Technik"],
+      ideas:["Mein bester Moment diese Woche","3 Tipps, die ich früher gebraucht hätte","Mein Setup unter 100 Euro","Ich reagiere auf eure Clips","Rangaufstieg: Tag 1 bis Tag 7"],
+      tip:"Community-Abend, du spielst mit deinen Zuschauern statt gegen Fremde." },
+    { key:"wissen", emoji:"💡", name:"Motivation & Wissen", short:"Du hilfst anderen weiter.",
+      text:"Leute bleiben bei dir, weil sie etwas mitnehmen. Klare Tipps und ehrliche Gedanken machen dich zur Anlaufstelle.",
+      mech:["Kurze Tipps mit klarem Nutzen","Ehrliche Gedanken und Erfahrungen","Fragen der Zuschauer beantworten"],
+      ideas:["3 Fehler, die ich am Anfang gemacht habe","Ein Tipp, der mein Leben verändert hat","Ich beantworte eure Fragen aus dem Live","Mythos oder Wahrheit?","Was ich gerne mit 18 gewusst hätte"],
+      tip:"Frag-mich-alles-Live mit einem festen Thema pro Woche." }
+  ],
+  questions: [
+    { q:"Worüber könntest du stundenlang reden?", a:["Familie und Alltag","Lustige Geschichten","Outfits und Make-up","Musik, Kunst oder Essen","Games und Technik","Ziele, Gefühle und gute Tipps"] },
+    { q:"Was schaust du selbst am liebsten auf TikTok?", a:["Family-Vlogs","Comedy und Sketche","Get ready with me und Styling","Musik, DIY oder Rezepte","Gaming-Clips","Motivation und Wissen"] },
+    { q:"Wofür fragen dich Freunde um Rat?", a:["Haushalt, Kinder, Alltag","Wenn es lustig werden soll","Was sie anziehen sollen","Für kreative Ideen","Bei Technik-Problemen","Bei Lebensfragen"] },
+    { q:"Was könntest du jeden Tag filmen, ohne dass dir die Ideen ausgehen?", a:["Meinen Alltag","Lustige Situationen","Meine Looks","Das, was ich erschaffe","Meine Gameplays","Meine Gedanken und Tipps"] },
+    { q:"Wo fühlst du dich am wohlsten?", a:["Zu Hause bei meinen Leuten","Auf der Party, mitten im Geschehen","Vor dem Spiegel","In meiner kreativen Ecke","Am PC oder an der Konsole","Draußen oder mit einem guten Buch"] },
+    { q:"Welches Kompliment freut dich am meisten?", a:["„Du bist so echt“","„Du bist so witzig“","„Du siehst toll aus“","„Du bist so talentiert“","„Du bist so gut im Game“","„Du hast mir echt geholfen“"] },
+    { q:"Ein Video von dir geht viral. Worum geht es?", a:["Ein echter Moment aus meinem Leben","Ein Sketch","Eine Verwandlung","Ein Bild, ein Song oder ein Rezept","Ein epischer Gaming-Moment","Ein Tipp, der vielen hilft"] }
+  ]
+}
+];

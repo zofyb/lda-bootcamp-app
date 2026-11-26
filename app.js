@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), tabsEl = $("#tabs");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false,
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, roster:[], noRoster:false, rosterPreview:null, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{}, cal:[], tasks:[], noUpd7:false, qres:[], noUpd8:false, qz:null,
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -252,6 +252,7 @@ async function refresh(){
   const [sn,qu,sv,tp] = await Promise.all([ sb.from("snapshots").select("*"), sb.from("questions").select("*").order("created_at",{ascending:false}), sb.from("survey").select("*"), sb.rpc("top5") ]);
   S.noUpd5 = !!(sn.error || qu.error || sv.error);
   if (S.real?.role==="lead" || S.me?.role==="lead"){ const ro=await sb.from("roster").select("*").order("handle"); S.noRoster=!!ro.error; S.roster=ro.data||[]; }
+  const qr=await sb.from("quiz_results").select("*"); S.noUpd8=!!qr.error; S.qres=qr.data||[];
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
   if (!S.noUpd7 && S.real?.role==="lead"){ const tk=await sb.from("tasks").select("*").order("created_at"); S.tasks=tk.data||[]; }
   S.snaps = sn.data||[]; S.questions = qu.data||[]; S.survey = sv.data||[]; S.top = tp.error ? [] : (tp.data||[]);
@@ -366,7 +367,7 @@ function render(keepScroll){
   tabsEl.innerHTML = t.map(([k,l]) => `<button data-tab="${k}" aria-pressed="${S.tab===k}">${l}</button>`).join("");
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
-  if (S.tab==="akademie" && !S.creator) html = academyView();
+  if (S.tab==="akademie" && !S.creator) html = S.qz ? quizView() : academyView();
   else if (S.tab==="kalender" && !S.creator) html = calendarView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
   else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : needIntro() ? introView() : creatorHome();
@@ -781,7 +782,7 @@ function creatorDetail(email){
   const c=member(email); if(!c){ S.creator=null; return ""; }
   let h=`<button class="btn ghost small back" id="back">← Zurück</button>
     <div class="stack"><span class="eyebrow">${esc(member(c.manager_email)?.name?"Manager: "+member(c.manager_email).name:"ohne Manager")}</span><h1>${esc(label(c))}</h1>
-    <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p></div>
+    <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p>${quizBadges(email)}</div>
     ${snapOf(email,"vorher")||snapOf(email,"nachher")?`<div class="panel stack"><h2>Vorher-Nachher</h2><div class="snaps">${["vorher","nachher"].map(k=>{const x=snapOf(email,k); return `<div class="snap">${x?`<a data-path="${esc(x.path)}" target="_blank" rel="noopener"><img data-img="${esc(x.path)}" alt="${k}"></a>`:`<div class="ph">–</div>`}<small>${k==="vorher"?"Vorher":"Nachher"}</small></div>`;}).join("")}</div></div>`:""}
     <div class="list">`;
   for (const a of S.areas){
@@ -854,7 +855,7 @@ function academyView(){
   const seen=storeGet("ldb-extras-"+me.email)||[];
   const groups={}; xs.forEach(x=>{ (groups[x.category||"Allgemein"] ||= []).push(x); });
   let h=`<div class="stack"><span class="eyebrow">LIVEdream Academy</span><h1>Die <em>Akademie</em></h1>
-    <p class="muted">Schulungen, Videos und Infos für alle Creator der LIVEdream Agency. Immer offen, ohne Punkte.</p></div>`;
+    <p class="muted">Schulungen, Videos und Infos für alle Creator der LIVEdream Agency. Immer offen, ohne Punkte.</p></div>` + quizCards();
   if (lead) h += S.noRoster ? `<div class="panel"><p class="err">Zuerst update-6.sql in Supabase ausführen, dann kannst du hier Inhalte hochladen.</p></div>` : `<div class="panel stack"><h2>Inhalt hinzufügen</h2>
     <div class="grid2"><label class="f" for="ak-title">Titel<input id="ak-title" type="text" placeholder="z. B. Schulung Videoproduktion"></label>
     <label class="f" for="ak-cat">Rubrik<input id="ak-cat" type="text" list="ak-cats" placeholder="z. B. Schulungen"><datalist id="ak-cats">${[...new Set(S.extras.map(x=>x.category).filter(Boolean).concat(["Schulungen","Infos","Videos"]))].map(c=>`<option value="${esc(c)}">`).join("")}</datalist></label>
@@ -872,14 +873,79 @@ function academyView(){
   return h;
 }
 
+/* ---------- Persönlichkeits-Quizze ---------- */
+const QZ = () => window.LDA_QUIZZES || [];
+const qzRes = (email, id) => S.qres.find(r=>r.creator_email===email && r.quiz===id);
+const qzType = (id, key) => QZ().find(q=>q.id===id)?.types.find(t=>t.key===key);
+function quizCards(){
+  if (!QZ().length) return "";
+  const me=S.me.email, canPlay=S.me.role==="creator";
+  return `<div class="wkh"><span>QUIZZE</span><small class="muted">Finde heraus, was zu dir passt</small></div>
+  <div class="qzcards">${QZ().map(q=>{ const r=canPlay&&qzRes(me,q.id), t=r&&qzType(q.id,r.result);
+    return `<button class="panel qzcard" data-qz="${q.id}"><span class="qzic">${t?t.emoji:q.icon}</span><span><b>${esc(q.title)}</b>
+      <small class="muted">${t?`Dein Ergebnis: <b class="gold">${esc(t.name)}</b>`:esc(q.teaser)}</small></span><span class="go">${t?"Ansehen":"Los"}</span></button>`; }).join("")}</div>`;
+}
+function shuffle(a){ const x=a.slice(); for(let i=x.length-1;i>0;i--){ const j=Math.random()*(i+1)|0; [x[i],x[j]]=[x[j],x[i]]; } return x; }
+function quizStart(id){
+  const q=QZ().find(x=>x.id===id); if (!q) return;
+  S.qz={ id, i:0, picks:[], order:q.questions.map(x=>shuffle(x.a.map((_,j)=>j))) }; render();
+}
+function quizView(){
+  const R=S.qz, q=QZ().find(x=>x.id===R.id);
+  if (R.done) return quizResult(q, R.result, true);
+  const Q=q.questions[R.i], n=q.questions.length;
+  return `<button class="btn ghost small back" id="qz-quit">← Abbrechen</button>
+  <div class="qzrun"><span class="eyebrow">${esc(q.title)}</span>
+    <div class="qzbar"><i style="width:${Math.round(R.i/n*100)}%"></i></div><small class="muted">Frage ${R.i+1} von ${n}</small>
+    <h2 class="qzq">${esc(Q.q)}</h2>
+    <div class="qzans">${R.order[R.i].map((j,k)=>`<button class="qzopt" style="--i:${k}" data-qza="${j}">${esc(Q.a[j])}</button>`).join("")}</div></div>`;
+}
+function quizResult(q, key, fresh){
+  const t=q.types.find(x=>x.key===key); if (!t) return "";
+  const nische=q.id==="nische";
+  return `${fresh?`<button class="btn ghost small back" id="qz-quit">← Zurück</button>`:""}
+  <div class="panel stack qzresult ${fresh?"fresh":""}"><span class="eyebrow">${fresh?"Dein Ergebnis":esc(q.title)}</span>
+    <div class="qzbig">${t.emoji}</div><h1>${esc(t.name)}</h1><p class="lead"><b>${esc(t.short)}</b></p><p class="soft">${esc(t.text)}</p>
+    <div class="wkh"><span>${nische?"DEINE 3 THEMEN":"DAS PASST ZU DIR"}</span></div>
+    <ul class="qzlist">${t.mech.map(m=>`<li>${esc(m)}</li>`).join("")}</ul>
+    ${t.ideas?`<div class="wkh"><span>5 VIDEOIDEEN</span></div><ol class="qzlist">${t.ideas.map(m=>`<li>${esc(m)}</li>`).join("")}</ol>`:""}
+    <p class="feedback gold"><b>${nische?"Live-Idee:":"Tipp:"}</b> ${esc(t.tip)}</p>
+    ${S.me.role==="creator"?`<button class="btn ghost small" data-qz-again="${q.id}">Quiz nochmal machen</button>`:""}</div>`;
+}
+async function quizAnswer(j){
+  const R=S.qz, q=QZ().find(x=>x.id===R.id); if (!R || R.done || R.busy) return;
+  R.busy=true; const b=document.querySelector(`[data-qza="${j}"]`); if (b) b.classList.add("picked");
+  await new Promise(r=>setTimeout(r,320)); R.busy=false;
+  R.picks.push(j);
+  if (R.i < q.questions.length-1){ R.i++; return render(true); }
+  const sc=q.types.map(()=>0); R.picks.forEach(p=>sc[p]++);
+  const max=Math.max(...sc); let win=R.picks.slice().reverse().find(p=>sc[p]===max);
+  R.result=q.types[win].key; R.done=true;
+  const row={ creator_email:S.me.email, quiz:q.id, result:R.result, scores:Object.fromEntries(q.types.map((t,i)=>[t.key,sc[i]])), created_at:new Date().toISOString() };
+  if (!readOnly() && !S.me.preview && !S.noUpd8){
+    const r=await sb.from("quiz_results").upsert(row,{ onConflict:"creator_email,quiz" });
+    if (r.error) console.warn(r.error);
+  }
+  S.qres=S.qres.filter(x=>!(x.creator_email===row.creator_email&&x.quiz===row.quiz)); S.qres.push(row);
+  render(); setTimeout(confetti, 350);
+}
+function quizBadges(email){
+  const xs=QZ().map(q=>{ const r=qzRes(email,q.id), t=r&&qzType(q.id,r.result); return t?`<span class="chip">${t.emoji} ${esc(t.name)}</span>`:""; }).filter(Boolean);
+  return xs.length?`<div class="mini">${xs.join("")}</div>`:"";
+}
+
 /* ---------- Sag's uns (anonym) ---------- */
 const KK_KINDS = [["frage","❓ Frage"],["kritik","💬 Kritik"],["wunsch","✨ Wunsch"]];
 const kkLabel = k => (KK_KINDS.find(x=>x[0]===(k||"frage"))||KK_KINDS[0])[1];
 function fab(){
   let b=$("#kk-fab");
   if (!b){ b=document.createElement("button"); b.id="kk-fab"; b.className="fab"; b.setAttribute("aria-label","Anonyme Nachricht schreiben");
-    b.innerHTML=`<span class="ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></svg></span><span class="tx">Anonym</span>`; document.body.appendChild(b); }
-  b.hidden = !(S.me && S.me.role==="creator" && !S.noUpd5) || !!S.openArea;
+    b.innerHTML=`<span class="ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></svg></span><span class="tx"><b>Sag's uns</b><small>anonym</small></span>`; document.body.appendChild(b); }
+  const show = S.me && S.me.role==="creator" && !S.noUpd5 && !S.openArea && !S.qz;
+  if (show && !S.viewAs && !storeGet("ldb-fabtip") && !$("#fab-tip")){ storeSet("ldb-fabtip",1);
+    const tip=document.createElement("div"); tip.id="fab-tip"; tip.className="fabtip"; tip.textContent="Fragen, Kritik, Wünsche? Hier anonym. 💜"; document.body.appendChild(tip);
+    setTimeout(()=>tip.classList.add("show"),1200); setTimeout(()=>{ tip.classList.remove("show"); setTimeout(()=>tip.remove(),500); },7500); }
+  b.hidden = !show;
 }
 function openKK(){
   const ro=readOnly()||S.me.preview, k=S.kkKind||"frage", pub=S.questions.filter(q=>q.published);
@@ -1358,7 +1424,7 @@ document.addEventListener("click", async e => {
   if (t.id==="to-register"){ S._loginMode="register"; return loginView($("#email")?.value||""); }
   if (t.id==="to-login"){ S._loginMode="login"; return loginView($("#email")?.value||""); }
   if (t.id==="logout"){ await sb.auth.signOut(); Object.assign(S,{me:null,real:null,viewAs:"",tab:null,creator:null,openArea:null,ringShown:false,localProg:{}}); return loginView(); }
-  if (t.dataset.tab){ S.tab=t.dataset.tab; S.creator=null; S.editMember=null; return render(); }
+  if (t.dataset.tab){ S.qz=null; S.tab=t.dataset.tab; S.creator=null; S.editMember=null; return render(); }
   if (t.dataset.area){
     const st=t.dataset.state;
     if (st==="lock") return toast("Gib zuerst das Thema davor ab.");
@@ -1369,7 +1435,11 @@ document.addEventListener("click", async e => {
   if (t.id==="intro-go") return introFinish();
   if (t.id==="intro-again"){ S.showIntro=true; return render(); }
   if (t.id==="qsend") return sendQuestion();
-  if (t.id==="kk-fab" || t.id==="kk-open") return openKK();
+  if (t.id==="kk-fab" || t.id==="kk-open"){ $("#fab-tip")?.remove(); return openKK(); }
+  if (t.dataset.qz){ const r=S.me.role==="creator" && qzRes(S.me.email,t.dataset.qz); if (r){ const q=QZ().find(x=>x.id===t.dataset.qz); return sheet(quizResult(q, r.result, false)); } return quizStart(t.dataset.qz); }
+  if (t.dataset.qzAgain){ closeSheet(); S.tab="akademie"; return quizStart(t.dataset.qzAgain); }
+  if (t.dataset.qza) return quizAnswer(+t.dataset.qza);
+  if (t.id==="qz-quit"){ S.qz=null; return render(); }
   if (t.dataset.kk){ S.kkDraft=$("#qbox")?.value||""; S.kkKind=t.dataset.kk; return openKK(); }
   if (t.dataset.cal){ return openCal(t.dataset.cal); }
   if (t.dataset.calnav){ const m=calMonth(); S.calMonth=new Date(m.getFullYear(), m.getMonth()+ +t.dataset.calnav, 1); return render(true); }
