@@ -1141,7 +1141,7 @@ function openHook(){
 
 /* Impuls der Woche */
 const IMPULSE = () => window.LDA_IMPULSE || [];
-function impulsNow(){ const xs=IMPULSE(); if (!xs.length) return null; const base=Date.UTC(2026,10,30), w=Math.max(0,Math.floor((Date.now()-base)/(7*DAY))); return xs[w % xs.length]; }
+function impulsNow(){ const xs=IMPULSE(); if (!xs.length) return null; const base=Date.UTC(2026,10,23), w=Math.max(0,Math.floor((Date.now()-base)/(7*DAY))); return xs[w % xs.length]; }
 function openImpuls(){
   const im=impulsNow(); if (!im) return;
   const e=S.me.email, wk=weekKey(), A=S.impAns?.[wk]||{};

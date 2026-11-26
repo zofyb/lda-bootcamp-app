@@ -3,190 +3,1022 @@
    Schulung Videoproduktion (24.11.2026) und Recherche Finanzen/Steuern (keine Steuerberatung).
    q: 3 Fragen, ok = Index der richtigen Antwort. */
 window.LDA_IMPULSE = [
-{ id:"i01", src:"Webinar Monetarisierung", title:"Die erste Minute entscheidet",
-  text:["Zuschauer bleiben im Schnitt nur etwa eine Minute in einem Stream. In dieser Minute entscheiden sie, ob sie bleiben.",
-        "Darum zählen Bild, Ton und Licht so viel: Kamera frontal und nicht zu nah, gutes Licht von vorne, ein Hintergrund, der etwas zeigt, aber nicht ablenkt.",
-        "Diese Woche: Schau dir die ersten 10 Sekunden deines letzten Lives als Aufnahme an, als wärst du fremd. Würdest du bleiben?"],
-  q:[{ q:"Wie lange bleiben Zuschauer im Schnitt in einem Stream?", a:["Etwa 10 Minuten","Etwa 1 Minute","Etwa 30 Sekunden"], ok:1 },
-     { q:"Wie sollte die Kamera stehen?", a:["Frontal und nicht zu nah","Schräg von unten","So nah wie möglich"], ok:0 },
-     { q:"Was gilt für den Hintergrund?", a:["Komplett leer ist am besten","Etwas zeigen, aber nicht ablenken","So bunt wie möglich"], ok:1 }] },
-{ id:"i02", src:"Webinar Monetarisierung", title:"Das 10k-Likes-Ziel",
-  text:["Likes sind für deinen Stream wie Rückenwind. Ab etwa 10.000 Likes wird ein Live stärker auf der For-You-Seite gezeigt, ab etwa 100.000 auch international.",
-        "Gib deinen Zuschauern darum früh ein Ziel: „Lasst uns die 10k knacken!“ Erinnere zwischendurch an den Stand und feier es, wenn ihr es schafft.",
-        "Wichtig: Fordere nicht zu stumpfem Dauertippen ohne Gespräch auf. TikTok wertet das als künstliche Interaktion."],
-  q:[{ q:"Ab wie vielen Likes läuft dein Live laut Webinar stärker auf der For-You-Seite?", a:["1.000","10.000","1 Million"], ok:1 },
-     { q:"Wann gibst du das Like-Ziel am besten vor?", a:["Gleich in den ersten Minuten","Erst kurz vor Ende","Gar nicht"], ok:0 },
-     { q:"Was ist laut Richtlinien nicht erlaubt?", a:["Ein Like-Ziel nennen","Zu reinem Tippen-Tippen-Tippen ohne Interaktion auffordern","Sich für Likes bedanken"], ok:1 }] },
-{ id:"i03", src:"Webinar Sperrungen und Verwarnungen", title:"Jede Warnung bleibt hängen",
-  text:["Jede Sperre und jede Warnung wird in deinem Konto vermerkt. Einzeln wirkt sie harmlos, in der Summe kann sie zu härteren Folgen führen.",
-        "Die Regeln findest du in der App unter TikTok Studio, dann LIVE, dann Regeln und Anleitung.",
-        "Wenn du eine Sperre bekommst: sofort Widerspruch einlegen und deinem Live-Manager einen Screenshot schicken."],
-  q:[{ q:"Was passiert mit Warnungen?", a:["Sie verfallen nach einem Live","Sie werden im Konto vermerkt und summieren sich","Sie betreffen nur Videos"], ok:1 },
-     { q:"Wo findest du die Live-Regeln in der App?", a:["TikTok Studio, LIVE, Regeln und Anleitung","Unter Guthaben","Im Posteingang"], ok:0 },
-     { q:"Was tust du nach einer Sperre zuerst?", a:["Einen Zweitaccount nutzen","Abwarten und nichts tun","Widerspruch einlegen und Screenshot an den Manager"], ok:2 }] },
-{ id:"i04", src:"Finanzen & Steuern", title:"Diamanten lieber auszahlen statt umtauschen",
-  text:["Wenn du deine Live-Einnahmen direkt in Münzen umtauschst, fließt zwar kein Geld aufs Konto, steuerlich ist es trotzdem eine Einnahme. Du musst den Wert dann selbst nachweisen, mit einem Beleg für die Einnahme und einem für die Ausgabe.",
-        "Einfacher ist meist: auszahlen lassen und bei Bedarf neu aufladen. Dann hast du einen klaren Zahlungseingang auf dem Konto und eine Rechnung für den Münzkauf.",
-        "Bewahre zu jeder Auszahlung den TikTok-Zahlungsbeleg, einen Screenshot aus dem Guthaben-Bereich und den Kontoauszug zusammen auf."],
-  note:"Keine Steuerberatung. Im Zweifel bitte deinen Steuerberater oder das Finanzamt fragen. Quellen: benderstream.de (Dez. 2025), accountable.de (Mai 2026).",
-  q:[{ q:"Ist ein Umtausch von Einnahmen in Münzen steuerlich egal?", a:["Ja, es fließt ja kein Geld","Nein, es zählt trotzdem als Einnahme","Nur über 1.000 €"], ok:1 },
-     { q:"Was ist meist der einfachere Weg?", a:["Auszahlen lassen und bei Bedarf neu aufladen","Alles in Münzen umtauschen","Gar nichts aufschreiben"], ok:0 },
-     { q:"Was gehört zu jeder Auszahlung in deine Ablage?", a:["Nur der Kontoauszug","Zahlungsbeleg, Screenshot und Kontoauszug","Nichts, TikTok meldet das"], ok:1 }] },
-{ id:"i05", src:"Webinar Monetarisierung", title:"Der Ablauf eines starken Streams",
-  text:["Minute 0 bis 5: begrüßen, kurz vorstellen, das Ziel nennen (zum Beispiel 10k Likes) und erklären, was heute passiert.",
-        "Minute 5 bis 20: Tippen und Teilen anstoßen, Fragen stellen, das eigentliche Programm starten (Match, Entertainment, Game).",
-        "Am Ende: bedanken, Zahlen zusammenfassen, das nächste Live ankündigen. Nach einer Pause oder einem Gast fängst du kurz wieder von vorne an, weil neue Zuschauer da sind."],
-  q:[{ q:"Was gehört in die ersten 5 Minuten?", a:["Begrüßen, vorstellen, Ziel nennen","Sofort ins Match","Geschenke-Rangliste vorlesen"], ok:0 },
-     { q:"Warum wiederholst du nach einer Pause den Anfang?", a:["Weil es Pflicht ist","Weil neue Zuschauer dazugekommen sind","Damit das Live länger wird"], ok:1 },
-     { q:"Was machst du am Ende des Lives?", a:["Einfach ausmachen","Bedanken und das nächste Live ankündigen","Nach Geschenken fragen"], ok:1 }] },
-{ id:"i06", src:"Webinar Teambindung", title:"Frag nach, was gestern war",
-  text:["Zuschauer kommen wieder, wenn sie sich gesehen fühlen. Frag, wie ihr Tag war, und merk dir die Antworten.",
-        "Der stärkste Trick: Greif ein Gespräch am nächsten Tag wieder auf. „Hey Lisa, wie lief dein Vorstellungsgespräch?“ So wird aus einem Zuschauer ein Teammitglied.",
-        "Lass deine Zuschauer auch mitentscheiden, zum Beispiel was ihr als Nächstes spielt."],
-  q:[{ q:"Was bindet Zuschauer laut Webinar besonders?", a:["Gespräche vom Vortag wieder aufgreifen","Möglichst wenig reden","Nur Matches machen"], ok:0 },
-     { q:"Wie bindest du Zuschauer ins Live ein?", a:["Gar nicht, sie sollen zuschauen","Sie bei Entscheidungen mitbestimmen lassen","Nur über Geschenke"], ok:1 },
-     { q:"Warum hilft Regelmäßigkeit?", a:["Zuschauer bauen dich in ihren Alltag ein","Der Akku hält länger","Es gibt mehr Warnungen"], ok:0 }] },
-{ id:"i07", src:"Schulung Videoproduktion", title:"Die 3-Hook-Regel",
-  text:["Ein Video hat etwa zwei Sekunden, um jemanden zu stoppen. Darum braucht der Anfang drei Hooks gleichzeitig: Ton, Text und Bewegung.",
-        "Ton: ein Satz oder Sound, der neugierig macht. Text: wenige Wörter oben im Bild. Bewegung: etwas passiert sofort, du kommst ins Bild oder hältst etwas in die Kamera.",
-        "Tipp: Den Hook des Tages hier in der App kannst du direkt dafür nutzen."],
-  q:[{ q:"Welche drei Hooks gehören an den Anfang?", a:["Ton, Text, Bewegung","Musik, Filter, Hashtag","Titel, Beschreibung, Link"], ok:0 },
-     { q:"Wie viel Zeit hat ein Video ungefähr, um jemanden zu stoppen?", a:["2 Sekunden","15 Sekunden","1 Minute"], ok:0 },
-     { q:"Wo steht der Text-Hook?", a:["Ganz unten","Oben im Bild, mit wenigen Wörtern","Nur in der Beschreibung"], ok:1 }] },
-{ id:"i08", src:"Webinar Sperrungen und Verwarnungen", title:"Geschenke richtig ansprechen",
-  text:["Nicht erlaubt ist: immer wieder nach Geschenken fragen, für Geschenke eine Gegenleistung versprechen oder Geschenke ohne jede andere Interaktion einfordern.",
-        "Ebenfalls verboten: Geschenke durch erniedrigendes oder riskantes Verhalten holen, etwa Eiswasser-Dusche oder Haare abrasieren.",
-        "Erlaubt ist, Geschenkgalerie und Wunschliste zu zeigen und dich ehrlich zu bedanken. Die Reaktion darf zur Größe des Geschenks passen."],
-  q:[{ q:"Was ist erlaubt?", a:["Für ein Geschenk etwas versprechen","Die Wunschliste zeigen und dich bedanken","Ständig nach Geschenken fragen"], ok:1 },
-     { q:"Ist eine Eiswasser-Challenge für Geschenke okay?", a:["Ja, wenn es lustig ist","Nein, riskante Aktionen für Geschenke sind verboten","Nur am Wochenende"], ok:1 },
-     { q:"Wie reagierst du auf ein kleines Geschenk?", a:["Ehrlich bedanken, aber nicht übertreiben","Gar nicht","Wie auf das größte Geschenk"], ok:0 }] },
-{ id:"i09", src:"Webinar Matchcontent", title:"Match-Ideen: Die Community entscheidet",
-  text:["Matches werden spannender, wenn deine Zuschauer etwas mitbestimmen: Kostüm oder Make-up per Abstimmung, Licht oder Playlist, Tanz- oder Talentformate wie „Dance or Freeze“.",
-        "Ein Winserien-Ziel motiviert zusätzlich: „Schaffen wir heute 5 Siege am Stück?“",
-        "Wichtig: Wird dein Match-Partner eingeschränkt, betrifft das deinen Stream mit, solange ihr verbunden seid. Wähle Partner, denen du vertraust."],
-  q:[{ q:"Was macht Matches spannender?", a:["Die Community entscheidet mit","Lange Pausen","Kein Ton"], ok:0 },
-     { q:"Was passiert, wenn dein Match-Partner eingeschränkt wird?", a:["Nichts","Dein Stream ist mit eingeschränkt, solange ihr verbunden seid","Du bekommst Bonuspunkte"], ok:1 },
-     { q:"Was ist ein Winserien-Ziel?", a:["Eine bestimmte Zahl Siege am Stück","Eine Geldstrafe","Ein Filter"], ok:0 }] },
-{ id:"i10", src:"Finanzen & Steuern", title:"Kleinunternehmer: die Grenzen seit 2025",
-  text:["Seit 1. Januar 2025 gelten neue Grenzen für die Kleinunternehmerregelung: höchstens 25.000 € Umsatz im Vorjahr und höchstens 100.000 € im laufenden Jahr, jeweils netto.",
-        "Neu ist: Wer im laufenden Jahr über 100.000 € kommt, fällt sofort aus der Regelung, nicht erst im nächsten Jahr. Im ersten Jahr der Tätigkeit zählt nur die 25.000-€-Grenze.",
-        "Auch als Kleinunternehmer musst du alle Einnahmen erfassen. Die Regelung betrifft nur die Umsatzsteuer, nicht die Einkommensteuer."],
-  note:"Keine Steuerberatung. Im Zweifel bitte deinen Steuerberater oder das Finanzamt fragen. Quellen: IHK München, IHK Berlin (Kleinunternehmerregelung 2025).",
-  q:[{ q:"Wie hoch darf der Vorjahresumsatz für Kleinunternehmer seit 2025 sein?", a:["22.000 €","25.000 €","50.000 €"], ok:1 },
-     { q:"Was passiert, wenn du im laufenden Jahr über 100.000 € kommst?", a:["Erst nächstes Jahr ändert sich etwas","Du fällst sofort aus der Regelung","Nichts"], ok:1 },
-     { q:"Musst du als Kleinunternehmer deine Einnahmen erfassen?", a:["Ja, trotzdem alle","Nein, gar nicht","Nur Geschenke über 100 €"], ok:0 }] },
-{ id:"i11", src:"Webinar Monetarisierung", title:"Dein Ankündigungsvideo",
-  text:["Etwa 15 Minuten vor dem Live ein kurzes Video posten: wer du bist, was heute im Live passiert, welches Ziel ihr habt, ob es ein Event gibt.",
-        "Kurzvideos und Lives zusammen funktionieren für den Algorithmus am besten. Wer dein Video sieht, bekommt dein Live eher angezeigt.",
-        "Mach es kurz und mit Stimmung, ein Hook am Anfang reicht."],
-  q:[{ q:"Wann postest du das Ankündigungsvideo am besten?", a:["Etwa 15 Minuten vor dem Live","Am Vortag","Nach dem Live"], ok:0 },
-     { q:"Was gehört hinein?", a:["Was im Live passiert und welches Ziel ihr habt","Deine Steuernummer","Nur Musik"], ok:0 },
-     { q:"Warum lohnt es sich?", a:["Videos und Lives zusammen stärken den Algorithmus","Es ist Pflicht","Es gibt Münzen dafür"], ok:0 }] },
-{ id:"i12", src:"Webinar Teambindung", title:"Gute Moderatoren",
-  text:["Deine Modis sind die wichtigsten Teammitglieder. Vertrauen ist dabei alles: Sie müssen hinter dir und deinem Content stehen.",
-        "Sprich mit ihnen ab, was sie tun sollen: neue Zuschauer begrüßen, an Tippen und Teilen erinnern, Kommentare fixieren, den Chat im Blick behalten.",
-        "Modis sollen die Stimmung tragen, aber dich nicht ablenken."],
-  q:[{ q:"Was ist bei Moderatoren das Wichtigste?", a:["Vertrauen","Viele Follower","Viele Geschenke"], ok:0 },
-     { q:"Welche Aufgabe passt zu Modis?", a:["Neue Zuschauer begrüßen","Dein Live beenden","Für dich Matches annehmen"], ok:0 },
-     { q:"Was sollen Modis nicht tun?", a:["Dich ablenken","Den Chat beobachten","An Teilen erinnern"], ok:0 }] },
-{ id:"i13", src:"Webinar Sperrungen und Verwarnungen", title:"Live im Auto",
-  text:["Im Auto müssen die Rollen eindeutig erkennbar sein.",
-        "Wer fährt, darf kein eigenes Live starten, nicht mit dem Stream eines Mitfahrers interagieren und kein gefährliches Fahrverhalten zeigen.",
-        "Wer mitfährt, darf die fahrende Person nicht ablenken und die Kamera nicht so stellen, dass die Sicht eingeschränkt ist."],
-  q:[{ q:"Darf die fahrende Person live gehen?", a:["Ja, mit Halterung","Nein","Nur auf der Autobahn"], ok:1 },
-     { q:"Was darf der Beifahrer nicht?", a:["Die fahrende Person ablenken","Reden","Sich anschnallen"], ok:0 },
-     { q:"Was muss im Auto-Live klar erkennbar sein?", a:["Die Marke des Autos","Wer fährt und wer mitfährt","Das Kennzeichen"], ok:1 }] },
-{ id:"i14", src:"Webinar Monetarisierung", title:"Immer zur gleichen Zeit",
-  text:["Versuch, möglichst immer zur gleichen Zeit live zu gehen. Der Algorithmus lernt aus deinen vergangenen Streams und den Zuschauerzahlen.",
-        "Für deine Zuschauer wird dein Live so ein fester Termin im Alltag, wie eine Lieblingsserie.",
-        "Diese Woche: Schreib dir zwei feste Live-Zeiten in den Kalender und sag sie im Live an."],
-  q:[{ q:"Warum hilft eine feste Uhrzeit?", a:["Der Algorithmus und die Zuschauer gewöhnen sich daran","Es gibt Bonus-Diamanten","Es ist Vorschrift"], ok:0 },
-     { q:"Woraus lernt der Algorithmus laut Webinar?", a:["Aus vergangenen Streams und Zuschauerzahlen","Aus deinem Profilbild","Gar nicht"], ok:0 },
-     { q:"Was machst du mit deinen Live-Zeiten?", a:["Geheim halten","Im Live ansagen","Jeden Tag ändern"], ok:1 }] },
-{ id:"i15", src:"Webinar Matchcontent", title:"Strafen, die Spaß machen",
-  text:["Match-Strafen sind beliebt, wenn sie lustig und harmlos sind: Profilbild oder Bio ändern, ein Video drehen, etwas singen, das nicht deinem Geschmack entspricht, kurz die Augen verbinden.",
-        "Auch „Preisgeben“ funktioniert gut: ein altes Foto zeigen, hinter die Kulissen schauen lassen, eine private Story erzählen.",
-        "Achtung: Strafen dürfen nicht gefährlich oder erniedrigend sein, sonst droht eine Sperre."],
-  q:[{ q:"Welche Strafe ist geeignet?", a:["Altes Foto zeigen","Etwas Gefährliches essen","Sich selbst schlagen"], ok:0 },
-     { q:"Was ist „Preisgeben“?", a:["Etwas Persönliches zeigen oder erzählen","Geld verschenken","Den Account abgeben"], ok:0 },
-     { q:"Welche Strafen sind tabu?", a:["Gefährliche oder erniedrigende","Lustige","Kurze"], ok:0 }] },
-{ id:"i16", src:"Finanzen & Steuern", title:"Belege für jede Auszahlung",
-  text:["TikTok schickt dir bei Auszahlungen meist nur einen Zahlungsbeleg. Dem fehlen oft Angaben wie Leistungszeitraum oder deine Steuernummer.",
-        "Viele Creator ergänzen das mit einem Eigenbeleg (Proforma-Rechnung) „nur für die Buchhaltung“: Belegnummer, Datum, Zeitraum, deine Daten, die TikTok-Gesellschaft laut Beleg, Betrag und Steuerhinweis.",
-        "Wichtig: Die Einnahme nur einmal buchen, nicht Zahlungsbeleg und Eigenbeleg doppelt."],
-  note:"Keine Steuerberatung. Im Zweifel bitte deinen Steuerberater oder das Finanzamt fragen. Quelle: accountable.de (Mai 2026).",
-  q:[{ q:"Was fehlt TikTok-Zahlungsbelegen oft?", a:["Leistungszeitraum oder deine Steuernummer","Der Betrag","Das Datum"], ok:0 },
-     { q:"Wofür ist ein Eigenbeleg da?", a:["Um fehlende Angaben für die Buchhaltung zu ergänzen","Um TikTok eine Rechnung zu schicken","Um mehr Geld zu bekommen"], ok:0 },
-     { q:"Wie oft buchst du eine Auszahlung?", a:["Einmal","Zweimal","Gar nicht"], ok:0 }] },
-{ id:"i17", src:"Webinar Monetarisierung", title:"Anerkennung zeigen",
-  text:["Kein Support ist selbstverständlich. Zeig deinen Unterstützern, dass du es siehst.",
-        "Je größer das Geschenk, desto größer darf deine Reaktion sein. Bei kleinen Geschenken freundlich danken, ohne zu übertreiben, sonst wirkt es unecht.",
-        "Ein Supportervideo nach dem Live ist eine schöne Extra-Geste für deine Top-Unterstützer."],
-  q:[{ q:"Wie reagierst du auf ein großes Geschenk?", a:["Deutlich und herzlich","Gar nicht","Genauso wie auf ein kleines"], ok:0 },
-     { q:"Was ist ein Supportervideo?", a:["Ein Dankeschön-Video für deine Unterstützer","Ein Werbevideo","Ein Tutorial"], ok:0 },
-     { q:"Warum nicht bei jedem kleinen Geschenk übertreiben?", a:["Es wirkt dann unecht","Es ist verboten","Es kostet Münzen"], ok:0 }] },
-{ id:"i18", src:"Webinar Teambindung", title:"Teamrahmen mit Bedacht",
-  text:["Ein Teamrahmen zeigt die Zugehörigkeit zu dir auf der ganzen Plattform. Teste vorher, ob Name und Design auch klein gut lesbar sind.",
-        "Gib den Rahmen nicht zu leicht heraus: Wer ihn trägt, tritt in deinem Namen auf.",
-        "Abo-Vorteile stärken das Team zusätzlich, zum Beispiel exklusive Sticker, eine Abo-Gruppe oder ein Gast-Live nur für Abonnenten."],
-  q:[{ q:"Warum den Teamrahmen nicht zu leicht vergeben?", a:["Die Träger treten in deinem Namen auf","Er kostet viel","Er verschwindet sonst"], ok:0 },
-     { q:"Was solltest du beim Rahmen testen?", a:["Die Lesbarkeit in klein","Die Farbe deines Hintergrunds","Die Uhrzeit"], ok:0 },
-     { q:"Was ist ein möglicher Abo-Vorteil?", a:["Exklusive Sticker","Geld zurück","Gratis-Münzen"], ok:0 }] },
-{ id:"i19", src:"Webinar Sperrungen und Verwarnungen", title:"Statische Lives und Minderjährige",
-  text:["Lives mit statischem Inhalt, also Fotos im Vollbild, kein Sprechen, schlechtes Bild oder ein abgespielter Film, werden in der Reichweite eingeschränkt.",
-        "Minderjährige dürfen in deinen Lives keine Münzen bekommen oder ausgeben. Weise regelmäßig darauf hin.",
-        "Auch Links oder QR-Codes zu Seiten außerhalb von TikTok sind im Live zu unterlassen."],
-  q:[{ q:"Was passiert bei statischen Lives?", a:["Die Reichweite wird eingeschränkt","Mehr Zuschauer","Nichts"], ok:0 },
-     { q:"Dürfen Minderjährige in deinem Live Geschenke schicken?", a:["Ja","Nein","Nur kleine"], ok:1 },
-     { q:"Sind QR-Codes zu anderen Seiten im Live okay?", a:["Ja","Nein, darauf verzichten","Nur abends"], ok:1 }] },
-{ id:"i20", src:"Webinar Monetarisierung", title:"Events: einfach mitmachen",
-  text:["Kannst du dich für ein Event registrieren? Dann tu es. Allein irgendwo in einer Rangliste sichtbar zu sein, bringt Reichweite.",
-        "Stimm deine Community vorher ein und arbeitet gemeinsam auf das Ziel hin. Ein geschafftes Event schweißt das Team zusammen.",
-        "Alle aktuellen Kampagnen findest du hier im Kalender."],
-  q:[{ q:"Warum lohnt sich ein Event auch ohne Sieg?", a:["Sichtbarkeit in der Rangliste bringt Reichweite","Es gibt immer Geld","Es ist Pflicht"], ok:0 },
-     { q:"Was machst du vor einem Event?", a:["Die Community einstimmen","Das Live absagen","Nichts sagen"], ok:0 },
-     { q:"Wo findest du die aktuellen Kampagnen?", a:["Im Kalender der App","Nur bei Google","Gar nicht"], ok:0 }] },
-{ id:"i21", src:"Schulung Videoproduktion", title:"Text sicher platzieren",
-  text:["Oben und unten verdeckt die TikTok-Oberfläche Teile deines Videos. Der Text-Hook gehört darum unter die Suchleiste, ungefähr ins obere Viertel.",
-        "Untertitel setzt du etwas oberhalb der Bildmitte bis knapp über zwei Drittel, mit genug Abstand zum rechten Rand wegen der Knöpfe.",
-        "Ab dem unteren Viertel stehen Name, Beschreibung und Shop. Dort hat wichtiger Text nichts zu suchen."],
-  q:[{ q:"Wohin gehört der Text-Hook?", a:["Unter die Suchleiste, ins obere Viertel","Ganz nach unten","In die Mitte rechts"], ok:0 },
-     { q:"Warum Abstand zum rechten Rand?", a:["Dort sind die Knöpfe","Wegen der Lesbarkeit von links","Kein Grund"], ok:0 },
-     { q:"Was steht im unteren Viertel?", a:["Name, Beschreibung, Shop","Nichts","Der Hook"], ok:0 }] },
-{ id:"i22", src:"Finanzen & Steuern", title:"Rücklagen von Anfang an",
-  text:["TikTok zieht keine Steuern ab. Was du auszahlst, ist erst mal brutto.",
-        "Viele Selbstständige legen darum von jeder Auszahlung einen festen Teil auf ein eigenes Konto. Wie viel sinnvoll ist, hängt von deinem Einkommen ab. Das kann dir ein Steuerberater schnell sagen.",
-        "Wer gleich zu Beginn ein Tagesgeldkonto nur für Steuern anlegt, erlebt bei der Nachzahlung keine böse Überraschung."],
-  note:"Keine Steuerberatung. Im Zweifel bitte deinen Steuerberater oder das Finanzamt fragen.",
-  q:[{ q:"Zieht TikTok bei Auszahlungen Steuern ab?", a:["Ja, automatisch","Nein, du kümmerst dich selbst","Nur bei Kleinunternehmern"], ok:1 },
-     { q:"Was hilft gegen eine böse Überraschung bei der Steuer?", a:["Ein eigenes Konto für Rücklagen","Alles ausgeben","Nichts aufschreiben"], ok:0 },
-     { q:"Wer sagt dir, wie viel Rücklage sinnvoll ist?", a:["Ein Steuerberater","Der Algorithmus","Deine Zuschauer"], ok:0 }] },
-{ id:"i23", src:"Webinar Monetarisierung", title:"Stimmung ist steuerbar",
-  text:["TikTok ist für die meisten Zuschauer eine Spaß-App. Sie wollen vom Alltag abschalten.",
-        "Musik und deine eigene Stimmung lenken das Live. Sounds, auch die von Geschenken, Filter, Verkleidungen oder kleine Spiele lockern auf.",
-        "Bleib dabei du selbst und zeig echte Emotionen. Das wirkt stärker als jede Show."],
-  q:[{ q:"Warum sind die meisten Zuschauer auf TikTok?", a:["Um Spaß zu haben und abzuschalten","Um zu arbeiten","Um Steuern zu lernen"], ok:0 },
-     { q:"Was lockert die Stimmung auf?", a:["Sounds, Filter, Spiele","Stille","Lange Pausen"], ok:0 },
-     { q:"Was wirkt laut Webinar am stärksten?", a:["Echte Emotionen","Perfekte Show","Ein teurer Hintergrund"], ok:0 }] },
-{ id:"i24", src:"Webinar Sperrungen und Verwarnungen", title:"Tikfinity und Glücksrad",
-  text:["Tikfinity ist kein offizieller Partner von TikTok. Nicht jede Funktion dort passt automatisch zu den TikTok-Regeln, zum Beispiel das Glücksrad.",
-        "Für alles, was aus deinem Chat vorgelesen wird, bist du selbst verantwortlich.",
-        "Glücksspiel oder glücksspielähnliche Aktionen sind im Live grundsätzlich nicht erlaubt."],
-  q:[{ q:"Ist Tikfinity ein offizieller TikTok-Partner?", a:["Ja","Nein","Nur in Deutschland"], ok:1 },
-     { q:"Wer ist für vorgelesene Chat-Nachrichten verantwortlich?", a:["Tikfinity","Du selbst","Der Zuschauer"], ok:1 },
-     { q:"Sind glücksspielähnliche Aktionen erlaubt?", a:["Ja","Nein","Nur mit kleinen Geschenken"], ok:1 }] },
-{ id:"i25", src:"Webinar Teambindung", title:"Gast-Live als Belohnung",
-  text:["Hol nur Zuschauer ins Gast-Live, denen du vertraust. Du bist verantwortlich für alles, was dort gesagt und getan wird.",
-        "Sieh das Gast-Live als Belohnung für treue Zuschauer. Das macht es besonders.",
-        "Gemeinsame Spiele und Gespräche mit Gästen stärken den Zusammenhalt im ganzen Team."],
-  q:[{ q:"Wen holst du ins Gast-Live?", a:["Nur Leute, denen du vertraust","Jeden, der fragt","Nur Fremde"], ok:0 },
-     { q:"Wer ist für das Verhalten der Gäste verantwortlich?", a:["Du","TikTok","Niemand"], ok:0 },
-     { q:"Wie siehst du das Gast-Live am besten?", a:["Als Belohnung für treue Zuschauer","Als Strafe","Als Pflicht"], ok:0 }] },
-{ id:"i26", src:"Webinar Monetarisierung", title:"Profil wie eine Marke",
-  text:["Dein Profil ist der erste Eindruck. Ein kurzer, einprägsamer Name bleibt besser hängen.",
-        "Ein gutes Profilbild, eine klare Bio und ein paar Videos von dir zeigen: Wer bin ich, wofür stehe ich, was will ich vermitteln?",
-        "Diese Woche: Lies deine Bio laut vor. Versteht eine fremde Person in drei Sekunden, was sie bei dir erwartet?"],
-  q:[{ q:"Was macht einen guten Namen aus?", a:["Kurz und einprägsam","Möglichst lang","Viele Zahlen"], ok:0 },
-     { q:"Was zeigt die Bio?", a:["Wer du bist und wofür du stehst","Deine Adresse","Nichts"], ok:0 },
-     { q:"Warum Videos auf dem Profil?", a:["Sie prägen den ersten Eindruck","Sie sind Pflicht","Sie bringen Münzen"], ok:0 }] }
+ {
+  "id": "i04",
+  "src": "Finanzen & Steuern",
+  "title": "Diamanten lieber auszahlen statt umtauschen",
+  "text": [
+   "Wenn du deine Live-Einnahmen direkt in Münzen umtauschst, fließt zwar kein Geld aufs Konto, steuerlich ist es trotzdem eine Einnahme. Du musst den Wert dann selbst nachweisen, mit einem Beleg für die Einnahme und einem für die Ausgabe.",
+   "Einfacher ist meist: auszahlen lassen und bei Bedarf neu aufladen. Dann hast du einen klaren Zahlungseingang auf dem Konto und eine Rechnung für den Münzkauf.",
+   "Bewahre zu jeder Auszahlung den TikTok-Zahlungsbeleg, einen Screenshot aus dem Guthaben-Bereich und den Kontoauszug zusammen auf."
+  ],
+  "note": "Keine Steuerberatung. Im Zweifel bitte deinen Steuerberater oder das Finanzamt fragen. Quellen: benderstream.de (Dez. 2025), accountable.de (Mai 2026).",
+  "q": [
+   {
+    "q": "Ist ein Umtausch von Einnahmen in Münzen steuerlich egal?",
+    "a": [
+     "Ja, es fließt ja kein Geld",
+     "Nein, es zählt trotzdem als Einnahme",
+     "Nur über 1.000 €"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Was ist meist der einfachere Weg?",
+    "a": [
+     "Auszahlen lassen und bei Bedarf neu aufladen",
+     "Alles in Münzen umtauschen",
+     "Gar nichts aufschreiben"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was gehört zu jeder Auszahlung in deine Ablage?",
+    "a": [
+     "Nur der Kontoauszug",
+     "Zahlungsbeleg, Screenshot und Kontoauszug",
+     "Nichts, TikTok meldet das"
+    ],
+    "ok": 1
+   }
+  ]
+ },
+ {
+  "id": "i01",
+  "src": "Webinar Monetarisierung",
+  "title": "Die erste Minute entscheidet",
+  "text": [
+   "Zuschauer bleiben im Schnitt nur etwa eine Minute in einem Stream. In dieser Minute entscheiden sie, ob sie bleiben.",
+   "Darum zählen Bild, Ton und Licht so viel: Kamera frontal und nicht zu nah, gutes Licht von vorne, ein Hintergrund, der etwas zeigt, aber nicht ablenkt.",
+   "Diese Woche: Schau dir die ersten 10 Sekunden deines letzten Lives als Aufnahme an, als wärst du fremd. Würdest du bleiben?"
+  ],
+  "q": [
+   {
+    "q": "Wie lange bleiben Zuschauer im Schnitt in einem Stream?",
+    "a": [
+     "Etwa 10 Minuten",
+     "Etwa 1 Minute",
+     "Etwa 30 Sekunden"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Wie sollte die Kamera stehen?",
+    "a": [
+     "Frontal und nicht zu nah",
+     "Schräg von unten",
+     "So nah wie möglich"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was gilt für den Hintergrund?",
+    "a": [
+     "Komplett leer ist am besten",
+     "Etwas zeigen, aber nicht ablenken",
+     "So bunt wie möglich"
+    ],
+    "ok": 1
+   }
+  ]
+ },
+ {
+  "id": "i02",
+  "src": "Webinar Monetarisierung",
+  "title": "Das 10k-Likes-Ziel",
+  "text": [
+   "Likes sind für deinen Stream wie Rückenwind. Ab etwa 10.000 Likes wird ein Live stärker auf der For-You-Seite gezeigt, ab etwa 100.000 auch international.",
+   "Gib deinen Zuschauern darum früh ein Ziel: „Lasst uns die 10k knacken!“ Erinnere zwischendurch an den Stand und feier es, wenn ihr es schafft.",
+   "Wichtig: Fordere nicht zu stumpfem Dauertippen ohne Gespräch auf. TikTok wertet das als künstliche Interaktion."
+  ],
+  "q": [
+   {
+    "q": "Ab wie vielen Likes läuft dein Live laut Webinar stärker auf der For-You-Seite?",
+    "a": [
+     "1.000",
+     "10.000",
+     "1 Million"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Wann gibst du das Like-Ziel am besten vor?",
+    "a": [
+     "Gleich in den ersten Minuten",
+     "Erst kurz vor Ende",
+     "Gar nicht"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was ist laut Richtlinien nicht erlaubt?",
+    "a": [
+     "Ein Like-Ziel nennen",
+     "Zu reinem Tippen-Tippen-Tippen ohne Interaktion auffordern",
+     "Sich für Likes bedanken"
+    ],
+    "ok": 1
+   }
+  ]
+ },
+ {
+  "id": "i03",
+  "src": "Webinar Sperrungen und Verwarnungen",
+  "title": "Jede Warnung bleibt hängen",
+  "text": [
+   "Jede Sperre und jede Warnung wird in deinem Konto vermerkt. Einzeln wirkt sie harmlos, in der Summe kann sie zu härteren Folgen führen.",
+   "Die Regeln findest du in der App unter TikTok Studio, dann LIVE, dann Regeln und Anleitung.",
+   "Wenn du eine Sperre bekommst: sofort Widerspruch einlegen und deinem Live-Manager einen Screenshot schicken."
+  ],
+  "q": [
+   {
+    "q": "Was passiert mit Warnungen?",
+    "a": [
+     "Sie verfallen nach einem Live",
+     "Sie werden im Konto vermerkt und summieren sich",
+     "Sie betreffen nur Videos"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Wo findest du die Live-Regeln in der App?",
+    "a": [
+     "TikTok Studio, LIVE, Regeln und Anleitung",
+     "Unter Guthaben",
+     "Im Posteingang"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was tust du nach einer Sperre zuerst?",
+    "a": [
+     "Einen Zweitaccount nutzen",
+     "Abwarten und nichts tun",
+     "Widerspruch einlegen und Screenshot an den Manager"
+    ],
+    "ok": 2
+   }
+  ]
+ },
+ {
+  "id": "i05",
+  "src": "Webinar Monetarisierung",
+  "title": "Der Ablauf eines starken Streams",
+  "text": [
+   "Minute 0 bis 5: begrüßen, kurz vorstellen, das Ziel nennen (zum Beispiel 10k Likes) und erklären, was heute passiert.",
+   "Minute 5 bis 20: Tippen und Teilen anstoßen, Fragen stellen, das eigentliche Programm starten (Match, Entertainment, Game).",
+   "Am Ende: bedanken, Zahlen zusammenfassen, das nächste Live ankündigen. Nach einer Pause oder einem Gast fängst du kurz wieder von vorne an, weil neue Zuschauer da sind."
+  ],
+  "q": [
+   {
+    "q": "Was gehört in die ersten 5 Minuten?",
+    "a": [
+     "Begrüßen, vorstellen, Ziel nennen",
+     "Sofort ins Match",
+     "Geschenke-Rangliste vorlesen"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Warum wiederholst du nach einer Pause den Anfang?",
+    "a": [
+     "Weil es Pflicht ist",
+     "Weil neue Zuschauer dazugekommen sind",
+     "Damit das Live länger wird"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Was machst du am Ende des Lives?",
+    "a": [
+     "Einfach ausmachen",
+     "Bedanken und das nächste Live ankündigen",
+     "Nach Geschenken fragen"
+    ],
+    "ok": 1
+   }
+  ]
+ },
+ {
+  "id": "i06",
+  "src": "Webinar Teambindung",
+  "title": "Frag nach, was gestern war",
+  "text": [
+   "Zuschauer kommen wieder, wenn sie sich gesehen fühlen. Frag, wie ihr Tag war, und merk dir die Antworten.",
+   "Der stärkste Trick: Greif ein Gespräch am nächsten Tag wieder auf. „Hey Lisa, wie lief dein Vorstellungsgespräch?“ So wird aus einem Zuschauer ein Teammitglied.",
+   "Lass deine Zuschauer auch mitentscheiden, zum Beispiel was ihr als Nächstes spielt."
+  ],
+  "q": [
+   {
+    "q": "Was bindet Zuschauer laut Webinar besonders?",
+    "a": [
+     "Gespräche vom Vortag wieder aufgreifen",
+     "Möglichst wenig reden",
+     "Nur Matches machen"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Wie bindest du Zuschauer ins Live ein?",
+    "a": [
+     "Gar nicht, sie sollen zuschauen",
+     "Sie bei Entscheidungen mitbestimmen lassen",
+     "Nur über Geschenke"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Warum hilft Regelmäßigkeit?",
+    "a": [
+     "Zuschauer bauen dich in ihren Alltag ein",
+     "Der Akku hält länger",
+     "Es gibt mehr Warnungen"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i07",
+  "src": "Schulung Videoproduktion",
+  "title": "Die 3-Hook-Regel",
+  "text": [
+   "Ein Video hat etwa zwei Sekunden, um jemanden zu stoppen. Darum braucht der Anfang drei Hooks gleichzeitig: Ton, Text und Bewegung.",
+   "Ton: ein Satz oder Sound, der neugierig macht. Text: wenige Wörter oben im Bild. Bewegung: etwas passiert sofort, du kommst ins Bild oder hältst etwas in die Kamera.",
+   "Tipp: Den Hook des Tages hier in der App kannst du direkt dafür nutzen."
+  ],
+  "q": [
+   {
+    "q": "Welche drei Hooks gehören an den Anfang?",
+    "a": [
+     "Ton, Text, Bewegung",
+     "Musik, Filter, Hashtag",
+     "Titel, Beschreibung, Link"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Wie viel Zeit hat ein Video ungefähr, um jemanden zu stoppen?",
+    "a": [
+     "2 Sekunden",
+     "15 Sekunden",
+     "1 Minute"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Wo steht der Text-Hook?",
+    "a": [
+     "Ganz unten",
+     "Oben im Bild, mit wenigen Wörtern",
+     "Nur in der Beschreibung"
+    ],
+    "ok": 1
+   }
+  ]
+ },
+ {
+  "id": "i08",
+  "src": "Webinar Sperrungen und Verwarnungen",
+  "title": "Geschenke richtig ansprechen",
+  "text": [
+   "Nicht erlaubt ist: immer wieder nach Geschenken fragen, für Geschenke eine Gegenleistung versprechen oder Geschenke ohne jede andere Interaktion einfordern.",
+   "Ebenfalls verboten: Geschenke durch erniedrigendes oder riskantes Verhalten holen, etwa Eiswasser-Dusche oder Haare abrasieren.",
+   "Erlaubt ist, Geschenkgalerie und Wunschliste zu zeigen und dich ehrlich zu bedanken. Die Reaktion darf zur Größe des Geschenks passen."
+  ],
+  "q": [
+   {
+    "q": "Was ist erlaubt?",
+    "a": [
+     "Für ein Geschenk etwas versprechen",
+     "Die Wunschliste zeigen und dich bedanken",
+     "Ständig nach Geschenken fragen"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Ist eine Eiswasser-Challenge für Geschenke okay?",
+    "a": [
+     "Ja, wenn es lustig ist",
+     "Nein, riskante Aktionen für Geschenke sind verboten",
+     "Nur am Wochenende"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Wie reagierst du auf ein kleines Geschenk?",
+    "a": [
+     "Ehrlich bedanken, aber nicht übertreiben",
+     "Gar nicht",
+     "Wie auf das größte Geschenk"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i09",
+  "src": "Webinar Matchcontent",
+  "title": "Match-Ideen: Die Community entscheidet",
+  "text": [
+   "Matches werden spannender, wenn deine Zuschauer etwas mitbestimmen: Kostüm oder Make-up per Abstimmung, Licht oder Playlist, Tanz- oder Talentformate wie „Dance or Freeze“.",
+   "Ein Winserien-Ziel motiviert zusätzlich: „Schaffen wir heute 5 Siege am Stück?“",
+   "Wichtig: Wird dein Match-Partner eingeschränkt, betrifft das deinen Stream mit, solange ihr verbunden seid. Wähle Partner, denen du vertraust."
+  ],
+  "q": [
+   {
+    "q": "Was macht Matches spannender?",
+    "a": [
+     "Die Community entscheidet mit",
+     "Lange Pausen",
+     "Kein Ton"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was passiert, wenn dein Match-Partner eingeschränkt wird?",
+    "a": [
+     "Nichts",
+     "Dein Stream ist mit eingeschränkt, solange ihr verbunden seid",
+     "Du bekommst Bonuspunkte"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Was ist ein Winserien-Ziel?",
+    "a": [
+     "Eine bestimmte Zahl Siege am Stück",
+     "Eine Geldstrafe",
+     "Ein Filter"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i10",
+  "src": "Finanzen & Steuern",
+  "title": "Kleinunternehmer: die Grenzen seit 2025",
+  "text": [
+   "Seit 1. Januar 2025 gelten neue Grenzen für die Kleinunternehmerregelung: höchstens 25.000 € Umsatz im Vorjahr und höchstens 100.000 € im laufenden Jahr, jeweils netto.",
+   "Neu ist: Wer im laufenden Jahr über 100.000 € kommt, fällt sofort aus der Regelung, nicht erst im nächsten Jahr. Im ersten Jahr der Tätigkeit zählt nur die 25.000-€-Grenze.",
+   "Auch als Kleinunternehmer musst du alle Einnahmen erfassen. Die Regelung betrifft nur die Umsatzsteuer, nicht die Einkommensteuer."
+  ],
+  "note": "Keine Steuerberatung. Im Zweifel bitte deinen Steuerberater oder das Finanzamt fragen. Quellen: IHK München, IHK Berlin (Kleinunternehmerregelung 2025).",
+  "q": [
+   {
+    "q": "Wie hoch darf der Vorjahresumsatz für Kleinunternehmer seit 2025 sein?",
+    "a": [
+     "22.000 €",
+     "25.000 €",
+     "50.000 €"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Was passiert, wenn du im laufenden Jahr über 100.000 € kommst?",
+    "a": [
+     "Erst nächstes Jahr ändert sich etwas",
+     "Du fällst sofort aus der Regelung",
+     "Nichts"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Musst du als Kleinunternehmer deine Einnahmen erfassen?",
+    "a": [
+     "Ja, trotzdem alle",
+     "Nein, gar nicht",
+     "Nur Geschenke über 100 €"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i11",
+  "src": "Webinar Monetarisierung",
+  "title": "Dein Ankündigungsvideo",
+  "text": [
+   "Etwa 15 Minuten vor dem Live ein kurzes Video posten: wer du bist, was heute im Live passiert, welches Ziel ihr habt, ob es ein Event gibt.",
+   "Kurzvideos und Lives zusammen funktionieren für den Algorithmus am besten. Wer dein Video sieht, bekommt dein Live eher angezeigt.",
+   "Mach es kurz und mit Stimmung, ein Hook am Anfang reicht."
+  ],
+  "q": [
+   {
+    "q": "Wann postest du das Ankündigungsvideo am besten?",
+    "a": [
+     "Etwa 15 Minuten vor dem Live",
+     "Am Vortag",
+     "Nach dem Live"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was gehört hinein?",
+    "a": [
+     "Was im Live passiert und welches Ziel ihr habt",
+     "Deine Steuernummer",
+     "Nur Musik"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Warum lohnt es sich?",
+    "a": [
+     "Videos und Lives zusammen stärken den Algorithmus",
+     "Es ist Pflicht",
+     "Es gibt Münzen dafür"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i12",
+  "src": "Webinar Teambindung",
+  "title": "Gute Moderatoren",
+  "text": [
+   "Deine Modis sind die wichtigsten Teammitglieder. Vertrauen ist dabei alles: Sie müssen hinter dir und deinem Content stehen.",
+   "Sprich mit ihnen ab, was sie tun sollen: neue Zuschauer begrüßen, an Tippen und Teilen erinnern, Kommentare fixieren, den Chat im Blick behalten.",
+   "Modis sollen die Stimmung tragen, aber dich nicht ablenken."
+  ],
+  "q": [
+   {
+    "q": "Was ist bei Moderatoren das Wichtigste?",
+    "a": [
+     "Vertrauen",
+     "Viele Follower",
+     "Viele Geschenke"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Welche Aufgabe passt zu Modis?",
+    "a": [
+     "Neue Zuschauer begrüßen",
+     "Dein Live beenden",
+     "Für dich Matches annehmen"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was sollen Modis nicht tun?",
+    "a": [
+     "Dich ablenken",
+     "Den Chat beobachten",
+     "An Teilen erinnern"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i13",
+  "src": "Webinar Sperrungen und Verwarnungen",
+  "title": "Live im Auto",
+  "text": [
+   "Im Auto müssen die Rollen eindeutig erkennbar sein.",
+   "Wer fährt, darf kein eigenes Live starten, nicht mit dem Stream eines Mitfahrers interagieren und kein gefährliches Fahrverhalten zeigen.",
+   "Wer mitfährt, darf die fahrende Person nicht ablenken und die Kamera nicht so stellen, dass die Sicht eingeschränkt ist."
+  ],
+  "q": [
+   {
+    "q": "Darf die fahrende Person live gehen?",
+    "a": [
+     "Ja, mit Halterung",
+     "Nein",
+     "Nur auf der Autobahn"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Was darf der Beifahrer nicht?",
+    "a": [
+     "Die fahrende Person ablenken",
+     "Reden",
+     "Sich anschnallen"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was muss im Auto-Live klar erkennbar sein?",
+    "a": [
+     "Die Marke des Autos",
+     "Wer fährt und wer mitfährt",
+     "Das Kennzeichen"
+    ],
+    "ok": 1
+   }
+  ]
+ },
+ {
+  "id": "i14",
+  "src": "Webinar Monetarisierung",
+  "title": "Immer zur gleichen Zeit",
+  "text": [
+   "Versuch, möglichst immer zur gleichen Zeit live zu gehen. Der Algorithmus lernt aus deinen vergangenen Streams und den Zuschauerzahlen.",
+   "Für deine Zuschauer wird dein Live so ein fester Termin im Alltag, wie eine Lieblingsserie.",
+   "Diese Woche: Schreib dir zwei feste Live-Zeiten in den Kalender und sag sie im Live an."
+  ],
+  "q": [
+   {
+    "q": "Warum hilft eine feste Uhrzeit?",
+    "a": [
+     "Der Algorithmus und die Zuschauer gewöhnen sich daran",
+     "Es gibt Bonus-Diamanten",
+     "Es ist Vorschrift"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Woraus lernt der Algorithmus laut Webinar?",
+    "a": [
+     "Aus vergangenen Streams und Zuschauerzahlen",
+     "Aus deinem Profilbild",
+     "Gar nicht"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was machst du mit deinen Live-Zeiten?",
+    "a": [
+     "Geheim halten",
+     "Im Live ansagen",
+     "Jeden Tag ändern"
+    ],
+    "ok": 1
+   }
+  ]
+ },
+ {
+  "id": "i15",
+  "src": "Webinar Matchcontent",
+  "title": "Strafen, die Spaß machen",
+  "text": [
+   "Match-Strafen sind beliebt, wenn sie lustig und harmlos sind: Profilbild oder Bio ändern, ein Video drehen, etwas singen, das nicht deinem Geschmack entspricht, kurz die Augen verbinden.",
+   "Auch „Preisgeben“ funktioniert gut: ein altes Foto zeigen, hinter die Kulissen schauen lassen, eine private Story erzählen.",
+   "Achtung: Strafen dürfen nicht gefährlich oder erniedrigend sein, sonst droht eine Sperre."
+  ],
+  "q": [
+   {
+    "q": "Welche Strafe ist geeignet?",
+    "a": [
+     "Altes Foto zeigen",
+     "Etwas Gefährliches essen",
+     "Sich selbst schlagen"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was ist „Preisgeben“?",
+    "a": [
+     "Etwas Persönliches zeigen oder erzählen",
+     "Geld verschenken",
+     "Den Account abgeben"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Welche Strafen sind tabu?",
+    "a": [
+     "Gefährliche oder erniedrigende",
+     "Lustige",
+     "Kurze"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i16",
+  "src": "Finanzen & Steuern",
+  "title": "Belege für jede Auszahlung",
+  "text": [
+   "TikTok schickt dir bei Auszahlungen meist nur einen Zahlungsbeleg. Dem fehlen oft Angaben wie Leistungszeitraum oder deine Steuernummer.",
+   "Viele Creator ergänzen das mit einem Eigenbeleg (Proforma-Rechnung) „nur für die Buchhaltung“: Belegnummer, Datum, Zeitraum, deine Daten, die TikTok-Gesellschaft laut Beleg, Betrag und Steuerhinweis.",
+   "Wichtig: Die Einnahme nur einmal buchen, nicht Zahlungsbeleg und Eigenbeleg doppelt."
+  ],
+  "note": "Keine Steuerberatung. Im Zweifel bitte deinen Steuerberater oder das Finanzamt fragen. Quelle: accountable.de (Mai 2026).",
+  "q": [
+   {
+    "q": "Was fehlt TikTok-Zahlungsbelegen oft?",
+    "a": [
+     "Leistungszeitraum oder deine Steuernummer",
+     "Der Betrag",
+     "Das Datum"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Wofür ist ein Eigenbeleg da?",
+    "a": [
+     "Um fehlende Angaben für die Buchhaltung zu ergänzen",
+     "Um TikTok eine Rechnung zu schicken",
+     "Um mehr Geld zu bekommen"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Wie oft buchst du eine Auszahlung?",
+    "a": [
+     "Einmal",
+     "Zweimal",
+     "Gar nicht"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i17",
+  "src": "Webinar Monetarisierung",
+  "title": "Anerkennung zeigen",
+  "text": [
+   "Kein Support ist selbstverständlich. Zeig deinen Unterstützern, dass du es siehst.",
+   "Je größer das Geschenk, desto größer darf deine Reaktion sein. Bei kleinen Geschenken freundlich danken, ohne zu übertreiben, sonst wirkt es unecht.",
+   "Ein Supportervideo nach dem Live ist eine schöne Extra-Geste für deine Top-Unterstützer."
+  ],
+  "q": [
+   {
+    "q": "Wie reagierst du auf ein großes Geschenk?",
+    "a": [
+     "Deutlich und herzlich",
+     "Gar nicht",
+     "Genauso wie auf ein kleines"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was ist ein Supportervideo?",
+    "a": [
+     "Ein Dankeschön-Video für deine Unterstützer",
+     "Ein Werbevideo",
+     "Ein Tutorial"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Warum nicht bei jedem kleinen Geschenk übertreiben?",
+    "a": [
+     "Es wirkt dann unecht",
+     "Es ist verboten",
+     "Es kostet Münzen"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i18",
+  "src": "Webinar Teambindung",
+  "title": "Teamrahmen mit Bedacht",
+  "text": [
+   "Ein Teamrahmen zeigt die Zugehörigkeit zu dir auf der ganzen Plattform. Teste vorher, ob Name und Design auch klein gut lesbar sind.",
+   "Gib den Rahmen nicht zu leicht heraus: Wer ihn trägt, tritt in deinem Namen auf.",
+   "Abo-Vorteile stärken das Team zusätzlich, zum Beispiel exklusive Sticker, eine Abo-Gruppe oder ein Gast-Live nur für Abonnenten."
+  ],
+  "q": [
+   {
+    "q": "Warum den Teamrahmen nicht zu leicht vergeben?",
+    "a": [
+     "Die Träger treten in deinem Namen auf",
+     "Er kostet viel",
+     "Er verschwindet sonst"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was solltest du beim Rahmen testen?",
+    "a": [
+     "Die Lesbarkeit in klein",
+     "Die Farbe deines Hintergrunds",
+     "Die Uhrzeit"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was ist ein möglicher Abo-Vorteil?",
+    "a": [
+     "Exklusive Sticker",
+     "Geld zurück",
+     "Gratis-Münzen"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i19",
+  "src": "Webinar Sperrungen und Verwarnungen",
+  "title": "Statische Lives und Minderjährige",
+  "text": [
+   "Lives mit statischem Inhalt, also Fotos im Vollbild, kein Sprechen, schlechtes Bild oder ein abgespielter Film, werden in der Reichweite eingeschränkt.",
+   "Minderjährige dürfen in deinen Lives keine Münzen bekommen oder ausgeben. Weise regelmäßig darauf hin.",
+   "Auch Links oder QR-Codes zu Seiten außerhalb von TikTok sind im Live zu unterlassen."
+  ],
+  "q": [
+   {
+    "q": "Was passiert bei statischen Lives?",
+    "a": [
+     "Die Reichweite wird eingeschränkt",
+     "Mehr Zuschauer",
+     "Nichts"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Dürfen Minderjährige in deinem Live Geschenke schicken?",
+    "a": [
+     "Ja",
+     "Nein",
+     "Nur kleine"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Sind QR-Codes zu anderen Seiten im Live okay?",
+    "a": [
+     "Ja",
+     "Nein, darauf verzichten",
+     "Nur abends"
+    ],
+    "ok": 1
+   }
+  ]
+ },
+ {
+  "id": "i20",
+  "src": "Webinar Monetarisierung",
+  "title": "Events: einfach mitmachen",
+  "text": [
+   "Kannst du dich für ein Event registrieren? Dann tu es. Allein irgendwo in einer Rangliste sichtbar zu sein, bringt Reichweite.",
+   "Stimm deine Community vorher ein und arbeitet gemeinsam auf das Ziel hin. Ein geschafftes Event schweißt das Team zusammen.",
+   "Alle aktuellen Kampagnen findest du hier im Kalender."
+  ],
+  "q": [
+   {
+    "q": "Warum lohnt sich ein Event auch ohne Sieg?",
+    "a": [
+     "Sichtbarkeit in der Rangliste bringt Reichweite",
+     "Es gibt immer Geld",
+     "Es ist Pflicht"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was machst du vor einem Event?",
+    "a": [
+     "Die Community einstimmen",
+     "Das Live absagen",
+     "Nichts sagen"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Wo findest du die aktuellen Kampagnen?",
+    "a": [
+     "Im Kalender der App",
+     "Nur bei Google",
+     "Gar nicht"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i21",
+  "src": "Schulung Videoproduktion",
+  "title": "Text sicher platzieren",
+  "text": [
+   "Oben und unten verdeckt die TikTok-Oberfläche Teile deines Videos. Der Text-Hook gehört darum unter die Suchleiste, ungefähr ins obere Viertel.",
+   "Untertitel setzt du etwas oberhalb der Bildmitte bis knapp über zwei Drittel, mit genug Abstand zum rechten Rand wegen der Knöpfe.",
+   "Ab dem unteren Viertel stehen Name, Beschreibung und Shop. Dort hat wichtiger Text nichts zu suchen."
+  ],
+  "q": [
+   {
+    "q": "Wohin gehört der Text-Hook?",
+    "a": [
+     "Unter die Suchleiste, ins obere Viertel",
+     "Ganz nach unten",
+     "In die Mitte rechts"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Warum Abstand zum rechten Rand?",
+    "a": [
+     "Dort sind die Knöpfe",
+     "Wegen der Lesbarkeit von links",
+     "Kein Grund"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was steht im unteren Viertel?",
+    "a": [
+     "Name, Beschreibung, Shop",
+     "Nichts",
+     "Der Hook"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i22",
+  "src": "Finanzen & Steuern",
+  "title": "Rücklagen von Anfang an",
+  "text": [
+   "TikTok zieht keine Steuern ab. Was du auszahlst, ist erst mal brutto.",
+   "Viele Selbstständige legen darum von jeder Auszahlung einen festen Teil auf ein eigenes Konto. Wie viel sinnvoll ist, hängt von deinem Einkommen ab. Das kann dir ein Steuerberater schnell sagen.",
+   "Wer gleich zu Beginn ein Tagesgeldkonto nur für Steuern anlegt, erlebt bei der Nachzahlung keine böse Überraschung."
+  ],
+  "note": "Keine Steuerberatung. Im Zweifel bitte deinen Steuerberater oder das Finanzamt fragen.",
+  "q": [
+   {
+    "q": "Zieht TikTok bei Auszahlungen Steuern ab?",
+    "a": [
+     "Ja, automatisch",
+     "Nein, du kümmerst dich selbst",
+     "Nur bei Kleinunternehmern"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Was hilft gegen eine böse Überraschung bei der Steuer?",
+    "a": [
+     "Ein eigenes Konto für Rücklagen",
+     "Alles ausgeben",
+     "Nichts aufschreiben"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Wer sagt dir, wie viel Rücklage sinnvoll ist?",
+    "a": [
+     "Ein Steuerberater",
+     "Der Algorithmus",
+     "Deine Zuschauer"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i23",
+  "src": "Webinar Monetarisierung",
+  "title": "Stimmung ist steuerbar",
+  "text": [
+   "TikTok ist für die meisten Zuschauer eine Spaß-App. Sie wollen vom Alltag abschalten.",
+   "Musik und deine eigene Stimmung lenken das Live. Sounds, auch die von Geschenken, Filter, Verkleidungen oder kleine Spiele lockern auf.",
+   "Bleib dabei du selbst und zeig echte Emotionen. Das wirkt stärker als jede Show."
+  ],
+  "q": [
+   {
+    "q": "Warum sind die meisten Zuschauer auf TikTok?",
+    "a": [
+     "Um Spaß zu haben und abzuschalten",
+     "Um zu arbeiten",
+     "Um Steuern zu lernen"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was lockert die Stimmung auf?",
+    "a": [
+     "Sounds, Filter, Spiele",
+     "Stille",
+     "Lange Pausen"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was wirkt laut Webinar am stärksten?",
+    "a": [
+     "Echte Emotionen",
+     "Perfekte Show",
+     "Ein teurer Hintergrund"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i24",
+  "src": "Webinar Sperrungen und Verwarnungen",
+  "title": "Tikfinity und Glücksrad",
+  "text": [
+   "Tikfinity ist kein offizieller Partner von TikTok. Nicht jede Funktion dort passt automatisch zu den TikTok-Regeln, zum Beispiel das Glücksrad.",
+   "Für alles, was aus deinem Chat vorgelesen wird, bist du selbst verantwortlich.",
+   "Glücksspiel oder glücksspielähnliche Aktionen sind im Live grundsätzlich nicht erlaubt."
+  ],
+  "q": [
+   {
+    "q": "Ist Tikfinity ein offizieller TikTok-Partner?",
+    "a": [
+     "Ja",
+     "Nein",
+     "Nur in Deutschland"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Wer ist für vorgelesene Chat-Nachrichten verantwortlich?",
+    "a": [
+     "Tikfinity",
+     "Du selbst",
+     "Der Zuschauer"
+    ],
+    "ok": 1
+   },
+   {
+    "q": "Sind glücksspielähnliche Aktionen erlaubt?",
+    "a": [
+     "Ja",
+     "Nein",
+     "Nur mit kleinen Geschenken"
+    ],
+    "ok": 1
+   }
+  ]
+ },
+ {
+  "id": "i25",
+  "src": "Webinar Teambindung",
+  "title": "Gast-Live als Belohnung",
+  "text": [
+   "Hol nur Zuschauer ins Gast-Live, denen du vertraust. Du bist verantwortlich für alles, was dort gesagt und getan wird.",
+   "Sieh das Gast-Live als Belohnung für treue Zuschauer. Das macht es besonders.",
+   "Gemeinsame Spiele und Gespräche mit Gästen stärken den Zusammenhalt im ganzen Team."
+  ],
+  "q": [
+   {
+    "q": "Wen holst du ins Gast-Live?",
+    "a": [
+     "Nur Leute, denen du vertraust",
+     "Jeden, der fragt",
+     "Nur Fremde"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Wer ist für das Verhalten der Gäste verantwortlich?",
+    "a": [
+     "Du",
+     "TikTok",
+     "Niemand"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Wie siehst du das Gast-Live am besten?",
+    "a": [
+     "Als Belohnung für treue Zuschauer",
+     "Als Strafe",
+     "Als Pflicht"
+    ],
+    "ok": 0
+   }
+  ]
+ },
+ {
+  "id": "i26",
+  "src": "Webinar Monetarisierung",
+  "title": "Profil wie eine Marke",
+  "text": [
+   "Dein Profil ist der erste Eindruck. Ein kurzer, einprägsamer Name bleibt besser hängen.",
+   "Ein gutes Profilbild, eine klare Bio und ein paar Videos von dir zeigen: Wer bin ich, wofür stehe ich, was will ich vermitteln?",
+   "Diese Woche: Lies deine Bio laut vor. Versteht eine fremde Person in drei Sekunden, was sie bei dir erwartet?"
+  ],
+  "q": [
+   {
+    "q": "Was macht einen guten Namen aus?",
+    "a": [
+     "Kurz und einprägsam",
+     "Möglichst lang",
+     "Viele Zahlen"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Was zeigt die Bio?",
+    "a": [
+     "Wer du bist und wofür du stehst",
+     "Deine Adresse",
+     "Nichts"
+    ],
+    "ok": 0
+   },
+   {
+    "q": "Warum Videos auf dem Profil?",
+    "a": [
+     "Sie prägen den ersten Eindruck",
+     "Sie sind Pflicht",
+     "Sie bringen Münzen"
+    ],
+    "ok": 0
+   }
+  ]
+ }
 ];
