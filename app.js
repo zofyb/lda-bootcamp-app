@@ -1467,7 +1467,7 @@ const ttVideos = () => S.extras.filter(x=>x.kind==="tiktok" && x.link).sort((a,b
 function ttCard(x){
   const cover=x.path && x.path!=="tiktok";
   return `<a class="ttcard" href="${esc(x.link)}" target="_blank" rel="noopener" data-tt="${esc(x.id)}">
-    <span class="ttimg">${cover?`<img data-tcover="${esc(x.path)}" alt="">`:""}<span class="ttplay">${ic("i-play")}</span></span>
+    <span class="ttimg ${cover?"":"nocov"}" ${cover?"":`data-ttfix="${esc(x.id)}"`}>${cover?`<img data-tcover="${esc(x.path)}" alt="">`:`<em>${esc(x.title)}</em>`}<span class="ttplay">${ic("i-play")}</span></span>
     <b>${esc(x.title)}</b><small>Auf TikTok ansehen ›</small></a>`;
 }
 function ttStrip(max, head="Tipps von Zofy auf TikTok"){
@@ -1479,7 +1479,7 @@ function ttAdmin(){
     <p class="muted" style="margin:0">In der App erscheint nur das Vorschaubild. Wer tippt, landet beim echten Video auf TikTok.</p>
     <label class="f" for="tt-link">Link zum TikTok-Video<input id="tt-link" type="url" placeholder="https://www.tiktok.com/@zofyb/video/…"></label>
     <label class="f" for="tt-title">Titel<input id="tt-title" type="text" placeholder="z. B. 3 Fehler beim ersten Live"></label>
-    <label class="f" for="tt-cover">Vorschaubild (Screenshot vom Video, wird verkleinert)<input id="tt-cover" type="file" accept="image/*"></label>
+    <label class="f" for="tt-cover">Vorschaubild (optional: ohne Bild versucht die App, es von TikTok zu holen)<input id="tt-cover" type="file" accept="image/*"></label>
     <button class="btn small" id="tt-add">Hinzufügen</button></div>`;
 }
 async function shrinkCover(file){
@@ -1497,12 +1497,36 @@ async function addTikTok(){
   if (!title) return toast("Bitte einen Titel eingeben.");
   try{
     $("#tt-add").disabled=true; let path="tiktok";
-    if (f){ const blob=await shrinkCover(f); path=`tiktok-${Date.now()}.jpg`; const u=await sb.storage.from("unterlagen").upload(path,blob,{ contentType:"image/jpeg" }); if (u.error) throw u.error; }
+    const src=f || await ttThumb(link);
+    if (src){ const blob=await shrinkCover(src); path=`tiktok-${Date.now()}.jpg`; const u=await sb.storage.from("unterlagen").upload(path,blob,{ contentType:"image/jpeg" }); if (u.error) throw u.error; }
     const r=await sb.from("extras").insert({ title, path, link, kind:"tiktok", audience:"all", category:"TikTok-Tipps", sort:S.extras.length }); if (r.error) throw r.error;
     await refresh(); render(true); toast("TikTok-Video hinzugefügt.");
   } catch(e){ fail(e); render(true); }
 }
+/* Vorschaubild automatisch von TikTok holen (nur im Browser der Leitung, beim Hinzufügen oder einmal nachträglich) */
+async function ttThumb(link){
+  try{
+    const j=await (await fetch("https://www.tiktok.com/oembed?url="+encodeURIComponent(link))).json();
+    if (!j?.thumbnail_url) return null;
+    const r=await fetch(j.thumbnail_url); if (!r.ok) return null;
+    const b=await r.blob(); return /^image\//.test(b.type) ? b : null;
+  } catch(e){ console.warn("TikTok-Vorschau", e); return null; }
+}
+const ttTried=new Set();
+async function ttBackfill(){
+  if (S.me?.role!=="lead" || S.viewAs || window.__DEMO) return;
+  for (const el of document.querySelectorAll("[data-ttfix]")){
+    const x=S.extras.find(y=>y.id===el.dataset.ttfix); if (!x || ttTried.has(x.id)) continue; ttTried.add(x.id);
+    const src=await ttThumb(x.link); if (!src) continue;
+    try{ const blob=await shrinkCover(src), path=`tiktok-${Date.now()}.jpg`;
+      const u=await sb.storage.from("unterlagen").upload(path,blob,{ contentType:"image/jpeg" }); if (u.error) throw u.error;
+      const r=await sb.from("extras").update({ path }).eq("id",x.id); if (r.error) throw r.error; x.path=path; }
+    catch(e){ console.warn("TikTok-Vorschau", e); }
+  }
+  if ([...ttTried].some(id=>S.extras.find(y=>y.id===id)?.path!=="tiktok")) render(true);
+}
 async function hydrateCovers(){
+  ttBackfill().catch(console.error);
   const imgs=[...document.querySelectorAll("img[data-tcover]:not([src])")]; if (!imgs.length) return;
   const need=[...new Set(imgs.map(i=>i.dataset.tcover))].filter(p=>!AVURL["u:"+p]);
   if (need.length){ const { data }=await sb.storage.from("unterlagen").createSignedUrls(need, 6*3600); (data||[]).forEach(d=>{ if (d.signedUrl) AVURL["u:"+d.path]=d.signedUrl; }); }
