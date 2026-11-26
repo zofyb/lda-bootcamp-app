@@ -4,11 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#060208">
-<title>LIVEdream Creator Bootcamp</title>
+<title>LIVEdream Academy</title>
 <link rel="icon" href="logo.png">
 <link rel="apple-touch-icon" href="logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Poppins:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,12 +20,14 @@
   <div class="switch" id="switch" hidden></div>
   <nav class="tabs" id="tabs" hidden></nav>
   <main id="view"><p class="muted">Lädt …</p></main>
+  <footer class="legal"><p>© 2026 Sophie Berger. Diese App ist ein persönliches Werk von Sophie Berger. Alle Rechte daran liegen bei ihr persönlich und nicht bei der LIVEdream Agency. Die Agentur nutzt die App mit ihrer Erlaubnis, die jederzeit widerrufen werden kann.</p><p class="links"><a href="#impressum">Impressum</a> · <a href="#datenschutz">Datenschutz</a></p></footer>
 </div>
 <div class="win" id="win" aria-live="polite"><div><div class="medal">✓</div><h2 id="win-t"></h2><p class="muted" id="win-p"></p></div></div>
 <canvas id="conf"></canvas>
 <div class="toast" id="toast" role="status" hidden></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
+<script src="vendor/supabase.js"></script>
 <script src="config.js"></script>
+<script>if(/[?&]demo\b/.test(location.search))document.write('<script src="demo.js"><\/script>')</script>
 <script src="app.js"></script>
 </body>
 </html>

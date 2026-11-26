@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const view = $("#view"), who = $("#who"), tabsEl = $("#tabs");
 
 let sb = null;
-const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, extras:[], noExtras:false,
+const S = { session:null, me:null, real:null, viewAs:"", areas:[], members:[], subs:[], progress:[], activity:[], settings:{}, extras:[], noExtras:false, snaps:[], questions:[], survey:[], top:[], noUpd5:false, survDraft:{},
   needsUpdate:false, tab:null, openArea:null, creator:null, pending:{}, editMember:null, editArea:1, confirmDelete:null,
   busy:false, quiz:{}, ringShown:false, localProg:{}, justUnlocked:null };
 
@@ -78,7 +78,8 @@ const BADGES = [
   ["streak","🔥","3 Tage am Stück dabei"],
   ["half","⭐","4 Themen abgegeben"],
   ["pass","👑","10 Punkte erreicht"],
-  ["all","🏆","Alle Themen abgegeben"]
+  ["all","🏆","Alle Themen abgegeben"],
+  ["snap","📸","Vorher-Nachher gezeigt"]
 ];
 function badgesFor(email){
   const subs=S.subs.filter(s=>s.creator_email===email), w1=S.areas.filter(a=>a.week===1);
@@ -88,10 +89,13 @@ function badgesFor(email){
     streak: streakInfo(email).best>=3,
     half: subs.length>=4,
     pass: total(email)>=10,
-    all: S.areas.length>0 && subs.length>=S.areas.length
+    all: S.areas.length>0 && subs.length>=S.areas.length,
+    snap: ["vorher","nachher"].every(k=>snapOf(email,k))
   };
   return BADGES.map(([k,ic,t]) => ({ k, ic, t, on:!!on[k] }));
 }
+const snapOf = (email,k) => S.snaps.find(x=>x.creator_email===email && x.kind===k);
+const passed = email => total(email) >= 10;
 function storeGet(k){ try{ return JSON.parse(localStorage.getItem(k)||"null"); }catch{ return null; } }
 function storeSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
 function newBadges(email){
@@ -125,6 +129,9 @@ async function hydrate(){
     const map = Object.fromEntries((data||[]).filter(d=>d.signedUrl).map(d=>[d.path,d.signedUrl]));
     els.forEach(e => { if (map[e.dataset.path]) e.href = map[e.dataset.path]; });
   }
+  const imgs=[...document.querySelectorAll("img[data-img]:not([src])")];
+  if (imgs.length){ const { data } = await sb.storage.from("nachweise").createSignedUrls([...new Set(imgs.map(i=>i.dataset.img))], 3600);
+    const map=Object.fromEntries((data||[]).filter(d=>d.signedUrl).map(d=>[d.path,d.signedUrl])); imgs.forEach(i=>{ if(map[i.dataset.img]) i.src=map[i.dataset.img]; }); }
   for (const v of document.querySelectorAll("video[data-video]:not([src])")) {
     const { data:d } = await sb.storage.from("unterlagen").createSignedUrl(v.dataset.video, 6*3600);
     if (d?.signedUrl) v.src = d.signedUrl;
@@ -212,6 +219,9 @@ async function refresh(){
   S.areas=a.data||[]; S.members=m.data||[]; S.subs=s.data||[];
   const [p,ac,st,ex] = await Promise.all([ sb.from("progress").select("*"), sb.from("activity").select("*"), sb.from("settings").select("*"), sb.from("extras").select("*").order("sort").order("created_at") ]);
   S.noExtras = !!ex.error; S.extras = ex.data || [];
+  const [sn,qu,sv,tp] = await Promise.all([ sb.from("snapshots").select("*"), sb.from("questions").select("*").order("created_at",{ascending:false}), sb.from("survey").select("*"), sb.rpc("top5") ]);
+  S.noUpd5 = !!(sn.error || qu.error || sv.error);
+  S.snaps = sn.data||[]; S.questions = qu.data||[]; S.survey = sv.data||[]; S.top = tp.error ? [] : (tp.data||[]);
   S.needsUpdate = !!(p.error || ac.error || st.error);
   S.progress = p.data||[]; S.activity = ac.data||[];
   S.settings = Object.fromEntries((st.data||[]).map(r=>[r.key,r.value]));
@@ -223,8 +233,8 @@ function loginView(email="", sent=false, err=""){
   document.querySelector(".wrap").classList.remove("wide");
   view.innerHTML = `<div class="login">
     <img class="logo" src="logo.png" alt="LIVEdream Agency">
-    <div class="stack" style="text-align:center"><span class="eyebrow">LIVEdream Creator Bootcamp</span>
-    <h1>${sent ? "Schau in dein <em>Postfach</em>" : "Willkommen im <em>Bootcamp</em>"}</h1></div>
+    <div class="stack" style="text-align:center"><span class="eyebrow">LIVEdream Academy</span>
+    <h1>${sent ? "Schau in dein <em>Postfach</em>" : "Willkommen in der <em>Academy</em>"}</h1></div>
     <div class="panel stack">
     <p class="soft">${sent ? `Wir haben dir eine E-Mail an <b>${esc(email)}</b> geschickt. Tippe auf den Link darin oder gib den Code hier ein.` : "Melde dich mit der E-Mail-Adresse an, die du deinem Manager gegeben hast. Du bekommst einen Anmelde-Link, ganz ohne Passwort."}</p>
     ${sent ? `<p class="muted"><b style="color:var(--gold);font-weight:600">Keine Mail da?</b> Schau bitte im Spam-Ordner nach und markiere die Mail als „Kein Spam“. Dann kommt sie beim nächsten Mal normal an.</p>
@@ -256,8 +266,8 @@ async function verifyCode(){
 /* ---------- Rahmen ---------- */
 const TABS = {
   creator: [["themen","Meine Themen"]],
-  manager: [["bewerten","Zu bewerten"],["creator","Meine Creator"]],
-  lead:    [["uebersicht","Übersicht"],["bewerten","Zu bewerten"],["personen","Teilnehmer"],["themenedit","Themen & Start"]]
+  manager: [["bewerten","Zu bewerten"],["creator","Meine Creator"],["fragen","Fragenbox"]],
+  lead:    [["uebersicht","Übersicht"],["bewerten","Zu bewerten"],["fragen","Fragen & Umfrage"],["personen","Teilnehmer"],["themenedit","Themen & Start"]]
 };
 const ROLE_NAME = { lead:"Agenturleitung", manager:"Manager", creator:"Creator" };
 function applyView(){
@@ -276,7 +286,8 @@ function switcher(){
     <optgroup label="Creator">${opt("__preview","Creator: Vorschau (alle Themen offen)")}${creators().map(c=>opt(c.email,"Creator: "+label(c))).join("")}</optgroup>
   </select></label>
   ${S.viewAs?`<p class="viewnote">Du siehst die App gerade so wie ${S.viewAs==="__preview"?"ein Creator":esc(S.me.role==="creator"?label(S.me):S.me.name)}.${S.me.role==="creator"?" Abgeben ist hier gesperrt, Video und Handout kannst du durchklicken.":""}</p>`:""}
-  ${S.needsUpdate?`<p class="err">Die Datenbank braucht noch das Update (update-2.sql). Bis dahin fehlen Startdatum, Fortschritt und Streak.</p>`:""}`;
+  ${S.needsUpdate?`<p class="err">Die Datenbank braucht noch das Update (update-2.sql). Bis dahin fehlen Startdatum, Fortschritt und Streak.</p>`:""}
+  ${!S.needsUpdate&&(S.noExtras||S.noUpd5)?`<p class="err">Noch ein Datenbank-Update fehlt (${[S.noExtras&&"update-4.sql",S.noUpd5&&"update-5.sql"].filter(Boolean).join(", ")}).</p>`:""}`;
 }
 function render(keepScroll){
   applyView();
@@ -291,7 +302,7 @@ function render(keepScroll){
   let html;
   if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : creatorHome();
   else if (S.creator) html = creatorDetail(S.creator);
-  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, personen:peopleView, themenedit:areaEditor }[S.tab] || pendingView)();
+  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor }[S.tab] || pendingView)();
   view.innerHTML = html;
   if (!keepScroll) window.scrollTo(0,0);
   afterRender();
@@ -320,7 +331,7 @@ function ringSvg(pts, max){
     <circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8"/>
     <circle class="arc" cx="50" cy="50" r="${r}" fill="none" stroke="url(#rg)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C.toFixed(2)}" style="stroke-dashoffset:${off.toFixed(2)}" data-off="${off.toFixed(2)}" data-full="${C.toFixed(2)}"/>
     ${max>=10?`<circle cx="${mx.toFixed(2)}" cy="${my.toFixed(2)}" r="3.4" fill="#FFB017" stroke="#060208" stroke-width="1.5"/>`:""}
-  </svg><div class="val"><div><b data-v="${pts}">${pts}</b><small>von ${max} Punkten</small></div></div></div>`;
+  </svg><div class="val"><div><b data-v="${pts}">${pts}</b><small>von ${max}</small></div></div></div>`;
 }
 function flipHtml(ms){
   ms=Math.max(0,ms); const d=Math.floor(ms/DAY), h=Math.floor(ms%DAY/36e5), m=Math.floor(ms%36e5/6e4), s=Math.floor(ms%6e4/1e3);
@@ -349,7 +360,8 @@ function creatorHome(){
   let h = `<div class="stack"><span class="eyebrow">LIVEdream Creator Bootcamp</span><h1>${hello}, <em>${esc(firstName(S.me))}</em></h1></div>
   <div class="panel"><div class="hero">${ringSvg(pts, maxPts())}<div><p><b>${esc(ht)}</b>${esc(hp)}</p>
     <div class="badges">${bs.map(b=>`<span class="${b.on?"on":""} ${fresh.has(b.k)?"new":""}" title="${esc(b.t)}${b.on?"":" (noch offen)"}" aria-label="${esc(b.t)}">${b.ic}</span>`).join("")}</div></div></div></div>`;
-  h += extrasBlock(e);
+  h += reminderBlock(e) + rewardsBlock(e);
+  if (!snapOf(e,"vorher") && !S.noUpd5) h += snapBlock(e);
   // Weg
   const states=S.areas.map(a=>areaState(e,a));
   const curIdx=states.findIndex(s=>s==="open");
@@ -375,18 +387,139 @@ function creatorHome(){
   }
   h += `</div>`;
   if (!S.areas.length) h += `<p class="muted">Noch keine Themen angelegt.</p>`;
+  h += surveyBlock(e) + topBlock() + (snapOf(e,"vorher")||S.noUpd5 ? snapBlock(e) : "") + extrasBlock(e) + questionBlock();
   return h;
 }
 
+const fileKind = p => isVid(p)?"Video":/\.pdf$/i.test(p||"")?"PDF":/\.(png|jpe?g|webp|gif)$/i.test(p||"")?"Bild":/\.zip$/i.test(p||"")?"Paket (ZIP)":"Datei";
 const isVid = p => /\.(mp4|mov|webm|m4v)$/i.test(p||"");
 function extraCard(x, seen){
-  return `<a class="doc" data-handout="${esc(x.path)}" data-extra="${esc(x.id)}" target="_blank" rel="noopener"><span class="paper ${isVid(x.path)?"vid":""}"></span><span><b>${esc(x.title)}${seen && !seen.includes(x.id)?' <span class="tag gold">Neu</span>':""}</b><small class="muted">${isVid(x.path)?"Video":"PDF"}${x.note?" · "+esc(x.note):""}</small></span></a>`;
+  return `<a class="doc" data-handout="${esc(x.path)}" data-extra="${esc(x.id)}" target="_blank" rel="noopener"><span class="paper ${isVid(x.path)?"vid":""}"></span><span><b>${esc(x.title)}${seen && !seen.includes(x.id)?' <span class="tag gold">Neu</span>':""}</b><small class="muted">${fileKind(x.path)}${x.note?" · "+esc(x.note):""}</small></span></a>`;
 }
 function extrasBlock(e){
-  if (!S.extras.length) return "";
+  const xs=S.extras.filter(x=>x.kind!=="reward"); if (!xs.length) return "";
   const seen = storeGet("ldb-extras-"+e) || [];
   return `<div class="stack"><div class="wkh"><span>EXTRAS</span><small class="muted">Zusatz-Infos, ohne Punkte</small></div>
-    <div class="extras">${S.extras.map(x=>extraCard(x,seen)).join("")}</div></div>`;
+    <div class="extras">${xs.map(x=>extraCard(x,seen)).join("")}</div></div>`;
+}
+
+/* ---------- Erinnerung, Belohnungen, Vorher-Nachher, Top 5, Fragen, Umfrage ---------- */
+function currentWeek(){ const now=Date.now(); return weeks().find(w=>{ const o=weekOpens(w); return o && now>=o.getTime() && now<o.getTime()+7*DAY; }); }
+function reminderBlock(e){
+  const w=currentWeek(); if (!w || S.me.preview) return "";
+  const day=new Date().getDay(); if (![5,6,0].includes(day)) return "";
+  const open=S.areas.filter(a=>a.week===w && !subOf(e,a.n)); if (!open.length) return "";
+  const end=weekOpens(w).getTime()+7*DAY;
+  return `<div class="panel remind"><div><b>⏰ ${day===0?"Heute ist Abgabe!":"Bald ist Abgabe"}</b><small class="muted">${open.map(a=>"Thema "+a.n).join(" und ")} bis Sonntag 24 Uhr</small></div><div class="flip" data-flip="${end}">${flipHtml(end-Date.now())}</div></div>`;
+}
+function rewardsBlock(e){
+  const rw=S.extras.filter(x=>x.kind==="reward"), ok=passed(e)||S.me.preview;
+  if (!ok) return `<div class="panel rewards locked"><b>🎁 Ab 10 Punkten freischalten</b><small class="muted">Deine Urkunde${rw.length?", "+rw.map(x=>esc(x.title)).join(", "):", Streamer-Rahmen, Overlay und mehr"}.</small></div>`;
+  return `<div class="panel rewards stack"><div class="sh"><span class="eyebrow">Bestanden</span><h2>Deine <em>Belohnungen</em></h2></div>
+    <div class="extras"><button class="doc" id="cert"><span class="paper cert"></span><span><b>Deine Urkunde</b><small class="muted">Als Bild oder PDF herunterladen</small></span></button>
+    ${rw.map(x=>extraCard(x,null)).join("")}</div>
+    ${!rw.length?`<p class="muted">Streamer-Rahmen, Overlay und mehr kommen hier bald dazu.</p>`:""}</div>`;
+}
+function snapBlock(e){
+  const ro=readOnly()||S.me.preview, v=snapOf(e,"vorher"), n=snapOf(e,"nachher");
+  const lastOpen = S.areas.length && (S.subs.filter(s=>s.creator_email===e).length>=S.areas.length || currentWeek()===weeks().at(-1));
+  const slot=(k,x,lock)=>`<div class="snap">${x?`<a data-path="${esc(x.path)}" target="_blank" rel="noopener"><img data-img="${esc(x.path)}" alt="${k}"></a>`:`<div class="ph">${lock?"🔒":"＋"}</div>`}
+    <small>${k==="vorher"?"Vorher":"Nachher"}</small>
+    ${!ro&&!lock?`<label class="btn ghost small" for="snap-${k}">${x?"Ersetzen":"Hochladen"}<input id="snap-${k}" data-snap="${k}" type="file" accept="image/*" hidden></label>`:""}</div>`;
+  return `<div class="panel stack"><div class="sh"><span class="eyebrow">Extra-Abzeichen 📸</span><h2>Vorher-<em>Nachher</em></h2></div>
+    <p class="muted">${!v?"Mach jetzt einen Screenshot von deinem kompletten Profil und lade ihn hoch. Am Ende vom Bootcamp kommt das Nachher-Bild dazu.":!n?"Am Ende vom Bootcamp lädst du hier deinen Profil-Screenshot von danach hoch.":"Schau, wie viel sich getan hat!"}</p>
+    <div class="snaps">${slot("vorher",v,false)}${slot("nachher",n,!lastOpen&&!n)}</div></div>`;
+}
+async function uploadSnap(kind, f){
+  if (!f) return; if (f.size>MAX_FILE) return toast("Das Bild ist größer als 50 MB.");
+  const e=S.me.email, safe=f.name.normalize("NFKD").replace(/[^\w.\-]+/g,"_").slice(-60), path=`${e}/snap/${kind}-${Date.now()}-${safe}`;
+  try{
+    toast("Wird hochgeladen …");
+    let r=await sb.storage.from("nachweise").upload(path,f,{contentType:f.type||undefined}); if(r.error) throw r.error;
+    r=await sb.from("snapshots").upsert({ creator_email:e, kind, path, created_at:new Date().toISOString() },{ onConflict:"creator_email,kind" }); if(r.error) throw r.error;
+    await refresh(); render(true); toast(kind==="vorher"?"Vorher-Bild gespeichert.":"Nachher-Bild gespeichert. 📸");
+  } catch(err){ fail(err); }
+}
+function topBlock(){
+  if (!S.top.length) return "";
+  const medal=["🥇","🥈","🥉","4","5"];
+  return `<div class="panel stack"><div class="sh"><span class="eyebrow">Bestenliste</span><h2>Top <em>5</em></h2></div>
+    <ol class="toplist">${S.top.map(t=>`<li><span class="pl">${medal[t.place-1]||t.place}</span><b>@${esc(String(t.handle).replace(/^@/,""))}</b></li>`).join("")}</ol>
+    <small class="muted">Ohne Punkte, nur die Reihenfolge. Wird mit jeder Bewertung neu berechnet.</small></div>`;
+}
+function questionBlock(){
+  if (S.noUpd5) return "";
+  const pub=S.questions.filter(q=>q.published), ro=readOnly()||S.me.preview;
+  return `<div class="panel stack"><div class="sh"><span class="eyebrow">Anonym</span><h2>Fragen<em>box</em></h2></div>
+    <p class="muted">Frag, was du dich sonst nicht traust. Dein Name wird nicht gespeichert. Die Antworten kommen hier oder in einem Live.</p>
+    <textarea id="qbox" maxlength="1000" placeholder="Deine Frage …"></textarea>
+    <button class="btn ghost" id="qsend" ${ro?"disabled":""}>Anonym abschicken</button>
+    ${pub.length?`<div class="list">${pub.map(q=>`<div class="row"><b>${esc(q.body)}</b>${q.answer?`<p class="feedback">${esc(q.answer)}</p>`:""}</div>`).join("")}</div>`:""}</div>`;
+}
+async function sendQuestion(){
+  const body=($("#qbox").value||"").trim(); if (body.length<3) return toast("Schreib bitte eine Frage.");
+  const r=await sb.from("questions").insert({ body }); if (r.error) return fail(r.error);
+  $("#qbox").value=""; toast("Danke! Deine Frage ist anonym angekommen.");
+}
+function surveyBlock(e){
+  if (S.noUpd5 || S.me.role!=="creator") return "";
+  const all=S.areas.length && S.subs.filter(s=>s.creator_email===e).length>=S.areas.length;
+  if (!all && !S.me.preview) return "";
+  if (S.survey.find(x=>x.creator_email===e)) return `<div class="panel"><b>💜 Danke für dein Feedback!</b><small class="muted" style="display:block">Damit machen wir das nächste Bootcamp noch besser.</small></div>`;
+  const d=S.survDraft;
+  return `<div class="panel stack"><div class="sh"><span class="eyebrow">2 Minuten</span><h2>Wie war's <em>für dich?</em></h2></div>
+    <div class="stars" role="group" aria-label="Bewertung">${[1,2,3,4,5].map(i=>`<button data-star="${i}" class="${(d.rating||0)>=i?"on":""}" aria-label="${i} Sterne">★</button>`).join("")}</div>
+    <label class="f" for="sv-helped">Welches Thema hat dir am meisten geholfen?<select id="sv-helped"><option value="">–</option>${S.areas.map(a=>`<option value="${a.n}" ${+d.helped===a.n?"selected":""}>${a.n} · ${esc(a.title)}</option>`).join("")}</select></label>
+    <label class="f" for="sv-missing">Was hat dir gefehlt?<textarea id="sv-missing" maxlength="1000">${esc(d.missing||"")}</textarea></label>
+    <label class="f" for="sv-wish">Was wünschst du dir als nächste Schulung?<textarea id="sv-wish" maxlength="1000">${esc(d.wish||"")}</textarea></label>
+    <button class="btn gold" id="sv-send" ${readOnly()||S.me.preview?"disabled":""}>Abschicken</button></div>`;
+}
+function keepSurveyDraft(){ const d=S.survDraft; if($("#sv-helped")){ d.helped=$("#sv-helped").value; d.missing=$("#sv-missing").value; d.wish=$("#sv-wish").value; } }
+async function sendSurvey(){
+  keepSurveyDraft(); const d=S.survDraft;
+  if (!d.rating) return toast("Bitte gib zuerst Sterne.");
+  const r=await sb.from("survey").insert({ creator_email:S.me.email, rating:d.rating, helped:+d.helped||null, missing:(d.missing||"").trim()||null, wish:(d.wish||"").trim()||null });
+  if (r.error) return fail(r.error);
+  await refresh(); render(true); toast("Danke! 💜");
+}
+
+/* ---------- Urkunde ---------- */
+async function certificate(){
+  const me=S.me, pts=total(me.email), s0=startDate()||new Date();
+  const month=s0.toLocaleDateString("de-DE",{month:"long",year:"numeric"});
+  toast("Urkunde wird erstellt …");
+  try{ await Promise.all([document.fonts.load('800 120px Unbounded'),document.fonts.load('600 40px Poppins'),document.fonts.load('400 40px Poppins')]); }catch{}
+  const W=2480, H=1754, c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d");
+  x.fillStyle="#060208"; x.fillRect(0,0,W,H);
+  const glow=(gx,gy,r,col)=>{ const g=x.createRadialGradient(gx,gy,0,gx,gy,r); g.addColorStop(0,col); g.addColorStop(1,"rgba(6,2,8,0)"); x.fillStyle=g; x.fillRect(0,0,W,H); };
+  glow(W*.88,H*.05,1100,"rgba(138,31,184,.55)"); glow(W*.05,H*.98,950,"rgba(184,40,127,.35)");
+  for(let i=0;i<14;i++){ x.beginPath(); const y=H-120-i*14; x.moveTo(-40,y); x.bezierCurveTo(W*.3,y-60,W*.6,H*.55-i*20,W+40,H*.25-i*16); x.strokeStyle=i%4?`rgba(194,79,224,${.05+i*.012})`:`rgba(255,176,23,${.08+i*.012})`; x.lineWidth=2; x.stroke(); }
+  x.strokeStyle="rgba(255,176,23,.55)"; x.lineWidth=4; x.strokeRect(70,70,W-140,H-140);
+  x.strokeStyle="rgba(230,168,247,.25)"; x.lineWidth=2; x.strokeRect(92,92,W-184,H-184);
+  const logo=await new Promise(r=>{ const i=new Image(); i.onload=()=>r(i); i.onerror=()=>r(null); i.src="logo.png"; });
+  if (logo){ const lw=300, lh=lw*logo.height/logo.width; x.drawImage(logo,(W-lw)/2,150,lw,lh); }
+  x.textAlign="center"; x.fillStyle="#c24fe0"; x.font="600 40px Poppins"; x.fillText("L I V E D R E A M   C R E A T O R   B O O T C A M P", W/2, 590);
+  x.fillStyle="#ffffff"; x.font="800 150px Unbounded"; x.fillText("URKUNDE", W/2, 770);
+  x.fillStyle="#eadcf0"; x.font="400 46px Poppins"; x.fillText("Hiermit bestätigen wir, dass", W/2, 880);
+  const name=me.name||label(me); let fs=130; x.font=`800 ${fs}px Unbounded`; while(x.measureText(name).width>W-500 && fs>60){ fs-=6; x.font=`800 ${fs}px Unbounded`; }
+  const gg=x.createLinearGradient(W/2-700,0,W/2+700,0); gg.addColorStop(0,"#e6a8f7"); gg.addColorStop(1,"#d6409f"); x.fillStyle=gg; x.fillText(name, W/2, 1040);
+  if (me.handle){ x.fillStyle="#9d8aa8"; x.font="500 44px Poppins"; x.fillText("@"+me.handle.replace(/^@/,""), W/2, 1115); }
+  x.fillStyle="#eadcf0"; x.font="400 46px Poppins"; x.fillText(`das LIVEdream Creator Bootcamp (${month}) erfolgreich bestanden hat`, W/2, 1220);
+  x.fillStyle="#FFB017"; x.font="700 46px Unbounded"; x.fillText(`${pts} von ${maxPts()} Punkten`, W/2, 1310);
+  const today=new Date().toLocaleDateString("de-DE");
+  x.strokeStyle="rgba(255,255,255,.35)"; x.lineWidth=2;
+  [[W*.3,today,"Datum"],[W*.7,"LIVEdream Agency","Agenturleitung"]].forEach(([cx,t,l])=>{ x.beginPath(); x.moveTo(cx-260,1500); x.lineTo(cx+260,1500); x.stroke(); x.fillStyle="#fff"; x.font="600 42px Poppins"; x.fillText(t,cx,1475); x.fillStyle="#9d8aa8"; x.font="400 32px Poppins"; x.fillText(l,cx,1550); });
+  const url=c.toDataURL("image/png"), base=`Urkunde-${(me.handle||me.name||"Creator").replace(/[^\w-]+/g,"_")}`;
+  S._cert={ url, base, W, H };
+  const w=$("#win"); $("#win-t").textContent="Deine Urkunde 🎉"; $("#win-p").innerHTML=`<img src="${url}" alt="Urkunde" style="width:100%;max-width:520px;border-radius:10px;margin:12px 0"><span class="actions" style="justify-content:center"><button class="btn small gold" id="cert-png">Als Bild speichern</button><button class="btn small" id="cert-pdf">Als PDF speichern</button></span>`;
+  w.classList.add("show","keep"); confetti();
+}
+function dl(href, name){ const a=document.createElement("a"); a.href=href; a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+async function certPdf(){
+  const C=S._cert; if(!C) return;
+  if (!window.jspdf){ await new Promise((res,rej)=>{ const sc=document.createElement("script"); sc.src="vendor/jspdf.umd.min.js"; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); }).catch(()=>toast("PDF konnte nicht geladen werden. Nimm das Bild.")); }
+  if (!window.jspdf) return;
+  const doc=new window.jspdf.jsPDF({ orientation:"landscape", unit:"mm", format:"a4" }); doc.addImage(C.url,"PNG",0,0,297,210); doc.save(C.base+".pdf");
 }
 
 /* ---------- Creator: Thema ---------- */
@@ -432,7 +565,7 @@ function topicView(a){
     ${a.handout_path ? (l2 ? `<div class="doc" aria-disabled="true"><span class="paper"></span><span><b>Handout Thema ${a.n}</b><small class="muted">PDF zum Nachlesen</small></span></div>`
       : `<a class="doc" data-handout="${esc(a.handout_path)}" data-n="${a.n}" target="_blank" rel="noopener"><span class="paper"></span><span><b>Handout Thema ${a.n} öffnen</b><small class="muted">PDF zum Nachlesen${!hOk?", danach ist deine Aufgabe frei":""}</small></span></a>`)
       : `<p class="muted">Für dieses Thema gibt es kein Handout.</p>`}
-    ${!l2 && S.extras.some(x=>x.area===a.n) ? `<small class="muted">Zusätzlich zu diesem Thema</small><div class="extras">${S.extras.filter(x=>x.area===a.n).map(x=>extraCard(x,storeGet("ldb-extras-"+e)||[])).join("")}</div>`:""}</section>`;
+    ${!l2 && S.extras.some(x=>x.area===a.n&&x.kind!=="reward") ? `<small class="muted">Zusätzlich zu diesem Thema</small><div class="extras">${S.extras.filter(x=>x.area===a.n&&x.kind!=="reward").map(x=>extraCard(x,storeGet("ldb-extras-"+e)||[])).join("")}</div>`:""}</section>`;
   const l3=!hOk;
   h += `<section class="panel step ${l3?"locked":""} ${ju==="task"?"unlocked":""}"><div class="sh"><span class="eyebrow">Schritt ${no}</span><h2>Deine Aufgabe</h2>${l3?`<span class="lk">🔒 nach dem Handout</span>`:""}</div>`;
   if (l3) h += `<p class="muted">Hier siehst du gleich, was du für 1 und 2 Punkte machst, und gibst deinen Nachweis ab.</p>`;
@@ -490,8 +623,8 @@ function celebrate(n){
   const nx=S.areas.find(a=>a.n>n), e=S.me.email;
   $("#win-t").textContent=`Thema ${n} abgegeben!`;
   $("#win-p").textContent = !nx ? "Das war das letzte Thema. Mega stark!" : areaState(e,nx)==="open" ? `Thema ${nx.n} ist jetzt frei.` : `Thema ${nx.n} öffnet am ${fmtD(weekOpens(nx.week))} um 0 Uhr.`;
-  const w=$("#win"); w.classList.add("show"); confetti();
-  clearTimeout(celebrate._t); celebrate._t=setTimeout(()=>w.classList.remove("show"),3600);
+  const w=$("#win"); w.classList.remove("keep"); w.classList.add("show"); confetti();
+  clearTimeout(celebrate._t); celebrate._t=setTimeout(()=>{ if(!w.classList.contains("keep")) w.classList.remove("show"); },3600);
 }
 function confetti(){
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -540,7 +673,9 @@ function creatorDetail(email){
   const c=member(email); if(!c){ S.creator=null; return ""; }
   let h=`<button class="btn ghost small back" id="back">← Zurück</button>
     <div class="stack"><span class="eyebrow">${esc(member(c.manager_email)?.name?"Manager: "+member(c.manager_email).name:"ohne Manager")}</span><h1>${esc(label(c))}</h1>
-    <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p></div><div class="list">`;
+    <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p></div>
+    ${snapOf(email,"vorher")||snapOf(email,"nachher")?`<div class="panel stack"><h2>Vorher-Nachher</h2><div class="snaps">${["vorher","nachher"].map(k=>{const x=snapOf(email,k); return `<div class="snap">${x?`<a data-path="${esc(x.path)}" target="_blank" rel="noopener"><img data-img="${esc(x.path)}" alt="${k}"></a>`:`<div class="ph">–</div>`}<small>${k==="vorher"?"Vorher":"Nachher"}</small></div>`;}).join("")}</div></div>`:""}
+    <div class="list">`;
   for (const a of S.areas){
     const s=subOf(email,a.n), p=progOf(email,a.n);
     if (s) { h += subCard(s,false); continue; }
@@ -570,6 +705,38 @@ function exportCsv(){
   }
   const csv="﻿"+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(";")).join("\r\n");
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download=`Bootcamp-Punkte-${isoDay(new Date())}.csv`; a.click();
+}
+
+function feedbackView(){
+  const lead=S.me.role==="lead";
+  if (S.noUpd5) return `<div class="panel"><p class="err">Zuerst update-5.sql in Supabase ausführen.</p></div>`;
+  let h=`<div class="stack"><span class="eyebrow">Anonym</span><h1>Frage<em>nbox</em></h1><p class="muted">${lead?"Antworte und veröffentliche, dann sehen alle Creator Frage und Antwort. Oder beantworte sie gesammelt im Live.":"Die anonymen Fragen der Creator. Antworten veröffentlicht die Agenturleitung."}</p></div>`;
+  h += S.questions.length ? `<div class="list">${S.questions.map(q=>`<div class="row"><div class="head"><b>${esc(q.body)}</b><span class="tag ${q.published?"ok":""}">${q.published?"veröffentlicht":"neu"}</span></div>
+      <small class="muted">${fmtAgo(q.created_at)}</small>
+      ${lead?`<textarea id="qa-${q.id}" placeholder="Antwort (optional)">${esc(q.answer||"")}</textarea>
+      <div class="actions"><button class="btn small" data-qpub="${q.id}">${q.published?"Antwort speichern":"Veröffentlichen"}</button>${q.published?`<button class="btn small ghost" data-qsave="${q.id}">Verstecken</button>`:""}<button class="btn small danger" data-qdel="${q.id}">${S.confirmDelete===q.id?"Wirklich löschen?":"Löschen"}</button></div>`
+      : q.answer?`<p class="feedback">${esc(q.answer)}</p>`:""}</div>`).join("")}</div>` : `<div class="panel"><p class="muted">Noch keine Fragen.</p></div>`;
+  if (lead){
+    const sv=S.survey, n=sv.length, avg=n?(sv.reduce((a,x)=>a+x.rating,0)/n).toFixed(1):"–";
+    const cnt={}; sv.forEach(x=>{ if(x.helped) cnt[x.helped]=(cnt[x.helped]||0)+1; });
+    h += `<div class="stack"><span class="eyebrow">Am Ende</span><h1><em>Umfrage</em></h1></div>
+    <div class="score"><div class="panel stat"><b>${n}</b><small>Antworten</small></div><div class="panel stat"><b>${avg}</b><small>Sterne im Schnitt</small></div><div class="panel stat"><b>${Object.keys(cnt).length?Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0][0]:"–"}</b><small>hilfreichstes Thema</small></div></div>
+    ${n?`<div class="list">${sv.map(x=>{ const c=member(x.creator_email); return `<div class="row"><div class="head"><b>${esc(label(c)||x.creator_email)}</b><span class="tag gold">${"★".repeat(x.rating)}</span></div>
+      ${x.helped?`<small class="muted">Am meisten geholfen: Thema ${x.helped} · ${esc(S.areas.find(a=>a.n===x.helped)?.title||"")}</small>`:""}
+      ${x.missing?`<p class="feedback"><b>Gefehlt:</b> ${esc(x.missing)}</p>`:""}${x.wish?`<p class="feedback gold"><b>Wunsch:</b> ${esc(x.wish)}</p>`:""}</div>`; }).join("")}</div>`:`<div class="panel"><p class="muted">Die Umfrage erscheint bei den Creatorn, sobald sie alle Themen abgegeben haben.</p></div>`}`;
+  }
+  return h;
+}
+async function answerQ(id, publish){
+  const ans=($(`#qa-${id}`)?.value||"").trim()||null, q=S.questions.find(x=>x.id===id);
+  const row = publish===null ? { published:false } : { answer:ans, answered_at:ans?new Date().toISOString():null, published:true };
+  const r=await sb.from("questions").update(row).eq("id",id); if(r.error) return fail(r.error);
+  await refresh(); render(true); toast(publish===null?"Versteckt.":q?.published?"Gespeichert.":"Veröffentlicht.");
+}
+async function delQ(id){
+  if (S.confirmDelete!==id){ S.confirmDelete=id; return render(true); }
+  S.confirmDelete=null; const r=await sb.from("questions").delete().eq("id",id); if(r.error) return fail(r.error);
+  await refresh(); render(true); toast("Gelöscht.");
 }
 
 /* ---------- Teilnehmer verwalten ---------- */
@@ -610,12 +777,13 @@ function areaEditor(){
     <p class="muted">Immer ein Montag. Woche 1 öffnet an diesem Tag um 0 Uhr, jede weitere Woche 7 Tage später.${s0?` Aktuell: Woche 1 ab ${fmtD(s0)}${s0.getFullYear()}, Woche ${weeks().length} bis ${fmtD(weekEnds(weeks().length))}`:" Noch nicht festgelegt: Bis dahin sind alle Wochen offen."}</p>
     ${S.needsUpdate?`<p class="err">Zuerst muss update-2.sql in Supabase laufen.</p>`:""}
     <div class="actions"><input id="st-date" type="date" value="${esc(S.settings.start||"")}" style="max-width:220px"><button class="btn small" id="st-save" ${S.needsUpdate?"disabled":""}>Start speichern</button></div></div>`;
-  h += `<div class="panel stack"><h2>Extras</h2><p class="muted">Zusatz-Infos als PDF oder Video. Sind immer offen, geben keine Punkte und erscheinen bei den Creatorn mit „Neu“-Zeichen.</p>
+  h += `<div class="panel stack"><h2>Extras & Belohnungen</h2><p class="muted">Extras sind immer offen, geben keine Punkte und erscheinen bei den Creatorn mit „Neu“-Zeichen. Belohnungen (z. B. Streamer-Rahmen, Overlay, Animation) sehen nur Creator ab 10 Punkten, zusammen mit ihrer Urkunde.</p>
     ${S.noExtras ? `<p class="err">Zuerst update-4.sql in Supabase ausführen.</p>` : `
-    ${S.extras.length?`<div class="list">${S.extras.map(x=>`<div class="row"><div class="head"><b>${isVid(x.path)?"🎬":"📄"} ${esc(x.title)}${x.area?` <span class="muted">· Thema ${x.area}</span>`:""}</b><span class="actions"><a class="chip" data-handout="${esc(x.path)}" target="_blank" rel="noopener" style="text-decoration:none">Öffnen</a><button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></span></div>${x.note?`<span class="muted">${esc(x.note)}</span>`:""}</div>`).join("")}</div>`:""}
+    ${S.extras.length?`<div class="list">${S.extras.map(x=>`<div class="row"><div class="head"><b>${x.kind==="reward"?"🎁":isVid(x.path)?"🎬":"📄"} ${esc(x.title)}${x.area?` <span class="muted">· Thema ${x.area}</span>`:""}</b><span class="actions"><a class="chip" data-handout="${esc(x.path)}" target="_blank" rel="noopener" style="text-decoration:none">Öffnen</a><button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></span></div>${x.note?`<span class="muted">${esc(x.note)}</span>`:""}</div>`).join("")}</div>`:""}
     <div class="grid2"><label class="f" for="ex-title">Titel<input id="ex-title" type="text" placeholder="z. B. Richtlinien & Tabus"></label>
     <label class="f" for="ex-note">Kurzbeschreibung (optional)<input id="ex-note" type="text" placeholder="z. B. Was im Live erlaubt ist"></label></div>
-    <div class="grid2"><label class="f" for="ex-file">PDF oder Video (max. 50 MB)<input id="ex-file" type="file" accept="application/pdf,video/mp4,video/*"></label>
+    <div class="grid2"><label class="f" for="ex-kind">Art<select id="ex-kind"><option value="extra">Extra (für alle, sofort)</option><option value="reward">Belohnung (ab 10 Punkten)</option></select></label>
+    <label class="f" for="ex-file">Datei (PDF, Video, Bild oder ZIP, max. 50 MB)<input id="ex-file" type="file"></label>
     <label class="f" for="ex-area">Auch bei Thema zeigen (optional)<select id="ex-area"><option value="">–</option>${S.areas.map(y=>`<option value="${y.n}">${y.n} · ${esc(y.title)}</option>`).join("")}</select></label></div>
     <button class="btn small" id="ex-add">Extra hinzufügen</button>`}</div>`;
   if (!a) return h + `<p class="muted">Keine Themen gefunden.</p>`;
@@ -646,12 +814,12 @@ function areaEditor(){
 async function addExtra(){
   const title=$("#ex-title").value.trim(), note=$("#ex-note").value.trim()||null, f=$("#ex-file").files[0];
   if (!title || !f) return toast("Bitte Titel und Datei auswählen.");
-  const vid=/^video\//.test(f.type)||isVid(f.name), ext=vid?(f.name.match(/\.(mp4|mov|webm|m4v)$/i)?.[1]||"mp4").toLowerCase():"pdf", area=+$("#ex-area").value||null;
+  const vid=/^video\//.test(f.type)||isVid(f.name), ext=(f.name.match(/\.([a-z0-9]{2,5})$/i)?.[1]||(vid?"mp4":"pdf")).toLowerCase(), area=+$("#ex-area").value||null, kind=$("#ex-kind")?.value||"extra";
   if (f.size>MAX_FILE) return toast("Die Datei ist größer als 50 MB.");
   try{
     $("#ex-add").disabled=true; $("#ex-add").textContent="Wird hochgeladen …";
-    const path=`extra-${Date.now()}.${ext}`; let r=await sb.storage.from("unterlagen").upload(path,f,{contentType:f.type||(vid?"video/mp4":"application/pdf")}); if(r.error) throw r.error;
-    r=await sb.from("extras").insert({ title, note, path, area, sort:S.extras.length }); if(r.error) throw r.error;
+    const path=`extra-${Date.now()}.${ext}`; let r=await sb.storage.from("unterlagen").upload(path,f,{contentType:f.type||"application/octet-stream"}); if(r.error) throw r.error;
+    r=await sb.from("extras").insert(Object.assign({ title, note, path, area, sort:S.extras.length }, kind==="reward"?{kind}:{})); if(r.error) throw r.error;
     await refresh(); render(true); toast("Extra hinzugefügt.");
   } catch(e){ fail(e); render(true); }
 }
@@ -691,10 +859,68 @@ async function saveArea(){
   } catch(e){ fail(e); render(true); }
 }
 
+
+/* ---------- Impressum & Datenschutz ---------- */
+const LEGAL = {
+impressum: `<h1>Impressum</h1>
+<p>Angaben gemäß § 5 DDG</p>
+<p><b>Sophie Berger</b><br>c/o LIVEdream Agency UG (haftungsbeschränkt)<br>Hardenbergstraße 83<br>51373 Leverkusen<br>Deutschland</p>
+<p>E-Mail: <a href="mailto:zofy_creates@web.de">zofy_creates@web.de</a><br>Kontaktformular: <a href="https://forms.gle/gtkiCJp1DUDsdvmV7" target="_blank" rel="noopener">forms.gle/gtkiCJp1DUDsdvmV7</a></p>
+<p>Verantwortlich für den Inhalt: Sophie Berger (Anschrift wie oben)</p>
+<h2>Rechte an der App</h2>
+<p>Die LIVEdream Academy (Konzept, Gestaltung, Programmcode und Inhalte der App) ist ein persönliches Werk von Sophie Berger. Alle Rechte liegen bei ihr persönlich und nicht bei der LIVEdream Agency UG (haftungsbeschränkt). Die Agentur nutzt die App mit Erlaubnis von Sophie Berger. Diese Erlaubnis kann jederzeit widerrufen werden. Vervielfältigung oder Weitergabe nur mit schriftlicher Zustimmung.</p>
+<h2>Streitbeilegung</h2>
+<p>Zur Teilnahme an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle bin ich nicht verpflichtet und nicht bereit.</p>`,
+datenschutz: `<h1>Datenschutz&shy;erklärung</h1>
+<p>Stand: November 2026</p>
+<h2>1. Verantwortliche</h2>
+<p>Sophie Berger, c/o LIVEdream Agency UG (haftungsbeschränkt), Hardenbergstraße 83, 51373 Leverkusen. E-Mail: <a href="mailto:zofy_creates@web.de">zofy_creates@web.de</a></p>
+<h2>2. Wofür ist die App da?</h2>
+<p>Die LIVEdream Academy ist eine Schulungsplattform für Creator und Manager der LIVEdream Agency. Sie stellt Lehrvideos, Handouts und Aufgaben bereit und ermöglicht Abgaben, Bewertungen und Rückmeldungen.</p>
+<h2>3. Welche Daten wir verarbeiten</h2>
+<ul>
+<li><b>Konto:</b> E-Mail-Adresse, Name, TikTok-Name, Rolle (Creator, Manager, Agenturleitung) und zugeordneter Manager.</li>
+<li><b>Anmeldung:</b> Beim Login schicken wir dir einen Link oder Code per E-Mail. Dabei werden technisch nötige Daten wie Zeitpunkt und IP-Adresse kurz verarbeitet.</li>
+<li><b>Lernfortschritt:</b> ob du Video, Quiz und Handout eines Themas abgeschlossen hast, an welchen Tagen du die App geöffnet hast (für die Streak-Anzeige) und deine Abzeichen.</li>
+<li><b>Abgaben:</b> die Dateien, die du hochlädst (Fotos, Videos, PDFs), deine Nachricht an deinen Manager, Punkte und Rückmeldungen. Dazu deine Vorher-Nachher-Screenshots, falls du welche hochlädst.</li>
+<li><b>Fragenbox:</b> Fragen werden ohne Namen und ohne E-Mail-Adresse gespeichert.</li>
+<li><b>Umfrage:</b> deine Antworten. Sie sieht nur die Agenturleitung.</li>
+<li><b>Bestenliste:</b> In den Top 5 erscheint dein TikTok-Name für die anderen Teilnehmer, ohne Punkte.</li>
+</ul>
+<h2>4. Wer sieht was?</h2>
+<p>Du siehst deine eigenen Daten. Dein Manager sieht die Daten seiner Creator. Die Agenturleitung sieht alle Daten. Andere Creator sehen deine Daten nicht, nur deinen TikTok-Namen in der Bestenliste, wenn du in den Top 5 bist.</p>
+<h2>5. Rechtsgrundlagen</h2>
+<p>Wir verarbeiten deine Daten, um dir die Schulung im Rahmen deiner Zusammenarbeit mit der LIVEdream Agency anzubieten (Art. 6 Abs. 1 lit. b DSGVO). Die Bestenliste, die Streak-Anzeige und die Umfrage dienen unserem berechtigten Interesse, die Schulung motivierend zu gestalten und zu verbessern (Art. 6 Abs. 1 lit. f DSGVO).</p>
+<h2>6. Dienstleister</h2>
+<ul>
+<li><b>Supabase</b> (Supabase Inc., USA) speichert Datenbank, Login und Dateien. Die Server stehen in Frankfurt am Main (EU). Es besteht ein Vertrag zur Auftragsverarbeitung mit EU-Standardvertragsklauseln.</li>
+<li><b>Netlify</b> (Netlify Inc., USA) stellt die Webseite bereit. Beim Aufruf werden technisch nötige Daten wie IP-Adresse und Zeitpunkt verarbeitet. Eine Übermittlung in die USA ist möglich. Sie ist durch EU-Standardvertragsklauseln bzw. das EU-US Data Privacy Framework abgesichert.</li>
+<li><b>Login-E-Mails</b> werden über den E-Mail-Dienst WEB.DE (1&amp;1 Mail &amp; Media GmbH, Deutschland) verschickt.</li>
+</ul>
+<p>Schriften und Programmbibliotheken liegen direkt auf unserem Server. Es werden keine Daten an Google oder andere Anbieter geschickt. Wir nutzen keine Werbe- oder Analyse-Cookies und kein Tracking.</p>
+<h2>7. Speicher in deinem Browser</h2>
+<p>Die App speichert in deinem Browser deine Anmeldung und kleine Merkhilfen, etwa welche Abzeichen und Extras du schon gesehen hast. Das ist technisch nötig (§ 25 Abs. 2 TDDDG). Du kannst es jederzeit über die Browser-Einstellungen löschen.</p>
+<h2>8. Wie lange wir speichern</h2>
+<p>Wir speichern deine Daten, solange du Zugang zur Academy hast. Endet deine Zusammenarbeit mit der Agentur, löschen wir dein Konto und deine Dateien, sofern keine gesetzlichen Aufbewahrungspflichten bestehen. Auf Wunsch löschen wir früher.</p>
+<h2>9. Deine Rechte</h2>
+<p>Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch (Art. 15–21 DSGVO). Schreib dafür einfach an <a href="mailto:zofy_creates@web.de">zofy_creates@web.de</a>. Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren, zum Beispiel bei der Landesbeauftragten für Datenschutz und Informationsfreiheit Nordrhein-Westfalen.</p>`
+};
+function showLegal(){
+  const k=location.hash.slice(1); let el=$("#legalpage");
+  if (!LEGAL[k]) { if (el) el.remove(); return; }
+  if (!el){ el=document.createElement("div"); el.id="legalpage"; el.className="legalpage"; document.body.appendChild(el); }
+  el.innerHTML=`<div class="wrap"><button class="btn ghost small back" id="legal-back">← Zurück</button><div class="panel stack legaltext">${LEGAL[k]}</div></div>`;
+  el.scrollTop=0;
+}
+window.addEventListener("hashchange", showLegal);
+
 /* ---------- Ereignisse ---------- */
 document.addEventListener("click", async e => {
-  if (e.target.closest("#win")) { $("#win").classList.remove("show"); return; }
+  if (e.target.closest("#cert-png")) { dl(S._cert.url, S._cert.base+".png"); return; }
+  if (e.target.closest("#cert-pdf")) { certPdf(); return; }
+  if (e.target.closest("#win")) { $("#win").classList.remove("show","keep"); return; }
   const t = e.target.closest("button,a"); if (!t) return;
+  if (t.id==="legal-back"){ history.replaceState(null,"",location.pathname+location.search); return showLegal(); }
   if (t.id==="send-link") return sendLink();
   if (t.id==="verify") return verifyCode();
   if (t.id==="restart") return loginView();
@@ -706,6 +932,13 @@ document.addEventListener("click", async e => {
     if (st==="time") return toast("Diese Woche öffnet am Montag um 0 Uhr.");
     S.openArea=+t.dataset.area; return render();
   }
+  if (t.id==="cert") return certificate();
+  if (t.id==="qsend") return sendQuestion();
+  if (t.dataset.star){ keepSurveyDraft(); S.survDraft.rating=+t.dataset.star; return render(true); }
+  if (t.id==="sv-send") return sendSurvey();
+  if (t.dataset.qpub) return answerQ(t.dataset.qpub, true);
+  if (t.dataset.qsave) return answerQ(t.dataset.qsave, null);
+  if (t.dataset.qdel) return delQ(t.dataset.qdel);
   if (t.id==="home"){ S.openArea=null; return render(); }
   if (t.dataset.quiz) return answerQuiz(+t.dataset.quiz, +t.dataset.j);
   if (t.dataset.seen) return markStep(+t.dataset.seen,"video_at");
@@ -744,6 +977,7 @@ document.addEventListener("change", e => {
     e.target.value=""; $("#pend").innerHTML=pendList(n);
   }
   if (e.target.id==="viewas"){ S.viewAs=e.target.value; S.quiz={}; S.creator=null; S.openArea=null; S.editMember=null; S.ringShown=false; S.localProg={}; applyView(); S.tab = S.me.role==="creator"?"themen":S.me.role==="manager"?"bewerten":"uebersicht"; return render(); }
+  if (e.target.dataset.snap) return uploadSnap(e.target.dataset.snap, e.target.files[0]);
   if (e.target.id==="ae-n"){ S.editArea=+e.target.value; render(true); }
 });
 document.addEventListener("input", e => { if (e.target.id==="note"){ const c=$("#cnt"); if(c) c.textContent=`${e.target.value.length} / 1000`; } });
@@ -754,5 +988,6 @@ document.addEventListener("keydown", e => {
   if (e.target.id==="code") verifyCode();
 });
 
+showLegal();
 boot();
 })();
