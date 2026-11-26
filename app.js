@@ -1472,8 +1472,9 @@ function mgrStart(){
 }
 
 /* ---------- Partner (Kooperationen): Kachel + Infoblatt, Leitung pflegt Text und Link ---------- */
-const PARTNERS = [["tiktori","Tiktori","i-rocket"],["papaya","Papaya Given","i-spark"]];
-const partnerOf = k => { try { return JSON.parse(S.settings["partner_"+k]||"{}"); } catch(e){ return {}; } };
+const PARTNERS = [["tiktori","Tiktory","i-rocket"],["papaya","Papaya Given","i-spark"]];
+const PARTNER_DEFAULT = { tiktori:{ info:"Tiktory heißt jetzt CastMonkey: Tools für dein TikTok LIVE. Overlays, Sound-Alarme und Text-to-Speech bei Geschenken und Followern, Abläufe automatisieren, Punkte und Level für deine Zuschauer. Läuft mit TikTok LIVE Studio und OBS.\n\nStart: kostenlos registrieren und deinen TikTok-Namen eintragen. Es gibt auch Bezahl-Tarife mit mehr Funktionen.", link:"https://castmonkey.com/de", label:"Zu CastMonkey (Tiktory)" } };
+const partnerOf = k => { try { const v=JSON.parse(S.settings["partner_"+k]||"null"); return v||PARTNER_DEFAULT[k]||{}; } catch(e){ return PARTNER_DEFAULT[k]||{}; } };
 function partnerTiles(){
   const lead=S.real?.role==="lead" && !S.viewAs;
   return PARTNERS.filter(([k])=>lead || partnerOf(k).info || partnerOf(k).link).map(([k,n,i])=>`<button class="tile" data-partner="${k}"><span class="tic">${ic(i)}</span>${n}</button>`).join("");

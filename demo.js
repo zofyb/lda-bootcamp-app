@@ -47,7 +47,7 @@ const db = {
   ],
   roster: ["luna.live","gamer_kevin","jenny.mama","tim.talks","sofia.sings","mia.vibes","neu.creator"].map(h=>({ handle:h, bootcamp:h!=="mia.vibes"&&h!=="neu.creator", manager_email:{"luna.live":"lena@demo","gamer_kevin":"lena@demo","jenny.mama":"max@demo","tim.talks":"max@demo","mia.vibes":"max@demo"}[h]||null })),
   activity: ["c1@demo","c1@demo","c1@demo","c3@demo","c5@demo"].map((e,i)=>({creator_email:e, day:day(i<3?i:0)})),
-  settings: [{key:"start", value:start}, {key:"anim_whatsapp", value:"0170 0000000"}, {key:"partner_tiktori", value:JSON.stringify({ info:"Beispieltext: Was Tiktori für unsere Creator anbietet und wie man Kontakt aufnimmt.", link:"https://example.com", label:"Zur Webseite" })}],
+  settings: [{key:"start", value:start}, {key:"anim_whatsapp", value:"0170 0000000"}, {key:"partner_papaya", value:JSON.stringify({ info:"Beispieltext: Was Papaya Given anbietet. Kontakt läuft über uns.", link:"", label:"" })}],
   questions: [
     {id:"q1", body:"Wie oft sollte ich pro Woche live gehen?", created_at:iso(now-3*D), published:true, answer:"Empfehlung: mindestens 3 Lives pro Woche, die du sicher schaffst."},
     {id:"q2", body:"Was mache ich, wenn jemand im Live nur stänkert?", created_at:iso(now-D), published:false}
