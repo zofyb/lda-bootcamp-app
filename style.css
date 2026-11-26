@@ -672,3 +672,8 @@ a.tile{text-decoration:none;color:var(--fg)}
 
 /* Netlify-Badge verdeckt die Menüleiste (lässt sich auch in Netlify abschalten) */
 #nl-badge-frame{display:none!important}
+/* automatische Video-Vorschaubilder */
+.paper.vid{overflow:hidden}
+.paper.vid .vth{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.paper.vid .vth:not([src]){display:none}
+.paper.vid:has(.vth[src])::after{z-index:1;text-shadow:0 1px 4px #000;background:rgba(0,0,0,.25)}

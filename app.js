@@ -136,9 +136,19 @@ async function hydrate(){
   const imgs=[...document.querySelectorAll("img[data-img]:not([src])")];
   if (imgs.length){ const { data } = await sb.storage.from("nachweise").createSignedUrls([...new Set(imgs.map(i=>i.dataset.img))], 3600);
     const map=Object.fromEntries((data||[]).filter(d=>d.signedUrl).map(d=>[d.path,d.signedUrl])); imgs.forEach(i=>{ if(map[i.dataset.img]) i.src=map[i.dataset.img]; }); }
-  for (const v of document.querySelectorAll("video[data-video]:not([src])")) {
-    const { data:d } = await sb.storage.from("unterlagen").createSignedUrl(v.dataset.video, 6*3600);
-    if (d?.signedUrl) v.src = d.signedUrl;
+  const vids=[...document.querySelectorAll("video[data-video]:not([src])")];
+  if (vids.length){
+    const ps=[...new Set(vids.map(v=>v.dataset.video))], { data } = await sb.storage.from("unterlagen").createSignedUrls([...ps, ...ps.map(posterOf)], 6*3600);
+    const map=Object.fromEntries((data||[]).filter(d=>d.signedUrl).map(d=>[d.path,d.signedUrl]));
+    vids.forEach(v=>{ const p=v.dataset.video, u=map[p]; if (!u) return;
+      if (map[posterOf(p)]) { v.poster=map[posterOf(p)]; v.src=u; }
+      else { v.src=u+"#t=0.5"; backfillPoster(p,u); } });
+  }
+  const vth=[...document.querySelectorAll("img[data-vposter]:not([src])")];
+  if (vth.length){
+    const ps=[...new Set(vth.map(i=>i.dataset.vposter))], { data } = await sb.storage.from("unterlagen").createSignedUrls([...ps, ...ps.map(posterOf)], 3600);
+    const map=Object.fromEntries((data||[]).filter(d=>d.signedUrl).map(d=>[d.path,d.signedUrl]));
+    vth.forEach(i=>{ const p=i.dataset.vposter; if (map[posterOf(p)]) i.src=map[posterOf(p)]; else if (map[p]) backfillPoster(p,map[p]).then(b=>{ if (b) i.src=URL.createObjectURL(b); }); });
   }
   for (const i of document.querySelectorAll("img[data-cimg]:not([src])")) {
     const { data:d } = await sb.storage.from("unterlagen").createSignedUrl(i.dataset.cimg, 3600);
@@ -535,8 +545,31 @@ function introFinish(){
 
 const fileKind = p => isVid(p)?"Video":/\.pdf$/i.test(p||"")?"PDF":/\.(png|jpe?g|webp|gif)$/i.test(p||"")?"Bild":/\.zip$/i.test(p||"")?"Paket (ZIP)":"Datei";
 const isVid = p => /\.(mp4|mov|webm|m4v)$/i.test(p||"");
+/* Vorschaubild für hochgeladene Videos: Bild aus dem Video (bei 1 Sek.) wird als <video>.jpg daneben gespeichert */
+const posterOf = p => p+".jpg";
+function grabFrame(src){
+  return new Promise((res,rej)=>{
+    const v=document.createElement("video"), done=(f,x)=>{ clearTimeout(t); v.removeAttribute("src"); v.load(); f(x); };
+    const t=setTimeout(()=>done(rej,new Error("timeout")),20000);
+    v.crossOrigin="anonymous"; v.muted=true; v.playsInline=true; v.preload="auto";
+    v.onloadedmetadata=()=>{ v.currentTime=Math.min(1, (v.duration||2)*0.1); };
+    v.onseeked=()=>{ try{ const w=Math.min(720,v.videoWidth||720), h=Math.round(w*(v.videoHeight||1280)/(v.videoWidth||720)), c=document.createElement("canvas"); c.width=w; c.height=h;
+      c.getContext("2d").drawImage(v,0,0,w,h); c.toBlob(b=>b?done(res,b):done(rej,new Error("leer")),"image/jpeg",.8); } catch(e){ done(rej,e); } };
+    v.onerror=()=>done(rej,new Error("video"));
+    v.src=src;
+  });
+}
+async function savePoster(path, src){
+  try{ const b=await grabFrame(src); const r=await sb.storage.from("unterlagen").upload(posterOf(path), b, { contentType:"image/jpeg", upsert:true }); if (r.error) throw r.error; return b; }
+  catch(e){ console.warn("Vorschaubild", path, e); return null; }
+}
+const posterTried=new Set();
+function backfillPoster(path, url){
+  if (S.me?.role!=="lead" || S.viewAs || window.__DEMO || posterTried.has(path)) return Promise.resolve(null);
+  posterTried.add(path); return savePoster(path, url);
+}
 function extraCard(x, seen){
-  return `<a class="doc" data-handout="${esc(x.path)}" data-extra="${esc(x.id)}" target="_blank" rel="noopener"><span class="paper ${isVid(x.path)?"vid":""}"></span><span><b>${esc(x.title)}${seen && !seen.includes(x.id)?' <span class="tag gold">Neu</span>':""}</b><small class="muted">${fileKind(x.path)}${x.note?" · "+esc(x.note):""}</small></span></a>`;
+  return `<a class="doc" data-handout="${esc(x.path)}" data-extra="${esc(x.id)}" target="_blank" rel="noopener"><span class="paper ${isVid(x.path)?"vid":""}">${isVid(x.path)?`<img class="vth" data-vposter="${esc(x.path)}" alt="">`:""}</span><span><b>${esc(x.title)}${seen && !seen.includes(x.id)?' <span class="tag gold">Neu</span>':""}</b><small class="muted">${fileKind(x.path)}${x.note?" · "+esc(x.note):""}</small></span></a>`;
 }
 function extrasBlock(e){
   const xs=S.extras.filter(x=>x.kind!=="reward" && audOf(x)==="bootcamp"); if (!xs.length) return "";
@@ -2083,6 +2116,7 @@ async function addExtra(pre="ex"){
   try{
     q("add").disabled=true; q("add").textContent="Wird hochgeladen …";
     const path=`extra-${Date.now()}.${ext}`; let r=await sb.storage.from("unterlagen").upload(path,f,{contentType:f.type||"application/octet-stream"}); if(r.error) throw r.error;
+    if (vid){ q("add").textContent="Vorschaubild …"; const ou=URL.createObjectURL(f); await savePoster(path, ou); URL.revokeObjectURL(ou); }
     r=await sb.from("extras").insert(Object.assign({ title, note, path, area, sort:S.extras.length }, kind==="reward"?{kind}:{}, audience?{audience, category}:{}, level?{level, category:"Freischaltungen"}:{})); if(r.error) throw r.error;
     await refresh(); render(true); toast("Extra hinzugefügt.");
   } catch(e){ fail(e); render(true); }
@@ -2091,7 +2125,7 @@ async function delExtra(id){
   if (S.confirmDelete!==id){ S.confirmDelete=id; return render(true); }
   const x=S.extras.find(y=>y.id===id); S.confirmDelete=null;
   const r=await sb.from("extras").delete().eq("id",id); if(r.error) return fail(r.error);
-  if (x) await sb.storage.from("unterlagen").remove([x.path]).catch(()=>{});
+  if (x) await sb.storage.from("unterlagen").remove(isVid(x.path)?[x.path,posterOf(x.path)]:[x.path]).catch(()=>{});
   await refresh(); render(true); toast("Gelöscht.");
 }
 async function saveStart(){
@@ -2116,7 +2150,8 @@ async function saveArea(){
   try{
     $("#ae-save").disabled=true;
     if (vf){ $("#ae-save").textContent="Video wird hochgeladen …";
-      const path=`video-${n}-${Date.now()}.mp4`; const {error}=await sb.storage.from("unterlagen").upload(path,vf,{contentType:vf.type||"video/mp4"}); if(error) throw error; row.video_url=path; }
+      const path=`video-${n}-${Date.now()}.mp4`; const {error}=await sb.storage.from("unterlagen").upload(path,vf,{contentType:vf.type||"video/mp4"}); if(error) throw error; row.video_url=path;
+      $("#ae-save").textContent="Vorschaubild …"; const ou=URL.createObjectURL(vf); await savePoster(path, ou); URL.revokeObjectURL(ou); }
     if (f){ const path=`handout-${n}-${Date.now()}.pdf`; const {error}=await sb.storage.from("unterlagen").upload(path,f,{contentType:"application/pdf"}); if(error) throw error; row.handout_path=path; }
     const {error}=await sb.from("areas").update(row).eq("n",n); if(error) throw error;
     await refresh(); render(true); toast("Thema gespeichert.");
