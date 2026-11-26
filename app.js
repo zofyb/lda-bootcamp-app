@@ -1772,11 +1772,12 @@ function ttCard(x){
   const cover=x.path && x.path!=="tiktok";
   return `<a class="ttcard" href="${esc(x.link)}" target="_blank" rel="noopener" data-tt="${esc(x.id)}">
     <span class="ttimg ${cover?"":"nocov"}" ${cover?"":`data-ttfix="${esc(x.id)}"`}>${cover?`<img data-tcover="${esc(x.path)}" alt="">`:`<em>${esc(x.title)}</em>`}<span class="ttplay">${ic("i-play")}</span></span>
-    <b>${esc(x.title)}</b><small>Auf TikTok ansehen ›</small></a>`;
+    <b>${esc(x.title)}</b><small>Auf TikTok ansehen ›</small></a>`
+    + (S.me?.role==="lead" && !S.viewAs ? `<div class="ttedit"><label class="chip" for="ttq-${esc(x.id)}">${ic("i-cam")} Bild<input id="ttq-${esc(x.id)}" data-ttcover="${esc(x.id)}" type="file" accept="image/*" hidden></label><button class="chip" data-ttdel="${esc(x.id)}">${S.confirmDelete==="tt"+x.id?"Sicher?":"Löschen"}</button></div>` : "");
 }
 function ttStrip(max, head="Tipps von uns auf TikTok"){
   const xs=ttVideos().slice(0,max||99); if (!xs.length) return "";
-  return `<div class="sec"><span>${esc(head)}</span><small>+15 XP je Video</small></div><div class="ttrow">${xs.map(ttCard).join("")}</div>`;
+  return `<div class="sec"><span>${esc(head)}</span><small>+15 XP je Video</small></div><div class="ttrow">${xs.map(x=>`<div class="ttcol">${ttCard(x)}</div>`).join("")}</div>`;
 }
 function ttAdmin(){
   return `<div class="panel stack"><h2>TikTok-Tippvideo hinzufügen</h2>
