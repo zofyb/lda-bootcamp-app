@@ -648,16 +648,27 @@ a.tile{text-decoration:none;color:var(--fg)}
 .chk{display:flex;align-items:center;gap:8px;font-size:14px}
 
 /* Leitung: Übersicht */
-.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.kpi{display:grid;gap:4px;justify-items:start;text-align:left;padding:14px;cursor:pointer;color:inherit;font:inherit;border:1px solid rgba(255,255,255,.08)}
-.kpi b{font-family:var(--head);font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
-.kpi small{color:var(--muted);font-size:12px}
-.kpi.warn b{color:var(--gold)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 6px}
+@media (min-width:700px){.kpis{grid-template-columns:repeat(8,1fr)}}
+.kpi{display:grid;justify-items:center;gap:6px;background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;text-align:center}
+.kring{position:relative;display:grid;place-items:center;width:62px;height:62px;border-radius:50%;background:radial-gradient(circle at 50% 35%,#2a1230,#140818);box-shadow:0 0 0 2px rgba(255,255,255,.08),0 6px 16px -8px #000}
+.kpi.warn .kring{box-shadow:0 0 0 2px var(--gold),0 0 18px -4px rgba(255,176,23,.55)}
+.kring b{font-family:var(--head);font-size:22px;line-height:1;font-variant-numeric:tabular-nums}
+.kpi.warn .kring b{color:var(--gold)}
+.kring i{position:absolute;right:-4px;bottom:-4px;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--rose),var(--plum));color:#fff}
+.kring i .ico{width:13px;height:13px}
+.kpi small{font-size:11px;line-height:1.25;color:var(--muted);max-width:90px}
 .kic{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:10px;background:rgba(214,64,159,.15);color:var(--rose)}
 .kic .ico{width:18px;height:18px}
-.remind{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;border:1px solid rgba(255,176,23,.35);background:linear-gradient(135deg,rgba(255,176,23,.08),rgba(214,64,159,.06))}
-.remind b{display:block}
-.remind small{color:var(--muted)}
-.remind .kic{background:rgba(255,176,23,.15);color:var(--gold)}
-@media (max-width:520px){.remind{grid-template-columns:auto 1fr}.remind .actions{grid-column:1/-1}}
+.remind{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:8px 8px 8px 10px;border-radius:16px;border:1px solid rgba(255,176,23,.35);background:linear-gradient(135deg,rgba(255,176,23,.08),rgba(214,64,159,.06))}
+.remind b{display:block;font-size:14px}
+.remind small{color:var(--muted);font-size:12px}
+.remind .kic{width:30px;height:30px;background:rgba(255,176,23,.15);color:var(--gold)}
+.rgo,.rx{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;border:0;cursor:pointer;color:#fff}
+.rgo{background:linear-gradient(135deg,var(--rose),var(--plum))}
+.rx{background:rgba(255,255,255,.07);color:var(--muted)}
+.rgo .ico,.rx .ico{width:18px;height:18px}
 .aprice:last-child:nth-child(odd){grid-column:1/-1}
+
+/* Netlify-Badge verdeckt die Menüleiste (lässt sich auch in Netlify abschalten) */
+#nl-badge-frame{display:none!important}

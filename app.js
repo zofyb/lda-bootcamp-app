@@ -1181,8 +1181,8 @@ function monthReminders(){
   const key="ldb-rem-"+isoDay(from), hidden=storeGet(key)||[];
   const bsDone=S.bs.some(b=>new Date(b.uploaded_at)>=from), roDone=(S.roster||[]).some(r=>new Date(r.added_at)>=from);
   return [
-    ["bs","Backstage-Export hochladen","Für Top 5, Live-Tage und XP. Backstage > Creator*innen verwalten > Export.","personen",bsDone],
-    ["ro","Zugangsliste aktualisieren","Neue Creator rein, Abgänge raus, Manager zuordnen.","personen",roDone]
+    ["bs","Backstage-Export hochladen","Top 5, Live-Tage und XP","personen",bsDone],
+    ["ro","Zugangsliste aktualisieren","Neue rein, Abgänge raus","personen",roDone]
   ].filter(r=>!r[4] && !hidden.includes(r[0])).map(r=>({ id:r[0], t:r[1], s:r[2], tab:r[3], key }));
 }
 function leadDash(){
@@ -1192,18 +1192,18 @@ function leadDash(){
   const rf=S.refs.filter(r=>r.status==="offen").length, drafts=(S.cal||[]).filter(c=>c.status==="draft").length;
   const regs=allCreators().length, list=(S.roster||[]).length, live=(S.cal||[]).filter(c=>c.status!=="draft" && c.starts<=t && c.ends>=t).length;
   const tasks=(S.tasks||[]).filter(x=>!x.done_at && x.due && x.due<=isoDay(new Date(Date.now()+3*DAY))).length;
-  const k=(i,n,l,tab,warn)=>`<button class="panel kpi ${warn&&n?"warn":""}" data-tab="${tab}"><span class="kic">${ic(i)}</span><b>${n}</b><small>${l}</small></button>`;
+  const k=(i,n,l,tab,warn)=>`<button class="kpi ${warn&&n?"warn":""}" data-tab="${tab}"><span class="kring"><b>${n}</b><i>${ic(i)}</i></span><small>${l}</small></button>`;
   return `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Hallo, <em>${esc(firstName(S.real))}</em></h1></div>
-    ${rem.map(r=>`<div class="panel remind"><span class="kic">${ic("i-bell")}</span><div><b>${r.t}</b><small>${r.s}</small></div><div class="actions"><button class="btn small" data-tab="${r.tab}">Jetzt</button><button class="btn small ghost" data-remhide="${r.id}" data-remkey="${r.key}">Erledigt</button></div></div>`).join("")}
+    ${rem.map(r=>`<div class="remind"><span class="kic">${ic("i-bell")}</span><div><b>${r.t}</b><small>${r.s}</small></div><button class="rgo" data-tab="${r.tab}" aria-label="Jetzt erledigen">${ic("i-chev")}</button><button class="rx" data-remhide="${r.id}" data-remkey="${r.key}" aria-label="Als erledigt ausblenden">${ic("i-check")}</button></div>`).join("")}
     <div class="kpis">
-      ${k("i-check",open,"warten auf Bewertung","bewerten",1)}
-      ${k("i-mail",qn,"neue Sag's-uns","fragen",1)}
-      ${k("i-rocket",rf,"Recruiting offen","recruit",1)}
-      ${!S.noUpd7?k("i-cal",drafts,"Kampagnen zur Freigabe","kalender",1):""}
-      ${S.animOwner?k("i-spark",aniNew(),"neue Animations-Anfragen","animadmin",1):""}
-      ${lead&&!S.noUpd7?k("i-list",tasks,"Aufgaben fällig (3 Tage)","fuehrung",1):""}
-      ${k("i-people",regs,`registriert${list?" von "+list:""}`,"personen")}
-      ${!S.noUpd7?k("i-fire",live,"Kampagnen laufen","kalender"):""}
+      ${k("i-check",open,"Bewerten","bewerten",1)}
+      ${k("i-mail",qn,"Sag's uns","fragen",1)}
+      ${k("i-rocket",rf,"Recruiting","recruit",1)}
+      ${!S.noUpd7?k("i-cal",drafts,"Freigeben","kalender",1):""}
+      ${S.animOwner?k("i-spark",aniNew(),"Animationen","animadmin",1):""}
+      ${lead&&!S.noUpd7?k("i-list",tasks,"Aufgaben fällig","fuehrung",1):""}
+      ${k("i-people",regs,"Registriert","personen")}
+      ${!S.noUpd7?k("i-fire",live,"Kampagnen live","kalender"):""}
     </div>`;
 }
 
