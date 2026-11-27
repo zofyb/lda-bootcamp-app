@@ -877,7 +877,3 @@ div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;
 .stats b{background:linear-gradient(135deg,#ffd76a,var(--gold) 55%,#ff9a3c);-webkit-background-clip:text;background-clip:text;color:transparent}
 .kring b{color:var(--gold)}
 .bg .sparkles{position:absolute;inset:0}
-/* Beim Scrollen: Hintergrund merklich abdunkeln */
-.bg>.glow,.bg>svg{transition:opacity .3s ease}
-.bg.scrolling>.glow{opacity:.06}
-.bg.scrolling>svg{opacity:.1}
