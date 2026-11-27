@@ -210,8 +210,23 @@ async function boot(){
   if (!window.supabase || !CFG.SUPABASE_URL || CFG.SUPABASE_URL.includes("DEIN-PROJEKT")) {
     view.innerHTML = `<div class="panel stack"><h2>Fast fertig</h2><p class="muted">In <b>config.js</b> fehlen noch die Supabase-Adresse und der öffentliche Schlüssel.</p></div>`; return;
   }
-  sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth:{ persistSession:true, detectSessionInUrl:true, flowType:"implicit" } });
-  sb.auth.onAuthStateChange((_e, session) => { const changed = session?.user?.email !== S.session?.user?.email; S.session=session; if (changed) load(); });
+  // Merkt sich fehlgeschlagene Token-Erneuerungen, damit wir ungewollte Abmeldungen nachvollziehen können
+  const authFetch = async (u,o) => {
+    const isTok = String(u).includes("/auth/v1/token");
+    try { const r = await fetch(u,o); if (isTok && !r.ok){ const t=await r.clone().text().catch(()=>""); storeSet("ldb-authfail",{ at:new Date().toISOString(), st:r.status, msg:t.slice(0,160) }); } return r; }
+    catch(e){ if (isTok) storeSet("ldb-authfail",{ at:new Date().toISOString(), st:0, msg:"Netzwerk: "+String(e?.message||e).slice(0,100) }); throw e; }
+  };
+  sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, flowType:"implicit" }, global:{ fetch:authFetch } });
+  sb.auth.onAuthStateChange((ev, session) => {
+    const changed = session?.user?.email !== S.session?.user?.email; S.session=session; if (!changed) return;
+    if (!session && S.real && !S._bye){
+      // Nicht selbst abgemeldet: kurz warten und nochmal nachsehen, bevor die Anmeldung erscheint
+      storeSet("ldb-kicked",{ at:new Date().toISOString(), ev, fail:storeGet("ldb-authfail") });
+      setTimeout(async()=>{ const { data } = await sb.auth.getSession(); if (data.session){ S.session=data.session; return; } load(); }, 1500);
+      return;
+    }
+    load();
+  });
   const { data } = await sb.auth.getSession(); S.session = data.session; load();
   setInterval(tick, 1000);
 }
@@ -242,7 +257,7 @@ async function load(){
       const { data: role } = await sb.rpc("my_role");
       if (!role) return noAccess("Dein Zugang zur LIVEdream Academy ist abgelaufen, weil du nicht mehr auf unserer Creator-Liste stehst. Wenn das ein Fehler ist, melde dich bei deinem Manager.");
     }
-    S.real = me; S.me = me; S.viewAs = "";
+    S.real = me; S.me = me; S.viewAs = ""; S._bye=false; storeSet("ldb-lastmail", email);
     if (me.role==="creator") {
       const r = await sb.from("activity").upsert({ creator_email:email, day:isoDay(new Date()) }, { onConflict:"creator_email,day", ignoreDuplicates:true });
       if (r?.error) console.warn(r.error);
@@ -289,6 +304,9 @@ async function refresh(){
 /* ---------- Login ---------- */
 function loginView(email="", sent=false, err="", mode){
   mode = mode || S._loginMode || "login"; S._loginMode = mode;
+  if (!email && mode==="login") email = storeGet("ldb-lastmail") || "";
+  const kick = storeGet("ldb-kicked"), kickNote = kick && !sent && Date.now()-new Date(kick.at) < 864e5
+    ? `<p class="muted" style="font-size:13px;margin:0">Du wurdest um ${new Date(kick.at).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr automatisch abgemeldet. Bitte einfach neu anmelden.${kick.fail?` <span style="opacity:.6">(Code ${esc(String(kick.fail.st))}: ${esc(String(kick.fail.msg||"").replace(/[{}"]/g,"").slice(0,80))})</span>`:""}</p>` : "";
   bnav.hidden = true; who.innerHTML = ""; $("#switch").hidden=true; $("#toplogo").hidden=true;
   document.querySelector(".wrap").classList.remove("wide");
   const reg = mode==="register", r = S._reg || {};
@@ -308,7 +326,7 @@ function loginView(email="", sent=false, err="", mode){
       <label class="f" for="rg-ref">Wer hat dich zu uns eingeladen? (TikTok-Name, optional)<input id="rg-ref" type="text" autocapitalize="none" autocomplete="off" placeholder="@name" value="${esc(r.ref||"")}"></label>
       <button class="btn" id="register">Registrieren</button>
       <button class="btn ghost" id="to-login">Ich habe schon ein Konto</button>`
-    : `<p class="soft">Melde dich mit deiner E-Mail-Adresse an. Du bekommst einen Anmelde-Link, ganz ohne Passwort.</p>
+    : `${kickNote}<p class="soft">Melde dich mit deiner E-Mail-Adresse an. Du bekommst einen Anmelde-Link, ganz ohne Passwort.</p>
       <label class="f" for="email">E-Mail-Adresse<input id="email" type="email" autocomplete="email" value="${esc(email)}"></label>
       <button class="btn" id="send-link">Anmelde-Link schicken</button>
       <button class="btn ghost" id="to-register">Neu hier? Registrieren</button>`}
@@ -394,8 +412,8 @@ function render(keepScroll){
   const sw=$("#switch"); sw.innerHTML = switcher(); sw.hidden = !sw.innerHTML.trim();
   const st = me.role==="creator" && !me.preview ? streakInfo(me.email).cur : 0;
   who.innerHTML = me.role==="creator"
-    ? `<button class="chip invchip" id="inv-open" aria-label="Streamer einladen">${ic("i-rocket")}<span>Einladen</span></button>${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}${S.noUpd9?`<button class="avabtn" data-tab="profil" aria-label="Mein Profil">${esc(initialOf(me))}</button>`:`<button class="avabtn rg" data-tab="profil" aria-label="Mein Profil">${lvRing(me.email,46,{badge:false})}</button>`}`
-    : `<button class="chip invchip" id="share-app" aria-label="App teilen">${ic("i-mail")}<span>App teilen</span></button><span class="chip">${esc(S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
+    ? `<button class="chip invchip" id="inv-open" aria-label="Streamer einladen">${ic("i-rocket")}<span>Einladen</span></button>${waBtn()}${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}${S.noUpd9?`<button class="avabtn" data-tab="profil" aria-label="Mein Profil">${esc(initialOf(me))}</button>`:`<button class="avabtn rg" data-tab="profil" aria-label="Mein Profil">${lvRing(me.email,46,{badge:false})}</button>`}`
+    : `<button class="chip invchip" id="share-app" aria-label="App teilen">${ic("i-mail")}<span>App teilen</span></button>${waBtn()}<span class="chip">${esc(S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
   if (me.role==="creator"){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
@@ -1520,14 +1538,15 @@ const partnerOf = k => { try { const v=JSON.parse(S.settings["partner_"+k]||"nul
 /* WhatsApp-Community: ein Link, Leitung pflegt ihn */
 const waLink = () => { const v=String(S.settings.wa_community||"").trim(); return /^https:\/\/(chat\.whatsapp\.com|whatsapp\.com|www\.whatsapp\.com)\//i.test(v)?v:""; };
 function waTile(){
-  const lead=S.real?.role==="lead" && !S.viewAs, l=waLink();
-  if (lead) return `<button class="tile" id="wa-open"><span class="tic">${ic("i-chat")}</span>WhatsApp-Community</button>`;
-  return l?`<a class="tile" href="${esc(l)}" target="_blank" rel="noopener"><span class="tic">${ic("i-chat")}</span>WhatsApp-Community</a>`:"";
+  const lead=S.real?.role==="lead" && !S.viewAs;
+  return lead ? `<button class="tile" id="wa-open"><span class="tic">${ic("i-chat")}</span>WhatsApp-Community</button>` : "";
 }
+const WA_PATH="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z";
+const waBtn = () => { const l=waLink(); return l?`<a class="wabtn" href="${esc(l)}" target="_blank" rel="noopener" aria-label="WhatsApp-Community öffnen" title="WhatsApp-Community"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${WA_PATH}"/></svg></a>`:""; };
 function openWa(){
   const l=waLink();
   sheet(`<div class="sh"><span class="eyebrow">Nur die Leitung kann das ändern</span><h2>WhatsApp-<em>Community</em></h2></div>
-    <p class="muted" style="margin:0">Einladungslink zur Community einfügen (WhatsApp > Community > Einladen > Link kopieren). Die Kachel sehen Creator und Manager erst, wenn ein Link gespeichert ist.</p>
+    <p class="muted" style="margin:0">Einladungslink zur Community einfügen (WhatsApp > Community > Einladen > Link kopieren). Sobald ein Link gespeichert ist, sehen alle oben neben „Einladen“ den grünen WhatsApp-Knopf.</p>
     <label class="f" for="wa-link">Link<input id="wa-link" type="url" placeholder="https://chat.whatsapp.com/…" value="${esc(S.settings.wa_community||"")}"></label>
     <div class="actions"><button class="btn small" id="wa-save">Speichern</button>${l?`<a class="btn small ghost" href="${esc(l)}" target="_blank" rel="noopener">Öffnen</a>`:""}</div>`);
 }
@@ -3049,7 +3068,7 @@ document.addEventListener("click", async e => {
   if (t.id==="register") return register();
   if (t.id==="to-register"){ S._loginMode="register"; return loginView($("#email")?.value||""); }
   if (t.id==="to-login"){ S._loginMode="login"; return loginView($("#email")?.value||""); }
-  if (t.id==="logout"){ await sb.auth.signOut({ scope:"local" }); Object.assign(S,{me:null,real:null,viewAs:"",tab:null,creator:null,openArea:null,ringShown:false,localProg:{}}); return loginView(); }
+  if (t.id==="logout"){ S._bye=true; storeSet("ldb-kicked",null); await sb.auth.signOut({ scope:"local" }); Object.assign(S,{me:null,real:null,viewAs:"",tab:null,creator:null,openArea:null,ringShown:false,localProg:{}}); return loginView(); }
   if (t.dataset.tab){ closeSheet(); S.qz=null; S.tab=t.dataset.tab; if (t.dataset.learn) S.learn=t.dataset.learn; S.creator=null; S.pend=null; S.editMember=null; return render(); }
   if (t.dataset.area){
     const st=t.dataset.state;
