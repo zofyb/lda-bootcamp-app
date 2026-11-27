@@ -24,17 +24,17 @@
     dpr = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight;
     cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
     cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const n = Math.round(Math.min(110, Math.max(36, W * H / 14000)) * (reduce ? .5 : 1));
+    const n = Math.round(Math.min(170, Math.max(60, W * H / 8500)) * (reduce ? .5 : 1));
     while (parts.length < n) parts.push(make()); parts.length = n;
   }
   size(); addEventListener("resize", size, { passive: true });
 
   const move = (x, y) => {
     const now = performance.now();
-    if (mouse.on && !reduce){ const d = Math.hypot(x - mouse.x, y - mouse.y), k = Math.min(4, Math.floor(d / 9));
-      for (let i = 0; i < k; i++){ const f = i / k; trail.push({ x: mouse.x + (x - mouse.x) * f + rnd(-4, 4), y: mouse.y + (y - mouse.y) * f + rnd(-4, 4), vx: rnd(-.4, .4), vy: rnd(-.6, .2), l: 1, s: rnd(7, 15), ci: Math.floor(rnd(0, COLORS.length)) }); } }
+    if (mouse.on && !reduce){ const d = Math.hypot(x - mouse.x, y - mouse.y), k = Math.min(6, Math.floor(d / 7));
+      for (let i = 0; i < k; i++){ const f = i / k; trail.push({ x: mouse.x + (x - mouse.x) * f + rnd(-4, 4), y: mouse.y + (y - mouse.y) * f + rnd(-4, 4), vx: rnd(-.4, .4), vy: rnd(-.6, .2), l: 1, s: rnd(9, 20), ci: Math.floor(rnd(0, COLORS.length)) }); } }
     mouse.x = x; mouse.y = y; mouse.on = true; mouse.t = now;
-    if (trail.length > 160) trail.splice(0, trail.length - 160);
+    if (trail.length > 220) trail.splice(0, trail.length - 220);
   };
   addEventListener("pointermove", e => move(e.clientX, e.clientY), { passive: true });
   addEventListener("touchmove", e => { const t = e.touches[0]; if (t) move(t.clientX, t.clientY); }, { passive: true });
@@ -57,12 +57,12 @@
       if (p.y < -20){ p.y = H + 20; p.x = rnd(0, W); } if (p.y > H + 20) p.y = -20;
       if (p.x < -20) p.x = W + 20; if (p.x > W + 20) p.x = -20;
       const tw = reduce ? .7 : .45 + .55 * Math.abs(Math.sin(now / 1000 * p.sp + p.ph)), s = p.s * (.75 + tw * .4);
-      cx.globalAlpha = tw * .5; cx.drawImage(sprites[p.ci], p.x - s / 2, p.y - s / 2, s, s);
+      cx.globalAlpha = tw * .6; cx.drawImage(sprites[p.ci], p.x - s / 2, p.y - s / 2, s, s);
     }
     for (let i = trail.length - 1; i >= 0; i--){ const t = trail[i];
-      t.l -= .022 * dt; if (t.l <= 0){ trail.splice(i, 1); continue; }
+      t.l -= .018 * dt; if (t.l <= 0){ trail.splice(i, 1); continue; }
       t.x += t.vx * dt; t.y += t.vy * dt; t.vy += .01 * dt;
-      const s = t.s * (.4 + t.l * .8); cx.globalAlpha = t.l * .6; cx.drawImage(sprites[t.ci], t.x - s / 2, t.y - s / 2, s, s);
+      const s = t.s * (.5 + t.l * .9); cx.globalAlpha = Math.min(1, t.l * 1.1); cx.drawImage(sprites[t.ci], t.x - s / 2, t.y - s / 2, s, s);
     }
     cx.globalAlpha = 1; cx.globalCompositeOperation = "source-over";
     requestAnimationFrame(frame);
