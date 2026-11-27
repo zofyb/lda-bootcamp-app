@@ -899,3 +899,19 @@ div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;
 }
 @keyframes cloudBoing{0%{transform:scale(1,1)}25%{transform:scale(1.15,.8)}55%{transform:translateY(-12px) scale(.92,1.08)}80%{transform:scale(1.04,.96)}100%{transform:scale(1,1)}}
 @media (prefers-reduced-motion:reduce){.tlogo .cloud{animation:none}}
+/* Tagesbonus-Fenster */
+.dpop{text-align:center;align-items:center}
+.dpop h2{margin:2px 0 0}
+.ddots{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;width:100%;margin-top:6px}
+.ddots span{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0 8px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--muted)}
+.ddots b{font:700 15px var(--head,inherit)}
+.ddots small{font-size:10.5px}
+.ddots .on{background:linear-gradient(180deg,rgba(155,47,201,.35),rgba(155,47,201,.15));border-color:rgba(230,168,247,.35);color:var(--fg)}
+.ddots .now{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 18px rgba(255,176,23,.35);color:var(--fg);animation:dnow 1.6s ease-in-out infinite}
+.ddots .big b{font-size:17px}
+@keyframes dnow{50%{transform:translateY(-3px)}}
+.dsum{display:flex;flex-direction:column;align-items:center;margin:8px 0 2px}
+.dsum b{font:800 34px var(--head,inherit);background:linear-gradient(90deg,#FFD36B,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+.dsum small{color:var(--muted)}
+.dpop .btn{width:100%}
+@media (prefers-reduced-motion:reduce){.ddots .now{animation:none}}

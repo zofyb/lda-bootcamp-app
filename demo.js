@@ -161,7 +161,7 @@ window.supabase = { createClient(){ return {
     if (n==="backstage_top"){ const mm=a?.m||db.backstage.map(b=>b.month).sort().pop(); const out=[];
       ["d","t"].forEach(l=>db.backstage.filter(b=>b.month===mm&&b["rank_"+l]>=1&&b["rank_"+l]<=5).sort((x,y)=>x["rank_"+l]-y["rank_"+l]).forEach(b=>out.push({ month:mm, list:l, place:b["rank_"+l], handle:b.handle })));
       return { data:out, error:null }; }
-    if (n==="award_xp") return { data:0, error:null };
+    if (n==="award_xp") return { data:a.k==="login"?5:a.k==="streak"?25:0, error:null };
     if (n==="report_referral"){ const h=String(a.rh||"").replace(/^@/,"").toLowerCase(); if (db.referrals.some(r=>r.recruit_handle===h)) return { data:"exists", error:null }; db.referrals.unshift({ recruit_handle:h, recruiter_email:"c1@demo", status:"offen", gun_sent:false, source:"creator", created_at:new Date().toISOString() }); return { data:"ok", error:null }; }
     if (n==="goal_progress") return { data:null, error:null };
     return { data:true, error:null };

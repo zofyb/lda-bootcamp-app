@@ -263,7 +263,8 @@ async function load(){
       if (r?.error) console.warn(r.error);
     }
     await refresh();
-    if (me.role==="creator"){ S.impAns=storeGet("ldb-imp-"+me.email)||{}; setTimeout(()=>award("login", todayKey()).then(n=>{ if(n) render(true); }), 900); }
+    if (me.role==="creator") S.impAns=storeGet("ldb-imp-"+me.email)||{};
+    if (me.role==="creator" || me.role==="manager") setTimeout(dailyPop, 1100);
     S.tab = S.tab || (me.role === "creator" ? "start" : "uebersicht");
     render();
   } catch(e){ fail(e); }
@@ -1641,7 +1642,7 @@ async function copyTxt(t, msg){ try{ await navigator.clipboard.writeText(t); toa
 
 /* ---------- Level-System: XP, Stufen, Hook des Tages, Impuls der Woche, Backstage, Monatsziel ---------- */
 const LEVELS = [[0,"Newcomer"],[300,"Rookie"],[1000,"Rising Star"],[2500,"Performer"],[5000,"Pro"],[9000,"Elite"],[15000,"Legend"]];
-const XP_LABEL = { login:"Reingeschaut", hook:"Hook des Tages", impuls:"Impuls der Woche", iq1:"Impuls-Frage", iq2:"Impuls-Frage", iq3:"Impuls-Frage", camp:"Kampagne gelesen", extra:"Akademie-Inhalt" };
+const XP_LABEL = { login:"Tagesbonus", streak:"7-Tage-Bonus", hook:"Hook des Tages", impuls:"Impuls der Woche", iq1:"Impuls-Frage", iq2:"Impuls-Frage", iq3:"Impuls-Frage", camp:"Kampagne gelesen", extra:"Akademie-Inhalt" };
 const fmtN = n => Number(n||0).toLocaleString("de-DE");
 const hnorm = h => lc(String(h||"").replace(/^@/,""));
 const ymNow = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; };
@@ -1676,13 +1677,45 @@ function checkLevelUp(email){
 }
 function win(t,p){ const w=$("#win"); if(!w) return toast(t); $("#win-t").textContent=t; $("#win-p").textContent=p; w.classList.add("show"); setTimeout(()=>w.classList.remove("show"),2600); }
 async function award(kind, ref){
-  if (S.noUpd9 || S.viewAs || !S.me || S.me.role!=="creator" || S.me.preview) return 0;
+  if (S.noUpd9 || S.viewAs || !S.me || S.me.preview) return 0;
+  if (S.me.role!=="creator" && !(S.me.role==="manager" && (kind==="login" || kind==="streak"))) return 0;
   if (S.xp.some(x=>x.creator_email===S.me.email && x.kind===kind && x.ref===ref)) return 0;
   const r=await sb.rpc("award_xp",{ k:kind, r:ref }); if (r.error){ console.warn(r.error); return 0; }
   const pts=r.data||0;
   S.xp.push({ creator_email:S.me.email, kind, ref, xp:pts, created_at:new Date().toISOString() });
   if (pts>0){ xpToast(pts); checkLevelUp(S.me.email); }
   return pts;
+}
+
+/* Tagesbonus: beim ersten Öffnen am Tag ein Fenster, Punkte abholen; am 7. Tag in Folge +25 extra */
+const DAILY_XP=5, WEEK_XP=25;
+function dailyRun(email){
+  const days=new Set(S.xp.filter(x=>x.creator_email===email && x.kind==="login").map(x=>x.ref));
+  let run=0; const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()-1);
+  while (days.has(isoDay(d))) { run++; d.setDate(d.getDate()-1); }
+  return run;
+}
+function dailyPop(){
+  const me=S.me; if (!me || S.viewAs || me.preview || S.noUpd9 || !["creator","manager"].includes(me.role)) return;
+  const t=todayKey(), k="ldb-daily-"+me.email;
+  if (S.xp.some(x=>x.creator_email===me.email && x.kind==="login" && x.ref===t) || storeGet(k)===t) return;
+  if (me.role==="creator" && introPending()) return;
+  if ($("#sheet.show")) return setTimeout(dailyPop, 4000);
+  const pos=dailyRun(me.email)%7+1, wk=pos===7;
+  sheet(`<div class="dpop stack"><span class="eyebrow">Tagesbonus</span><h2>Schön, dass du <em>da bist</em></h2>
+    <p class="muted">Jeden Tag reinschauen und Punkte abholen. Am 7. Tag in Folge gibt es den Wochenbonus.</p>
+    <div class="ddots">${[1,2,3,4,5,6,7].map(i=>`<span class="${i<pos?"on":i===pos?"now":""}${i===7?" big":""}"><b>${i===7?"🎁":i}</b><small>${i===7?"+"+(DAILY_XP+WEEK_XP):"+"+DAILY_XP}</small></span>`).join("")}</div>
+    <div class="dsum"><b>+${wk?DAILY_XP+WEEK_XP:DAILY_XP} XP</b><small>${wk?"Tagesbonus und Wochenbonus":`Tag ${pos} von 7`}</small></div>
+    <button class="btn gold" id="daily-get">Punkte abholen</button></div>`);
+}
+async function dailyGet(){
+  const b=$("#daily-get"); if (b){ b.disabled=true; b.textContent="Einen Moment …"; }
+  const me=S.me, t=todayKey(), wk=dailyRun(me.email)%7===6;
+  storeSet("ldb-daily-"+me.email, t);
+  let n=await award("login", t);
+  if (n && wk) n+=await award("streak", t);
+  closeSheet();
+  if (n){ confetti(); render(true); } else toast("Heute schon abgeholt.");
 }
 function xpToast(n){ const t=document.createElement("div"); t.className="xpfly"; t.textContent="+"+n+" XP"; document.body.appendChild(t); setTimeout(()=>t.remove(),1800); }
 
@@ -1757,7 +1790,7 @@ function lvPill(email){
 function openLvSheet(email){
   const mine=email===S.me.email && S.me.role==="creator", m=member(email)||S.me;
   const xp=xpOf(email), L=levelOf(xp);
-  const ways=[["i-check","Täglich reinschauen","5 XP pro Tag"],["i-spark","Hook des Tages öffnen","10 XP pro Tag"],["i-bulb","Impuls der Woche","20 XP + 10 je richtige Antwort"],
+  const ways=[["i-check","Tagesbonus abholen","5 XP pro Tag, am 7. Tag +25"],["i-spark","Hook des Tages öffnen","10 XP pro Tag"],["i-bulb","Impuls der Woche","20 XP + 10 je richtige Antwort"],
     ["i-cal","Kampagne durchlesen","15 XP je Kampagne"],["i-play","Akademie-Inhalt ansehen","15 XP je Inhalt"],["i-quiz","Quiz machen","50 XP je Quiz"],
     ["i-fire","Live gehen","10 XP je gültigem Live-Tag im Monat"],["i-trophy","Top 10 der Agentur","bis 300 XP im Monat"],["i-star","Monatsziel erreichen","250 XP"],["i-rocket","Streamer einladen","300 XP + Money Gun je neuem Streamer"]];
   if (inBootcamp(m)) ways.push(["i-learn","Bootcamp","50 XP je Abgabe, 200 XP fürs Bestehen"]);
@@ -2888,7 +2921,7 @@ const weekTask = mgr => S.mt.find(t=>t.manager_email===mgr && t.week===mondayKey
 const doneOf = tid => S.md.filter(d=>d.task_id===tid);
 const talkedSet = (mgr, ym=ymNow()) => new Set(S.talks.filter(t=>t.manager_email===mgr && counted(t) && ymOf(t.day)===ym).map(t=>t.creator_key));
 function mxpParts(mgr){
-  const p={ gespraeche:0, aufgaben:0, werben:0, bootcamp:0, ziel:0 }, best={};
+  const p={ gespraeche:0, aufgaben:0, werben:0, bootcamp:0, ziel:0, taeglich:S.xp.filter(x=>x.creator_email===mgr && (x.kind==="login"||x.kind==="streak")).reduce((a,x)=>a+x.xp,0) }, best={};
   S.talks.filter(t=>t.manager_email===mgr && counted(t)).forEach(t=>{ const k=t.creator_key+"|"+ymOf(t.day), v=t.status==="ok"?MXP.talk:MXP.talkList; best[k]=Math.max(best[k]||0,v); });
   p.gespraeche=Object.values(best).reduce((a,b)=>a+b,0);
   const tasks=S.mt.filter(t=>t.manager_email===mgr);
@@ -2931,7 +2964,8 @@ function mgrBlock(mgr){
         <li>Alle deine Creator im Monat gesprochen: <b>${MXP.goal}</b></li>
         <li>Wochenaufgabe gestellt: <b>${MXP.task}</b>, plus <b>${MXP.done}</b> für jeden Creator, der sie erledigt</li>
         <li>Neuer Streamer rekrutiert, von der Leitung bestätigt: <b>${MXP.rec}</b></li>
-        <li>Dein Creator macht im Bootcamp mit: <b>${MXP.camp}</b>, besteht: <b>${MXP.pass}</b></li></ul>
+        <li>Dein Creator macht im Bootcamp mit: <b>${MXP.camp}</b>, besteht: <b>${MXP.pass}</b></li>
+        <li>Tagesbonus beim Öffnen der App: <b>${DAILY_XP}</b>, am 7. Tag in Folge <b>${WEEK_XP}</b> extra</li></ul>
         <small class="muted">Nur du und die Agenturleitung sehen deine Stufe.</small></details>
     </div>
     <div class="panel stack mtask">
@@ -3189,6 +3223,7 @@ document.addEventListener("click", async e => {
   if (t.id==="mr-add") return mrAdd();
   if (t.id==="reg-csv") return regCsv();
   if (t.id==="ak-wish-send") return sendWish();
+  if (t.id==="daily-get") return dailyGet();
   if (t.dataset.editReg){ S.editMember=t.dataset.editReg; S.tab="personen"; render(); return document.getElementById("pm-email")?.scrollIntoView({block:"center"}); }
   if (t.id==="wa-open") return openWa();
   if (t.id==="wa-save") return waSave();
