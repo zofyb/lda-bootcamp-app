@@ -1140,7 +1140,7 @@ function startView(){
     ${boot?tile("i-gift","Belohnungen",'id="rw-open"',ok?`<i class="dot">!</i>`:`<small class="tl">ab 10 P</small>`):""}
     ${tile("i-user","Profil",'data-tab="profil"')}
     ${tile("i-spark","Animationen",'data-tab="anim"')}
-    <a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${partnerTiles()}
+    <a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${waTile()}${partnerTiles()}
   </div>
   ${ttStrip(6)}
   ${boot?reminderBlock(e):""}
@@ -1181,7 +1181,7 @@ function profileView(email){
 function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
   const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd9?[]:[["rw","i-gift","Live-Belohnungen"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
-  return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${partnerTiles()}</div>`;
+  return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${waTile()}${partnerTiles()}</div>`;
 }
 function leadStart(){ if (S.me.role==="manager") return mgrStart(); return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
 
@@ -1510,13 +1510,33 @@ function mgrStart(){
     <div class="sec"><span>Neuigkeiten</span><small>letzte 7 Tage</small></div>
     ${news.length?`<div class="news">${news.map(n=>`<button class="nrow" ${n.go}><span class="kic">${ic(n.ic)}</span><span>${n.t}</span><small>${ago(n.at)}</small></button>`).join("")}</div>`:`<p class="muted">Gerade nichts Neues von deinen Creatorn.</p>`}
     <div class="sec"><span>Bereiche</span></div>
-    <div class="tiles">${tile("creator","i-people","Betreuung")}${tile("bewerten","i-check","Bewerten",open)}${S.noUpd14?"":tile("termine","i-clock","1:1-Termine",soonBooked())}${tile("kalender","i-cal","Kalender")}${tile("akademie","i-learn","Akademie")}${tile("fragen","i-mail","Sag's uns")}${S.noUpd16?"":tile("match","i-sword","Match-Börse",matchDot())+tile("erfolge","i-trophy","Erfolge-Wand",winDot())}</div>`;
+    <div class="tiles">${tile("creator","i-people","Betreuung")}${tile("bewerten","i-check","Bewerten",open)}${S.noUpd14?"":tile("termine","i-clock","1:1-Termine",soonBooked())}${tile("kalender","i-cal","Kalender")}${tile("akademie","i-learn","Akademie")}${tile("fragen","i-mail","Sag's uns")}${S.noUpd16?"":tile("match","i-sword","Match-Börse",matchDot())+tile("erfolge","i-trophy","Erfolge-Wand",winDot())}${waTile()}</div>`;
 }
 
 /* ---------- Partner (Kooperationen): Kachel + Infoblatt, Leitung pflegt Text und Link ---------- */
 const PARTNERS = [["tiktori","CastMonkey (ehemals Tiktory)","i-rocket"],["papaya","Papaya Given","i-spark"]];
 const PARTNER_DEFAULT = { tiktori:{ info:"Tools für dein TikTok LIVE: Overlays, Sound-Alarme und Text-to-Speech bei Geschenken und Followern, Abläufe automatisieren, Punkte und Level für deine Zuschauer. Läuft mit TikTok LIVE Studio und OBS.\n\nStart: kostenlos registrieren und deinen TikTok-Namen eintragen. Es gibt auch Bezahl-Tarife mit mehr Funktionen.", link:"https://castmonkey.com/de", label:"Zu CastMonkey" }, papaya:{ info:"Papaya Given ist eine Marketingagentur und unser Kooperationspartner.\n\nInteresse an einer Kooperation im TikTok Shop? Den Kontakt stellen wir für dich her. Sprich einfach deinen Manager an.", link:"https://www.instagram.com/papayagiven.agency/", label:"Papaya Given auf Instagram" } };
 const partnerOf = k => { try { const v=JSON.parse(S.settings["partner_"+k]||"null"); return v||PARTNER_DEFAULT[k]||{}; } catch(e){ return PARTNER_DEFAULT[k]||{}; } };
+/* WhatsApp-Community: ein Link, Leitung pflegt ihn */
+const waLink = () => { const v=String(S.settings.wa_community||"").trim(); return /^https:\/\/(chat\.whatsapp\.com|whatsapp\.com|www\.whatsapp\.com)\//i.test(v)?v:""; };
+function waTile(){
+  const lead=S.real?.role==="lead" && !S.viewAs, l=waLink();
+  if (lead) return `<button class="tile" id="wa-open"><span class="tic">${ic("i-chat")}</span>WhatsApp-Community</button>`;
+  return l?`<a class="tile" href="${esc(l)}" target="_blank" rel="noopener"><span class="tic">${ic("i-chat")}</span>WhatsApp-Community</a>`:"";
+}
+function openWa(){
+  const l=waLink();
+  sheet(`<div class="sh"><span class="eyebrow">Nur die Leitung kann das ändern</span><h2>WhatsApp-<em>Community</em></h2></div>
+    <p class="muted" style="margin:0">Einladungslink zur Community einfügen (WhatsApp > Community > Einladen > Link kopieren). Die Kachel sehen Creator und Manager erst, wenn ein Link gespeichert ist.</p>
+    <label class="f" for="wa-link">Link<input id="wa-link" type="url" placeholder="https://chat.whatsapp.com/…" value="${esc(S.settings.wa_community||"")}"></label>
+    <div class="actions"><button class="btn small" id="wa-save">Speichern</button>${l?`<a class="btn small ghost" href="${esc(l)}" target="_blank" rel="noopener">Öffnen</a>`:""}</div>`);
+}
+async function waSave(){
+  const v=$("#wa-link").value.trim();
+  if (v && !/^https:\/\/(chat\.whatsapp\.com|whatsapp\.com|www\.whatsapp\.com)\//i.test(v)) return toast("Bitte den WhatsApp-Link einfügen, er beginnt mit https://chat.whatsapp.com/");
+  const r=await sb.from("settings").upsert({ key:"wa_community", value:v||null }, { onConflict:"key" }); if (r.error) return fail(r.error);
+  S.settings.wa_community=v; closeSheet(); render(true); toast(v?"Link gespeichert ✓":"Link entfernt.");
+}
 function partnerTiles(){
   const lead=S.real?.role==="lead" && !S.viewAs;
   return PARTNERS.filter(([k])=>lead || partnerOf(k).info || partnerOf(k).link).map(([k,n,i])=>`<button class="tile" data-partner="${k}"><span class="tic">${ic(i)}</span>${n}</button>`).join("");
@@ -3075,6 +3095,8 @@ document.addEventListener("click", async e => {
   if (t.dataset.mtdel) return mtDel(t.dataset.mtdel);
   if (t.dataset.mtdone) return mtDone(t.dataset.mtdone);
   if (t.id==="mr-add") return mrAdd();
+  if (t.id==="wa-open") return openWa();
+  if (t.id==="wa-save") return waSave();
   if (t.dataset.rwm){ S.rwm=t.dataset.rwm; return render(true); }
   if (t.dataset.rwall){ const [,d,ok]=t.dataset.rwall.split("|"); return sheet(rwTable(Number(d),ok==="1")); }
   if (t.dataset.viewmgr){ const sel=$("#viewas"); if (sel){ sel.value=t.dataset.viewmgr; sel.dispatchEvent(new Event("change",{ bubbles:true })); } return; }
