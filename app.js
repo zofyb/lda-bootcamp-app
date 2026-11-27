@@ -454,7 +454,8 @@ function render(keepScroll){
     if (!["start","lernen","kalender","profil","anim","termine","match","erfolge"].includes(S.tab)) S.tab="start";
   } else if (["start","lernen","profil","themen"].includes(S.tab) || (S.tab==="fuehrung" && S.real.role!=="lead") || S.tab==="mehr") S.tab = "uebersicht";
   if (me.role==="lead" && S.tab==="mehr") S.tab="uebersicht";
-  bnav.innerHTML = navHtml(); bnav.hidden = !!S.openArea || !!(S.qz && !S.qz.done);
+  { const tmp=document.createElement("div"); tmp.innerHTML=navHtml(); const old=bnav.querySelector(".bn"); if (old) old.replaceWith(tmp.firstElementChild); else bnav.appendChild(tmp.firstElementChild); }
+  bnav.hidden = !!S.openArea || !!(S.qz && !S.qz.done);
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
   if (S.qz && !S.creator) html = quizView();

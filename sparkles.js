@@ -83,4 +83,31 @@
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+
+  // Funken-Explosion hinter der Navigationsleiste beim Tippen auf einen Knopf
+  const nav = document.getElementById("bnav");
+  if (nav){
+    const nc = document.createElement("canvas"); nc.className = "navfx"; nav.prepend(nc); const nx = nc.getContext("2d");
+    let bits = [], going = false;
+    const fit = () => { const r = nav.getBoundingClientRect(); nc.width = r.width * dpr; nc.height = r.height * dpr; nx.setTransform(dpr, 0, 0, dpr, 0, 0); };
+    function loop(){
+      const r = nav.getBoundingClientRect(); nx.clearRect(0, 0, r.width, r.height); nx.globalCompositeOperation = "lighter";
+      for (let i = bits.length - 1; i >= 0; i--){ const b = bits[i]; b.l -= .028; if (b.l <= 0){ bits.splice(i, 1); continue; }
+        b.x += b.vx; b.y += b.vy; b.vx *= .94; b.vy *= .94;
+        const s = b.s * (.4 + b.l * .8); nx.globalAlpha = Math.min(1, b.l * 1.2); nx.drawImage(sprites[b.ci], b.x - s / 2, b.y - s / 2, s, s); }
+      nx.globalAlpha = 1;
+      if (bits.length) requestAnimationFrame(loop); else going = false;
+    }
+    nav.addEventListener("pointerdown", e => {
+      const btn = e.target.closest("button"); if (!btn || reduce) return;
+      const r = nav.getBoundingClientRect(), b = btn.querySelector(".bi") || btn, br = b.getBoundingClientRect();
+      if (nc.width !== Math.round(r.width * dpr)) fit();
+      const x = br.left + br.width / 2 - r.left, y = br.top + br.height / 2 - r.top;
+      for (let i = 0; i < 34; i++){ const a = rnd(0, 6.283), v = rnd(1.2, 5.2);
+        bits.push({ x, y, vx: Math.cos(a) * v * 1.4, vy: Math.sin(a) * v * .8, l: rnd(.8, 1), s: rnd(9, 22), ci: Math.floor(rnd(0, COLORS.length)) }); }
+      if (!going){ going = true; requestAnimationFrame(loop); }
+    }, { passive: true });
+  }
+  const lg = document.getElementById("toplogo");
+  if (lg) lg.addEventListener("click", () => { lg.classList.remove("boing"); void lg.offsetWidth; lg.classList.add("boing"); setTimeout(() => lg.classList.remove("boing"), 750); });
 })();
