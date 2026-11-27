@@ -444,7 +444,7 @@ function render(keepScroll){
   const st = me.role==="creator" && !me.preview ? streakInfo(me.email).cur : 0;
   who.innerHTML = me.role==="creator"
     ? `<button class="chip invchip" id="inv-open" aria-label="Streamer einladen">${ic("i-rocket")}<span>Einladen</span></button>${waBtn()}${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}${S.noUpd9?`<button class="avabtn" data-tab="profil" aria-label="Mein Profil">${esc(initialOf(me))}</button>`:`<button class="avabtn rg" data-tab="profil" aria-label="Mein Profil">${lvRing(me.email,46,{badge:false})}</button>`}`
-    : `<button class="hbtn" id="logout" aria-label="Abmelden" title="Abmelden">${ic("i-power")}</button><button class="avabtn hav" id="pw-open" aria-label="Mein Konto" title="${esc(S.real.name)} · Passwort">${avaInner(S.real)}</button>${waBtn()}<button class="hbtn share" id="share-app" aria-label="App teilen" title="App teilen">${ic("i-share")}</button>`;
+    : `${waBtn()}<button class="hbtn share" id="share-app" aria-label="App teilen" title="App teilen">${ic("i-share")}</button><button class="avabtn hav" id="pw-open" aria-label="Mein Konto" title="${esc(S.real.name)} · Passwort">${avaInner(S.real)}</button><button class="hbtn" id="logout" aria-label="Abmelden" title="Abmelden">${ic("i-power")}</button>`;
   if (me.role==="creator"){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
