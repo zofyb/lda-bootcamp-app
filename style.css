@@ -868,3 +868,6 @@ div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;
 .avabtn.hav{position:relative;overflow:hidden;flex:none}
 .avabtn.hav .avimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
 .who .wabtn{width:38px;height:38px}
+.avabtn.hav{box-shadow:none}
+.who .wabtn{box-shadow:none}
+.who:has(.hav){gap:10px}
