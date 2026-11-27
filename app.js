@@ -408,7 +408,7 @@ async function verifyCode(){
 
 /* ---------- Rahmen ---------- */
 const ic = (n, cls="") => `<svg class="ico ${cls}" aria-hidden="true"><use href="#${n}"/></svg>`;
-const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","match","erfolge","mteam","rw"];
+const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","match","erfolge","mteam","rw","reg"];
 function navItems(){
   const me=S.me;
   if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],["anim","i-spark","Animation"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
@@ -465,7 +465,7 @@ function render(keepScroll){
   else if (S.tab==="kalender") html = calendarView();
   else if (S.tab==="termine") html = termView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
-  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView, mteam:mteamView, rw:rwView }[S.tab] || pendingView)();
+  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView, mteam:mteamView, rw:rwView, reg:regView }[S.tab] || pendingView)();
   if (!S.openArea && !S.creator && !S.pend && !S.qz && !navItems().some(x=>x[0]===S.tab))
     html = `<button class="btn ghost small back" data-tab="${me.role==="creator"?"start":"uebersicht"}">← Zurück</button>`+html;
   view.innerHTML = html;
@@ -1232,7 +1232,7 @@ function profileView(email){
 }
 function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
-  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd9?[]:[["rw","i-gift","Live-Belohnungen"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
+  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],...(S.real?.role==="lead"?[["reg","i-user","Registrierungen"]]:[]),["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd9?[]:[["rw","i-gift","Live-Belohnungen"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
   return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${waTile()}${partnerTiles()}</div>`;
 }
 function leadStart(){ if (S.me.role==="manager") return mgrStart(); return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
@@ -3027,6 +3027,30 @@ function rwView(){
     <div class="mini"><span class="chip">💎 ${fmtN(x.r.d)}</span><span class="chip">${fmtH(x.r.h)} Std.</span></div></div>`).join("")}</div>`:""}
   <button class="btn ghost small" data-rwall="${esc(m)}|0|0">Belohnungstabelle</button>`;
 }
+/* Registrierungsliste (nur Leitung): wer sich wann mit welcher E-Mail angemeldet hat */
+function regRows(){
+  const q=(S.regQ||"").toLowerCase().trim();
+  return S.members.filter(m=>m.role==="creator").filter(m=>!q || [m.name,m.handle,m.email].some(x=>String(x||"").toLowerCase().includes(q)))
+    .sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
+}
+function regView(){
+  const all=S.members.filter(m=>m.role==="creator"), rows=regRows(), wk=Date.now()-7*864e5;
+  const fresh=all.filter(m=>new Date(m.created_at)>=wk).length;
+  const d=x=>x?new Date(x).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"2-digit"}):"–";
+  return `<div class="stack"><span class="eyebrow">Nur für die Leitung</span><h1>Registrie<em>rungen</em></h1>
+    <p class="muted">Alle Creator mit Konto in der App: Name, TikTok-Name und E-Mail-Adresse, die neuesten oben.</p></div>
+    <div class="stats"><div><b>${all.length}</b><small>Registriert</small></div><div><b>${fresh}</b><small>Neu in 7 Tagen</small></div><div><b>${all.filter(m=>!m.manager_email).length}</b><small>Ohne Manager</small></div></div>
+    <div class="actions"><input id="reg-q" type="text" placeholder="Suchen: Name, TikTok oder E-Mail" value="${esc(S.regQ||"")}" style="flex:1;min-width:0"><button class="btn small ghost" id="reg-csv">${ic("i-list")} Als Excel-Liste</button></div>
+    <div class="list">${rows.map(m=>`<button class="row" data-edit-reg="${esc(m.email)}"><div class="head"><b>${esc(m.name||"–")}</b><span class="muted">${d(m.created_at)}</span></div>
+      <div class="mini"><span class="chip">@${esc(String(m.handle||"").replace(/^@/,""))}</span><span class="chip">${esc(m.email)}</span><span class="chip ${m.manager_email?"":"warn"}">${esc(member(m.manager_email)?.name||"ohne Manager")}</span></div></button>`).join("")||`<div class="panel"><p class="muted" style="margin:0">Keine Treffer.</p></div>`}</div>`;
+}
+function regCsv(){
+  const c=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+  const lines=[["Registriert am","Name","TikTok-Name","E-Mail","Manager","Bootcamp"].map(c).join(";"),
+    ...regRows().map(m=>[m.created_at?new Date(m.created_at).toLocaleString("de-DE"):"",m.name,"@"+String(m.handle||"").replace(/^@/,""),m.email,member(m.manager_email)?.name||"",m.bootcamp?"ja":"nein"].map(c).join(";"))];
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"}));
+  a.download=`registrierungen-${isoDay(new Date())}.csv`; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
 function mteamView(){
   if (S.noUpd19) return soonUpd16("Manager-","Rangliste");
   const staff=S.members.filter(m=>m.role==="manager" || (m.role==="lead" && (peopleOf(m.email).length || pendingOf(m.email).length)));
@@ -3151,6 +3175,8 @@ document.addEventListener("click", async e => {
   if (t.dataset.mtdel) return mtDel(t.dataset.mtdel);
   if (t.dataset.mtdone) return mtDone(t.dataset.mtdone);
   if (t.id==="mr-add") return mrAdd();
+  if (t.id==="reg-csv") return regCsv();
+  if (t.dataset.editReg){ S.editMember=t.dataset.editReg; S.tab="personen"; render(); return document.getElementById("pm-email")?.scrollIntoView({block:"center"}); }
   if (t.id==="wa-open") return openWa();
   if (t.id==="wa-save") return waSave();
   if (t.dataset.rwm){ S.rwm=t.dataset.rwm; return render(true); }
@@ -3281,7 +3307,7 @@ document.addEventListener("change", e => {
   if (e.target.id==="cal-showcamp"){ S.calShowCamp=e.target.checked; return render(true); }
   if (e.target.id==="ae-n"){ S.editArea=+e.target.value; render(true); }
 });
-document.addEventListener("input", e => { if (e.target.id==="note"){ const c=$("#cnt"); if(c) c.textContent=`${e.target.value.length} / 1000`; } });
+document.addEventListener("input", e => { if (e.target.id==="reg-q"){ S.regQ=e.target.value; clearTimeout(S._regT); S._regT=setTimeout(()=>{ render(true); const i=$("#reg-q"); if (i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } },250); return; } if (e.target.id==="note"){ const c=$("#cnt"); if(c) c.textContent=`${e.target.value.length} / 1000`; } });
 document.addEventListener("keydown", e => {
   if (e.key==="Escape"){ $("#win").classList.remove("show"); closeSheet(); }
   if (e.key!=="Enter") return;
