@@ -5,7 +5,7 @@
   const cv = document.createElement("canvas"); cv.className = "sparkles"; host.appendChild(cv);
   const cx = cv.getContext("2d");
   const COLORS = ["194,79,224", "155,47,201", "214,150,245", "170,90,230"];
-  let W = 0, H = 0, dpr = 1, parts = [], trail = [], mouse = { x: -999, y: -999, on: false, t: 0 };
+  let W = 0, H = 0, dpr = 1, parts = [], trail = [], mouse = { x: -999, y: -999, on: false, t: 0, touch: false }, glow = { x: -999, y: -999, a: 0 };
 
   // vorgerenderte Leuchtpunkte je Farbe
   const sprites = COLORS.map(c => {
@@ -36,8 +36,9 @@
     mouse.x = x; mouse.y = y; mouse.on = true; mouse.t = now;
     if (trail.length > 220) trail.splice(0, trail.length - 220);
   };
-  addEventListener("pointermove", e => move(e.clientX, e.clientY), { passive: true });
-  addEventListener("touchmove", e => { const t = e.touches[0]; if (t) move(t.clientX, t.clientY); }, { passive: true });
+  addEventListener("pointermove", e => { mouse.touch = e.pointerType !== "mouse"; move(e.clientX, e.clientY); }, { passive: true });
+  addEventListener("touchmove", e => { const t = e.touches[0]; mouse.touch = true; if (t) move(t.clientX, t.clientY); }, { passive: true });
+  addEventListener("touchstart", e => { const t = e.touches[0]; mouse.touch = true; if (t){ mouse.on = false; move(t.clientX, t.clientY); glow.x = t.clientX; glow.y = t.clientY; } }, { passive: true });
   addEventListener("pointerdown", e => move(e.clientX, e.clientY), { passive: true });
   document.addEventListener("pointerleave", () => { mouse.on = false; });
 
@@ -48,6 +49,14 @@
     if (!run) return;
     const dt = Math.min(3, (now - last) / 16.7); last = now;
     cx.clearRect(0, 0, W, H); cx.globalCompositeOperation = "lighter";
+    // Leuchtfleck an Maus oder Finger: folgt weich, verblasst nach dem Loslassen
+    const want = mouse.on && (mouse.touch ? now - mouse.t < 700 : true) ? 1 : 0;
+    glow.a += (want - glow.a) * Math.min(1, .08 * dt);
+    if (glow.x < -900){ glow.x = mouse.x; glow.y = mouse.y; }
+    glow.x += (mouse.x - glow.x) * Math.min(1, .25 * dt); glow.y += (mouse.y - glow.y) * Math.min(1, .25 * dt);
+    if (glow.a > .01){ const gr = cx.createRadialGradient(glow.x, glow.y, 0, glow.x, glow.y, 170);
+      gr.addColorStop(0, `rgba(194,79,224,${.38 * glow.a})`); gr.addColorStop(.4, `rgba(155,47,201,${.16 * glow.a})`); gr.addColorStop(1, "rgba(155,47,201,0)");
+      cx.globalAlpha = 1; cx.fillStyle = gr; cx.fillRect(glow.x - 170, glow.y - 170, 340, 340); }
     const active = mouse.on && now - mouse.t < 1500, R = 130;
     for (const p of parts){
       if (active){ const dx = p.x - mouse.x, dy = p.y - mouse.y, d2 = dx * dx + dy * dy;
