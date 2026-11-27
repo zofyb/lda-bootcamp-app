@@ -876,3 +876,4 @@ div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;
 /* Schlagzahlen in Gold-Orange */
 .stats b{background:linear-gradient(135deg,#ffd76a,var(--gold) 55%,#ff9a3c);-webkit-background-clip:text;background-clip:text;color:transparent}
 .kring b{color:var(--gold)}
+.bg .sparkles{position:absolute;inset:0}
