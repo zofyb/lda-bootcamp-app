@@ -30,7 +30,9 @@
   size(); addEventListener("resize", size, { passive: true });
 
   // Beim Scrollen: Lichter abdunkeln, keine Spur und kein Ausweichen
-  addEventListener("scroll", () => { lastScroll = performance.now(); if (mouse.touch) mouse.on = false; }, { passive: true });
+  let scrollT = 0;
+  addEventListener("scroll", () => { lastScroll = performance.now(); if (mouse.touch) mouse.on = false;
+    host.classList.add("scrolling"); clearTimeout(scrollT); scrollT = setTimeout(() => host.classList.remove("scrolling"), 500); }, { passive: true });
   const move = (x, y) => {
     const now = performance.now();
     if (now - lastScroll < 300){ if (mouse.touch){ mouse.on = false; return; } }
@@ -60,7 +62,7 @@
     if (glow.a > .01){ const gr = cx.createRadialGradient(glow.x, glow.y, 0, glow.x, glow.y, 170);
       gr.addColorStop(0, `rgba(194,79,224,${.38 * glow.a})`); gr.addColorStop(.4, `rgba(155,47,201,${.16 * glow.a})`); gr.addColorStop(1, "rgba(155,47,201,0)");
       cx.globalAlpha = 1; cx.fillStyle = gr; cx.fillRect(glow.x - 170, glow.y - 170, 340, 340); }
-    dim += ((now - lastScroll < 450 ? .18 : 1) - dim) * Math.min(1, (dim > .5 ? .25 : .06) * dt);
+    dim += ((now - lastScroll < 500 ? .04 : 1) - dim) * Math.min(1, (dim > .5 ? .25 : .06) * dt);
     const active = mouse.on && now - mouse.t < 1500, R = 130;
     for (const p of parts){
       if (active){ const dx = p.x - mouse.x, dy = p.y - mouse.y, d2 = dx * dx + dy * dy;
