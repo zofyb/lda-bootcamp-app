@@ -414,6 +414,8 @@ function render(keepScroll){
   else if (S.tab==="termine") html = termView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
   else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView, mteam:mteamView, rw:rwView }[S.tab] || pendingView)();
+  if (!S.openArea && !S.creator && !S.pend && !S.qz && !navItems().some(x=>x[0]===S.tab))
+    html = `<button class="btn ghost small back" data-tab="${me.role==="creator"?"start":"uebersicht"}">← Zurück</button>`+html;
   view.innerHTML = html;
   if (!keepScroll) window.scrollTo(0,0);
   afterRender(); watchAni(); fab();
