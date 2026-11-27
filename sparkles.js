@@ -84,30 +84,54 @@
   }
   requestAnimationFrame(frame);
 
-  // Funken-Explosion hinter der Navigationsleiste beim Tippen auf einen Knopf
+  // Funken sprühen beim Tippen auf einen Knopf der Navigationsleiste nach oben, oberhalb der Leiste
   const nav = document.getElementById("bnav");
   if (nav){
-    const nc = document.createElement("canvas"); nc.className = "navfx"; nav.prepend(nc); const nx = nc.getContext("2d");
-    let bits = [], going = false;
-    const fit = () => { const r = nav.getBoundingClientRect(); nc.width = r.width * dpr; nc.height = r.height * dpr; nx.setTransform(dpr, 0, 0, dpr, 0, 0); };
+    const nc = document.createElement("canvas"); nc.className = "navfx"; document.body.appendChild(nc); const nx = nc.getContext("2d");
+    const UP = 260; let bits = [], going = false, NW = 0, NH = 0;
+    const fit = () => { const r = nav.getBoundingClientRect(); NW = innerWidth; NH = r.height + UP;
+      nc.style.height = NH + "px"; nc.width = NW * dpr; nc.height = NH * dpr; nx.setTransform(dpr, 0, 0, dpr, 0, 0); };
     function loop(){
-      const r = nav.getBoundingClientRect(); nx.clearRect(0, 0, r.width, r.height); nx.globalCompositeOperation = "lighter";
-      for (let i = bits.length - 1; i >= 0; i--){ const b = bits[i]; b.l -= .028; if (b.l <= 0){ bits.splice(i, 1); continue; }
-        b.x += b.vx; b.y += b.vy; b.vx *= .94; b.vy *= .94;
-        const s = b.s * (.4 + b.l * .8); nx.globalAlpha = Math.min(1, b.l * 1.2); nx.drawImage(sprites[b.ci], b.x - s / 2, b.y - s / 2, s, s); }
+      nx.clearRect(0, 0, NW, NH); nx.globalCompositeOperation = "lighter";
+      for (let i = bits.length - 1; i >= 0; i--){ const b = bits[i]; b.l -= .02; if (b.l <= 0){ bits.splice(i, 1); continue; }
+        b.x += b.vx; b.y += b.vy; b.vx *= .97; b.vy = b.vy * .97 + .06;
+        const s = b.s * (.45 + b.l * .7); nx.globalAlpha = Math.min(1, b.l * 1.3); nx.drawImage(sprites[b.ci], b.x - s / 2, b.y - s / 2, s, s); }
       nx.globalAlpha = 1;
-      if (bits.length) requestAnimationFrame(loop); else going = false;
+      if (bits.length) requestAnimationFrame(loop); else { going = false; nx.clearRect(0, 0, NW, NH); }
     }
     nav.addEventListener("pointerdown", e => {
       const btn = e.target.closest("button"); if (!btn || reduce) return;
-      const r = nav.getBoundingClientRect(), b = btn.querySelector(".bi") || btn, br = b.getBoundingClientRect();
-      if (nc.width !== Math.round(r.width * dpr)) fit();
-      const x = br.left + br.width / 2 - r.left, y = br.top + br.height / 2 - r.top;
-      for (let i = 0; i < 34; i++){ const a = rnd(0, 6.283), v = rnd(1.2, 5.2);
-        bits.push({ x, y, vx: Math.cos(a) * v * 1.4, vy: Math.sin(a) * v * .8, l: rnd(.8, 1), s: rnd(9, 22), ci: Math.floor(rnd(0, COLORS.length)) }); }
+      fit();
+      const r = nav.getBoundingClientRect(), bi = (btn.querySelector(".bi") || btn).getBoundingClientRect();
+      const x = bi.left + bi.width / 2, y = UP + (bi.top - r.top) + 2;
+      for (let i = 0; i < 40; i++){ const a = -Math.PI / 2 + rnd(-.55, .55), v = rnd(2.5, 7.5);
+        bits.push({ x: x + rnd(-10, 10), y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, l: rnd(.75, 1), s: rnd(8, 20), ci: Math.floor(rnd(0, COLORS.length)) }); }
       if (!going){ going = true; requestAnimationFrame(loop); }
     }, { passive: true });
   }
-  const lg = document.getElementById("toplogo");
-  if (lg) lg.addEventListener("click", () => { lg.classList.remove("boing"); void lg.offsetWidth; lg.classList.add("boing"); setTimeout(() => lg.classList.remove("boing"), 750); });
+
+  // Logo-Wolke: antippen = Boing, festhalten und ziehen = Wolke mitnehmen und dehnen, loslassen = springt zurück
+  const lg = document.getElementById("toplogo"), cl = lg && lg.querySelector(".cloud");
+  if (cl){
+    let drag = null;
+    cl.addEventListener("pointerdown", e => {
+      e.preventDefault(); cl.setPointerCapture(e.pointerId);
+      drag = { x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, moved: false };
+      cl.style.transition = "none"; lg.classList.add("drag");
+    });
+    cl.addEventListener("pointermove", e => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0, vx = e.clientX - drag.lx, vy = e.clientY - drag.ly;
+      drag.lx = e.clientX; drag.ly = e.clientY; if (Math.hypot(dx, dy) > 6) drag.moved = true;
+      const st = Math.min(.35, Math.hypot(vx, vy) / 40), ang = Math.atan2(vy, vx) * 180 / Math.PI;
+      cl.style.transform = `translate(${dx}px,${dy}px) rotate(${ang}deg) scale(${1 + st},${1 - st * .6}) rotate(${-ang}deg)`;
+    });
+    const end = () => {
+      if (!drag) return; const moved = drag.moved; drag = null;
+      cl.style.transition = "transform .7s cubic-bezier(.34,1.56,.64,1)"; cl.style.transform = "";
+      setTimeout(() => { lg.classList.remove("drag"); cl.style.transition = ""; }, 720);
+      if (!moved){ lg.classList.remove("boing"); void lg.offsetWidth; lg.classList.add("boing"); setTimeout(() => lg.classList.remove("boing"), 750); }
+    };
+    cl.addEventListener("pointerup", end); cl.addEventListener("pointercancel", end);
+  }
 })();
