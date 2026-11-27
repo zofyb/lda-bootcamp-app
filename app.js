@@ -2908,7 +2908,7 @@ async function hydrateWins(){
 }
 
 /* ---------- Manager-Punkte: Gespräche, Wochenaufgabe, Stufen (nur Manager selbst + Leitung sehen das) ---------- */
-const MLEVELS = [[0,"Betreuer"],[500,"Coach"],[1500,"Mentor"],[3500,"Senior-Coach"],[7000,"Head-Coach"]];
+const MLEVELS = [[0,"Betreuer"],[1000,"Coach"],[3000,"Mentor"],[6500,"Senior-Coach"],[12000,"Head-Coach"]];
 const MXP = { talk:50, talkList:20, task:10, done:10, rec:300, camp:50, pass:100, goal:250, cdone:20 };
 const ymOf = d => String(d||"").slice(0,7);
 const mondayKey = (d=new Date()) => { const x=new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate()-((x.getDay()+6)%7)); return isoDay(x); };
