@@ -873,3 +873,6 @@ div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;
 .who:has(.hav){gap:10px}
 .acct{display:flex;align-items:center;gap:14px}
 .avabtn.hav.big{width:64px;height:64px;font-size:24px;cursor:default}
+/* Schlagzahlen in Gold-Orange */
+.stats b{background:linear-gradient(135deg,#ffd76a,var(--gold) 55%,#ff9a3c);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kring b{color:var(--gold)}
