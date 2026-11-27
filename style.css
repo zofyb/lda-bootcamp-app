@@ -132,7 +132,7 @@ p{margin:0;line-height:1.55}
 .files a:hover{border-color:rgba(214,64,159,.5)}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--lilac)}
 label.f .row2{display:flex;justify-content:space-between}
-input[type=text],input[type=email],input[type=url],input[type=date],input[type=time],input[type=tel],input[type=number],input[type=month],textarea,select{font:400 14.5px var(--body);color:var(--fg);background:#0e0611;border:1px solid var(--line2);border-radius:12px;padding:12px;width:100%}
+input[type=text],input[type=email],input[type=password],input[type=url],input[type=date],input[type=time],input[type=tel],input[type=number],input[type=month],textarea,select{font:400 14.5px var(--body);color:var(--fg);background:#0e0611;border:1px solid var(--line2);border-radius:12px;padding:12px;width:100%}
 textarea{min-height:96px;resize:vertical;line-height:1.5}
 select option,select optgroup{background:#140918}
 .btn{font:600 14.5px var(--body);color:#fff;border:0;border-radius:14px;padding:14px;width:100%;cursor:pointer;background:linear-gradient(135deg,var(--rose),var(--plum));box-shadow:0 10px 24px rgba(160,30,140,.35);transition:transform .15s,opacity .2s}

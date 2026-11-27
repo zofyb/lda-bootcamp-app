@@ -257,7 +257,7 @@ async function load(){
       const { data: role } = await sb.rpc("my_role");
       if (!role) return noAccess("Dein Zugang zur LIVEdream Academy ist abgelaufen, weil du nicht mehr auf unserer Creator-Liste stehst. Wenn das ein Fehler ist, melde dich bei deinem Manager.");
     }
-    S.real = me; S.me = me; S.viewAs = ""; S._bye=false; storeSet("ldb-lastmail", email);
+    S.real = me; S.me = me; S.viewAs = ""; S._bye=false; if (!window.__DEMO) storeSet("ldb-lastmail", email);
     if (me.role==="creator") {
       const r = await sb.from("activity").upsert({ creator_email:email, day:isoDay(new Date()) }, { onConflict:"creator_email,day", ignoreDuplicates:true });
       if (r?.error) console.warn(r.error);
@@ -326,9 +326,12 @@ function loginView(email="", sent=false, err="", mode){
       <label class="f" for="rg-ref">Wer hat dich zu uns eingeladen? (TikTok-Name, optional)<input id="rg-ref" type="text" autocapitalize="none" autocomplete="off" placeholder="@name" value="${esc(r.ref||"")}"></label>
       <button class="btn" id="register">Registrieren</button>
       <button class="btn ghost" id="to-login">Ich habe schon ein Konto</button>`
-    : `${kickNote}<p class="soft">Melde dich mit deiner E-Mail-Adresse an. Du bekommst einen Anmelde-Link, ganz ohne Passwort.</p>
-      <label class="f" for="email">E-Mail-Adresse<input id="email" type="email" autocomplete="email" value="${esc(email)}"></label>
-      <button class="btn" id="send-link">Anmelde-Link schicken</button>
+    : `${kickNote}<p class="soft">Melde dich mit deinem Passwort an. Noch kein Passwort? Dann lass dir einen Code per E-Mail schicken und leg danach eins fest.</p>
+      <form class="stack" id="pw-form" onsubmit="return false">
+      <label class="f" for="email">E-Mail-Adresse<input id="email" name="username" type="email" autocomplete="username" value="${esc(email)}"></label>
+      <label class="f" for="pw">Passwort<input id="pw" name="password" type="password" autocomplete="current-password"></label>
+      <button class="btn" id="pw-login" type="submit">Anmelden</button></form>
+      <button class="btn ghost" id="send-link">Code per E-Mail schicken</button>
       <button class="btn ghost" id="to-register">Neu hier? Registrieren</button>`}
     ${err ? `<p class="err">${err}</p>` : ""}</div>
   </div>`;
@@ -365,6 +368,34 @@ async function register(){
   storeSet("ldb-register", { name, handle, email, ref });
   const er = await otp(email, ref ? { name, handle, ref } : { name, handle }); if (er) return loginView(email,false,er);
   loginView(email,true);
+}
+async function pwLogin(){
+  const email=lc($("#email").value), password=$("#pw").value;
+  if (!/^\S+@\S+\.\S+$/.test(email)) return loginView(email,false,"Bitte eine gültige E-Mail-Adresse eingeben.");
+  if (!password) return sendLink();
+  $("#pw-login").disabled=true;
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) return loginView(email,false,"E-Mail oder Passwort stimmt nicht. Noch kein Passwort festgelegt? Dann tippe auf „Code per E-Mail schicken“.");
+  storeSet("ldb-kicked",null);
+}
+function openPw(){
+  sheet(`<div class="sh"><span class="eyebrow">Schneller anmelden</span><h2>Passwort <em>festlegen</em></h2></div>
+    <p class="muted" style="margin:0">Danach meldest du dich mit E-Mail und Passwort an, ohne Code. Dein Handy oder Browser kann sich das Passwort merken.</p>
+    <form class="stack" id="pw-set-form" onsubmit="return false">
+      <input type="email" name="username" autocomplete="username" value="${esc(S.real?.email||"")}" hidden>
+      <label class="f" for="pw-new">Neues Passwort (mind. 8 Zeichen)<input id="pw-new" type="password" autocomplete="new-password" minlength="8"></label>
+      <label class="f" for="pw-new2">Nochmal eingeben<input id="pw-new2" type="password" autocomplete="new-password" minlength="8"></label>
+      <button class="btn" id="pw-save" type="submit">Passwort speichern</button></form>`);
+}
+async function pwSave(){
+  const a=$("#pw-new").value, b=$("#pw-new2").value;
+  if (a.length<8) return toast("Bitte mindestens 8 Zeichen.");
+  if (a!==b) return toast("Die beiden Passwörter sind nicht gleich.");
+  if (window.__DEMO) { closeSheet(); return toast("In der Demo wird nichts gespeichert."); }
+  $("#pw-save").disabled=true;
+  const { error } = await sb.auth.updateUser({ password:a });
+  if (error){ $("#pw-save").disabled=false; return toast(/weak|short|pwned|leak/i.test(error.message)?"Dieses Passwort ist zu leicht zu erraten. Bitte ein anderes wählen.":error.message); }
+  closeSheet(); toast("Passwort gespeichert ✓ Ab jetzt kannst du dich damit anmelden.");
 }
 async function verifyCode(){
   const token = $("#code").value.replace(/\s/g,"");
@@ -413,7 +444,7 @@ function render(keepScroll){
   const st = me.role==="creator" && !me.preview ? streakInfo(me.email).cur : 0;
   who.innerHTML = me.role==="creator"
     ? `<button class="chip invchip" id="inv-open" aria-label="Streamer einladen">${ic("i-rocket")}<span>Einladen</span></button>${waBtn()}${st?`<span class="chip" title="Tage am Stück dabei">🔥 <b>${st}</b></span>`:""}${S.noUpd9?`<button class="avabtn" data-tab="profil" aria-label="Mein Profil">${esc(initialOf(me))}</button>`:`<button class="avabtn rg" data-tab="profil" aria-label="Mein Profil">${lvRing(me.email,46,{badge:false})}</button>`}`
-    : `<button class="chip invchip" id="share-app" aria-label="App teilen">${ic("i-mail")}<span>App teilen</span></button>${waBtn()}<span class="chip">${esc(S.real.name)}</span><button class="chip" id="logout">Abmelden</button>`;
+    : `<button class="chip invchip" id="share-app" aria-label="App teilen">${ic("i-mail")}<span>App teilen</span></button>${waBtn()}<button class="chip" id="pw-open" title="Passwort festlegen">${ic("i-lock")}<span>${esc(S.real.name)}</span></button><button class="chip" id="logout">Abmelden</button>`;
   if (me.role==="creator"){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
@@ -1194,7 +1225,7 @@ function profileView(email){
   <div class="sec"><span>Abzeichen</span><small>${on} von ${bs.length}</small></div>
   <div class="hexes">${bs.map(hexBadge).join("")}</div>
   ${unlocksBlock(email)}
-  ${own && !S.viewAs ? `<button class="btn ghost small" id="logout">${ic("i-out")} Abmelden</button>` : ""}`;
+  ${own && !S.viewAs ? `<div class="actions"><button class="btn ghost small" id="pw-open">${ic("i-lock")} Passwort festlegen</button><button class="btn ghost small" id="logout">${ic("i-out")} Abmelden</button></div>` : ""}`;
 }
 function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
@@ -3064,6 +3095,9 @@ document.addEventListener("click", async e => {
   if (t.id==="legal-back"){ history.replaceState(null,"",location.pathname+location.search); return showLegal(); }
   if (t.id==="send-link") return sendLink();
   if (t.id==="verify") return verifyCode();
+  if (t.id==="pw-login") return pwLogin();
+  if (t.id==="pw-open") return openPw();
+  if (t.id==="pw-save") return pwSave();
   if (t.id==="restart") return loginView();
   if (t.id==="register") return register();
   if (t.id==="to-register"){ S._loginMode="register"; return loginView($("#email")?.value||""); }
@@ -3248,7 +3282,7 @@ document.addEventListener("input", e => { if (e.target.id==="note"){ const c=$("
 document.addEventListener("keydown", e => {
   if (e.key==="Escape"){ $("#win").classList.remove("show"); closeSheet(); }
   if (e.key!=="Enter") return;
-  if (e.target.id==="email") (S._loginMode==="register" ? register() : sendLink());
+  if (e.target.id==="email" && !$("#pw")) (S._loginMode==="register" ? register() : sendLink());
   if (e.target.id==="code") verifyCode();
   if (e.target.id==="an-wa") aniWaSave();
 });
