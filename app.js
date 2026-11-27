@@ -578,7 +578,7 @@ function creatorHome(){
   }
   h += `</div>`;
   if (!S.areas.length) h += `<p class="muted">Noch keine Themen angelegt.</p>`;
-  h += (snapOf(e,"vorher")||S.noUpd5 ? snapBlock(e) : "") + extrasBlock(e);
+  h += surveyBlock(e) + (snapOf(e,"vorher")||S.noUpd5 ? snapBlock(e) : "") + extrasBlock(e);
   return h;
 }
 
@@ -735,7 +735,8 @@ function surveyBlock(e){
   if (!all && !S.me.preview) return "";
   if (S.survey.find(x=>x.creator_email===e)) return `<div class="panel"><b>💜 Danke für dein Feedback!</b><small class="muted" style="display:block">Damit machen wir das nächste Bootcamp noch besser.</small></div>`;
   const d=S.survDraft;
-  return `<div class="panel stack"><div class="sh"><span class="eyebrow">2 Minuten</span><h2>Wie war's <em>für dich?</em></h2></div>
+  return `<div class="panel stack"><div class="sh"><span class="eyebrow">Bootcamp geschafft 🎉</span><h2>Dein <em>Feedback</em></h2></div>
+    <p class="muted" style="margin:0">Wie hat dir das Bootcamp gefallen? Mit deinen Antworten machen wir das nächste noch besser.</p>
     <div class="stars" role="group" aria-label="Bewertung">${[1,2,3,4,5].map(i=>`<button data-star="${i}" class="${(d.rating||0)>=i?"on":""}" aria-label="${i} Sterne">★</button>`).join("")}</div>
     <label class="f" for="sv-helped">Welches Thema hat dir am meisten geholfen?<select id="sv-helped"><option value="">–</option>${S.areas.map(a=>`<option value="${a.n}" ${+d.helped===a.n?"selected":""}>${a.n} · ${esc(a.title)}</option>`).join("")}</select></label>
     <label class="f" for="sv-missing">Was hat dir gefehlt?<textarea id="sv-missing" maxlength="1000">${esc(d.missing||"")}</textarea></label>
@@ -1049,6 +1050,10 @@ function academyView(){
       ? `<div class="row" data-sid="${esc(x.id)}"><div class="head"><span class="drag" aria-label="Ziehen zum Sortieren">⠿</span>${extraCard(x,seen)}</div><div class="actions"><span class="tag">${x.level!=null?"Freischaltung ab Stufe "+x.level:audOf(x)==="team"?"nur Team":"alle Creator"}</span>${isVid(x.path)?vCoverBtn(x.path):""}<button class="chip" data-delextra="${esc(x.id)}">${S.confirmDelete===x.id?"Wirklich löschen?":"Löschen"}</button></div></div>`
       : extraCard(x,seen)).join("")}</div>`;
   }
+  if (S.me.role==="creator" && !S.noUpd5) h += `<div class="panel stack akwish"><div class="sh"><span class="eyebrow">Dein Wunsch</span><h2>Welche Schulung <em>wünschst du dir?</em></h2></div>
+    <p class="muted" style="margin:0">Sag uns, zu welchem Thema du als Nächstes etwas lernen willst. Anonym.</p>
+    <textarea id="ak-wish" maxlength="500" placeholder="z. B. Mehr Geschenke im Match, Licht am Handy, …"></textarea>
+    <button class="btn gold" id="ak-wish-send" ${readOnly()||S.me.preview?"disabled":""}>Wunsch abschicken</button></div>`;
   return h;
 }
 
@@ -1200,7 +1205,7 @@ function startView(){
     <div class="camps">${camps.map(c=>`<button class="camp k-${c.kind}" data-cal="${esc(c.id)}"><b>${esc(c.title)}</b><small>${c.starts>t?"ab "+fmtDate(c.starts).replace(/\.\d{4}$/,"."):"bis "+fmtDate(c.ends).replace(/\.\d{4}$/,".")}</small></button>`).join("")}</div>`:""}
   ${topLists()}
   ${recCard(e,true)}
-  ${boot?surveyBlock(e)+topBlock():""}`;
+  ${boot?topBlock():""}`;
 }
 function learnView(){
   const segs=[...(inBootcamp(S.me)?[["bootcamp","Bootcamp"]]:[]),["akademie","Akademie"],["quiz","Quizze"]];
@@ -2212,6 +2217,12 @@ function openKK(){
     <button class="btn" id="qsend" ${ro?"disabled":""}>Anonym abschicken</button>
     ${pub.length?`<div class="wkh"><span>ANTWORTEN</span><small class="muted">Fragen, die schon beantwortet sind</small></div><div class="list">${pub.map(q=>`<div class="row"><b>${esc(q.body)}</b>${q.answer?`<p class="feedback">${esc(q.answer)}</p>`:""}</div>`).join("")}</div>`:""}`);
 }
+async function sendWish(){
+  const t=($("#ak-wish").value||"").trim(); if (t.length<3) return toast("Schreib bitte ein paar Worte.");
+  const row={ body:"Schulungswunsch: "+t }; if (!S.noUpd7) row.kind="wunsch";
+  const r=await sb.from("questions").insert(row); if (r.error) return fail(r.error);
+  $("#ak-wish").value=""; toast("Danke! Dein Wunsch ist angekommen. 💜");
+}
 async function sendQuestion(){
   const body=($("#qbox").value||"").trim(); if (body.length<3) return toast("Schreib bitte ein paar Worte.");
   const row={ body }; if (!S.noUpd7) row.kind=S.kkKind||"frage";
@@ -3176,6 +3187,7 @@ document.addEventListener("click", async e => {
   if (t.dataset.mtdone) return mtDone(t.dataset.mtdone);
   if (t.id==="mr-add") return mrAdd();
   if (t.id==="reg-csv") return regCsv();
+  if (t.id==="ak-wish-send") return sendWish();
   if (t.dataset.editReg){ S.editMember=t.dataset.editReg; S.tab="personen"; render(); return document.getElementById("pm-email")?.scrollIntoView({block:"center"}); }
   if (t.id==="wa-open") return openWa();
   if (t.id==="wa-save") return waSave();
