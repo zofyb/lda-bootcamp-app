@@ -871,3 +871,5 @@ div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;
 .avabtn.hav{box-shadow:none}
 .who .wabtn{box-shadow:none}
 .who:has(.hav){gap:10px}
+.acct{display:flex;align-items:center;gap:14px}
+.avabtn.hav.big{width:64px;height:64px;font-size:24px;cursor:default}

@@ -379,7 +379,10 @@ async function pwLogin(){
   storeSet("ldb-kicked",null);
 }
 function openPw(){
-  sheet(`<div class="sh"><span class="eyebrow">Schneller anmelden</span><h2>Passwort <em>festlegen</em></h2></div>
+  const staff=S.real?.role!=="creator" && !S.viewAs;
+  sheet(`${staff?`<div class="sh"><span class="eyebrow">${esc(S.real.name||"")}</span><h2>Dein <em>Konto</em></h2></div>
+    <div class="acct"><span class="avabtn hav big">${avaInner(S.real)}</span><label class="btn ghost small" for="av-file">${ic("i-cam")} Profilbild ${S.real.avatar?"ändern":"hochladen"}<input id="av-file" type="file" accept="image/*" hidden></label></div>
+    <h3 style="margin:6px 0 0">Passwort festlegen</h3>`:`<div class="sh"><span class="eyebrow">Schneller anmelden</span><h2>Passwort <em>festlegen</em></h2></div>`}
     <p class="muted" style="margin:0">Danach meldest du dich mit E-Mail und Passwort an, ohne Code. Dein Handy oder Browser kann sich das Passwort merken.</p>
     <form class="stack" id="pw-set-form" onsubmit="return false">
       <input type="email" name="username" autocomplete="username" value="${esc(S.real?.email||"")}" hidden>
@@ -1776,7 +1779,7 @@ async function avatarUpload(f){
   if (!/^image\//.test(f.type)) return toast("Bitte ein Bild auswählen.");
   if (S.viewAs || S.me.preview || window.__DEMO) return toast("In der Vorschau wird nichts gespeichert.");
   try{
-    toast("Profilbild wird gespeichert …");
+    closeSheet(); toast("Profilbild wird gespeichert …");
     const blob=await shrinkImage(f), e=S.me.email, path=`${e}/avatar-${Date.now()}.jpg`;
     const u=await sb.storage.from("profilbilder").upload(path, blob, { contentType:"image/jpeg" }); if (u.error) throw u.error;
     const r=await sb.rpc("set_avatar",{ p:path }); if (r.error) throw r.error;
