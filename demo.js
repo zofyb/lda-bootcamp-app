@@ -72,7 +72,7 @@ const db = {
   xp_events: [].concat(...["c1@demo","c3@demo","c5@demo"].map((e,j)=>Array.from({length:[12,5,8][j]},(_,i)=>({creator_email:e, kind:"login", ref:day(i), xp:5})))).concat([
     {creator_email:"c1@demo", kind:"hook", ref:day(0), xp:10},{creator_email:"c1@demo", kind:"impuls", ref:"w", xp:20},{creator_email:"c1@demo", kind:"iq1", ref:"w", xp:10},
     {creator_email:"c1@demo", kind:"camp", ref:"k1", xp:15},{creator_email:"c1@demo", kind:"extra", ref:"e1", xp:15}]),
-  backstage: [["luna.live",22,61.5,48210,1,1],["sofia.sings",18,40.2,30550,2,3],["gamer_kevin",20,55,21800,3,2],["tim.talks",9,14,12040,4,6],["jenny.mama",15,22.5,9800,5,4],["mia.vibes",12,18,4100,6,5]]
+  backstage: [["luna.live",22,61.5,512340,1,1],["sofia.sings",18,40.2,380550,2,3],["gamer_kevin",20,72,231800,3,2],["tim.talks",9,14,12040,5,6],["jenny.mama",15,62.5,158800,4,4],["mia.vibes",12,18,4100,6,5]]
     .map(([h,dy,hr,dm,rd,rt])=>({ month:BSM, handle:h, days:dy, hours:hr, diamonds:dm, rank_d:rd, rank_t:rt })),
   guide_checks: ["start1","start2","start3","app1","app2","app3","video1","video2","anlauf1","licht1"].map((id,i)=>({ creator_email:"c1@demo", item:id, status:i%4===3?"known":"done", by_email:"lena@demo", at:iso(now-i*D) })),
   guide_notes: [{ creator_email:"c1@demo", chapter:"video", note:"Hooks klappen gut, beim Text-Hook nochmal nachhaken.", by_email:"lena@demo" }],

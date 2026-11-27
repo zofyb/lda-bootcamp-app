@@ -356,7 +356,7 @@ async function verifyCode(){
 
 /* ---------- Rahmen ---------- */
 const ic = (n, cls="") => `<svg class="ico ${cls}" aria-hidden="true"><use href="#${n}"/></svg>`;
-const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","match","erfolge","mteam"];
+const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","match","erfolge","mteam","rw"];
 function navItems(){
   const me=S.me;
   if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],["anim","i-spark","Animation"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
@@ -413,7 +413,7 @@ function render(keepScroll){
   else if (S.tab==="kalender") html = calendarView();
   else if (S.tab==="termine") html = termView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
-  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView, mteam:mteamView }[S.tab] || pendingView)();
+  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView, mteam:mteamView, rw:rwView }[S.tab] || pendingView)();
   view.innerHTML = html;
   if (!keepScroll) window.scrollTo(0,0);
   afterRender(); watchAni(); fab();
@@ -904,7 +904,7 @@ function creatorDetail(email){
   let h=`<button class="btn ghost small back" id="back">← Zurück</button>
     <div class="stack"><span class="eyebrow">${esc(member(c.manager_email)?.name?"Manager: "+member(c.manager_email).name:"ohne Manager")}</span><h1>${esc(label(c))}</h1>
     <p class="muted">${esc(c.name)} · ${esc(c.email)} · ${total(email)} von ${maxPts()} Punkten · 🔥 ${streakInfo(email).cur} Tage</p><div class="titles">${titleChips(email,false)}</div></div>
-    ${S.noUpd9?"":lvHero(email,false)}${liveStand(email)}${recCard(email,false)}${goalAdmin(email)}${talkPanel(email)}${guideBlock(email)}
+    ${S.noUpd9?"":lvHero(email,false)}${liveStand(email)}${rewardCard(email,false)}${recCard(email,false)}${goalAdmin(email)}${talkPanel(email)}${guideBlock(email)}
     <div class="hexes">${allBadges(email).map(hexBadge).join("")}</div>
     ${snapOf(email,"vorher")||snapOf(email,"nachher")?`<div class="panel stack"><h2>Vorher-Nachher</h2><div class="snaps">${["vorher","nachher"].map(k=>{const x=snapOf(email,k); return `<div class="snap">${x?`<a data-path="${esc(x.path)}" target="_blank" rel="noopener"><img data-img="${esc(x.path)}" alt="${k}"></a>`:`<div class="ph">–</div>`}<small>${k==="vorher"?"Vorher":"Nachher"}</small></div>`;}).join("")}</div></div>`:""}
     <div class="list">`;
@@ -1122,6 +1122,7 @@ function startView(){
   return `<div class="hi"><h1>${hello}, <em>${esc(firstName(me))}</em></h1><div class="hirow">${mt?`<button class="title" data-qzshow="${main.quiz}" data-who="${esc(e)}"><i>${ic(TYPE_IC[mt.key]||"i-star")}</i>${esc(mt.name)}</button>`:""}</div></div>
   ${remindRows(myReminders())}
   ${S.noUpd9?"":lvHero(e,true)}
+  ${S.noUpd9?"":rewardCard(e,true)}
   ${inviteBar()}
   ${nextCard(e)}
   ${hk||im?`<div class="daily">${hk?`<button class="dcard ${hkDone?"done":""}" id="hook-open"><span class="dic">${ic("i-spark")}</span><b>Hook des Tages</b><small>${hkDone?"Erledigt ✓":"+10 XP"}</small></button>`:""}${im?`<button class="dcard ${imDone?"done":""}" id="imp-open"><span class="dic">${ic("i-bulb")}</span><b>Impuls der Woche</b><small>${imDone?"Angesehen ✓":"bis +50 XP"}</small></button>`:""}</div>`:""}
@@ -1177,7 +1178,7 @@ function profileView(email){
 }
 function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
-  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
+  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd9?[]:[["rw","i-gift","Live-Belohnungen"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
   return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${partnerTiles()}</div>`;
 }
 function leadStart(){ if (S.me.role==="manager") return mgrStart(); return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
@@ -2894,6 +2895,63 @@ function creatorMgrCards(e){
       <button class="btn ${done?"ghost":"gold"} small" data-mtdone="${esc(t.id)}">${done?"✓ Erledigt":`Erledigt · +${MXP.cdone} XP`}</button></div>`:"");
 }
 
+/* Live-Belohnungen der Agentur: min. 60 Std. Live-Zeit im Monat, dann zählt das Diamantenziel (Werte aus der Backstage-Liste) */
+const RW_HOURS=60;
+const REWARDS=[[200000,"Car Drifting","🚙"],[350000,"Baby Löwe","🦁"],[500000,"6k Geschenk","🎁"],[750000,"Sportwagen","🏎️"],[1000000,"Interstellar","🪐"],
+  [1500000,"15k Geschenk","🎁"],[2000000,"Premium-Shuttle","🚀"],[3000000,"Löwe","🦁"],[4000000,"Universum","🌌"],[5000000,"Löwe und Gorilla","🦍"]];
+function rwOf(b){
+  const d=b.diamonds||0, h=b.hours||0; let i=-1; REWARDS.forEach((r,j)=>{ if (d>=r[0]) i=j; });
+  const tier=i>=0?REWARDS[i]:null, next=REWARDS[i+1]||null, ok=h>=RW_HOURS;
+  return { d, h, ok, tier, next, got:ok&&tier?tier:null, missH:Math.max(0,Math.ceil((RW_HOURS-h)*10)/10), missD:next?next[0]-d:0 };
+}
+const fmtH = h => String(Math.round((h||0)*10)/10).replace(".",",");
+const rwBar = (v,max) => `<div class="rwbar"><i style="width:${max?Math.min(100,Math.round(v/max*100)):100}%"></i></div>`;
+function rewardCard(email, mine){
+  const b=bsRows(email)[0]; if (!b) return "";
+  const r=rwOf(b), mon=MONTHS[Number(b.month.slice(5))-1];
+  const first=REWARDS[0];
+  const msg = r.got ? `<div class="rwgot"><span class="rwem">${r.got[2]}</span><span><small>${mine?"Dir steht zu":"Steht zu"}</small><b>${esc(r.got[1])}</b></span></div>`
+    : r.tier ? `<p class="rwmiss">${r.tier[2]} <b>${esc(r.tier[1])}</b> wäre drin gewesen. Es fehlten nur <b>${fmtH(r.missH)} Std.</b> Live-Zeit.</p>`
+    : r.ok ? `<p class="rwmiss">Bis zur ersten Belohnung (${first[2]} ${esc(first[1])}) fehlten noch <b>${fmtN(first[0]-r.d)} 💎</b>.</p>`
+    : `<p class="rwmiss">Für die erste Belohnung (${first[2]} ${esc(first[1])}) fehlten <b>${fmtH(r.missH)} Std.</b> Live-Zeit und <b>${fmtN(first[0]-r.d)} 💎</b>.</p>`;
+  const goal=r.next||r.tier;
+  return `<div class="sec"><span>Live-Belohnung · ${esc(mon)}</span><small>laut Backstage</small></div>
+  <div class="panel rw stack">${msg}
+    <div class="rwrow"><span>${ic("i-clock")} Live-Zeit</span><small>${fmtH(r.h)} / ${RW_HOURS} Std.${r.ok?" ✓":""}</small></div>${rwBar(r.h,RW_HOURS)}
+    <div class="rwrow"><span>${ic("i-gem")} Diamanten</span><small>${fmtN(r.d)} / ${fmtN(goal[0])}${r.next?` bis ${r.next[2]} ${esc(r.next[1])}`:" · höchste Stufe"}</small></div>${rwBar(r.d,goal[0])}
+    ${r.next&&r.got?`<p class="muted rwnext">Bis ${esc(r.next[1])} fehlten ${fmtN(r.missD)} 💎.</p>`:""}
+    <button class="btn ghost small" data-rwall="${esc(b.month)}|${r.d}|${r.ok?1:0}">Alle Live-Belohnungen</button></div>`;
+}
+function rwTable(d, ok){
+  return `<h2>Live-<em>Belohnungen</em></h2><p class="muted">Voraussetzung: mindestens ${RW_HOURS} Std. Live-Zeit im Monat. Dann zählt das Diamantenziel.</p>
+  <div class="rwtab">${REWARDS.map(r=>`<div class="${d>=r[0]?(ok?"on":"near"):""}"><span>💎 ${fmtN(r[0])}</span><b>${r[2]} ${esc(r[1])}</b></div>`).join("")}</div>`;
+}
+function rwView(){
+  if (S.noUpd9) return `<div class="panel"><p class="err">Dafür zuerst update-9.sql in Supabase ausführen.</p></div>`;
+  const months=[...new Set(S.bs.map(b=>b.month))].sort().reverse(), m=months.includes(S.rwm)?S.rwm:months[0];
+  const head=`<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Live-<em>Belohnungen</em></h1>
+    <p class="muted">Aus der Backstage-Liste: wer ${RW_HOURS} Std. Live-Zeit geschafft hat und welches Diamantenziel erreicht ist. Neue Liste am 1. unter Teilnehmer hochladen.</p></div>`;
+  if (!m) return head+`<div class="panel"><p class="muted" style="margin:0">Noch keine Backstage-Liste hochgeladen.</p></div>`;
+  const byH=new Map(S.members.filter(x=>x.handle).map(x=>[hnorm(x.handle),x]));
+  const rows=S.bs.filter(b=>b.month===m).map(b=>({ b, r:rwOf(b), mem:byH.get(hnorm(b.handle)) }));
+  const who=x=>`<b>${esc(x.mem?.name||"@"+x.b.handle)}</b><small class="muted">@${esc(x.b.handle)}${x.mem&&member(x.mem.manager_email)?` · ${esc(member(x.mem.manager_email).name)}`:""}</small>`;
+  const got=rows.filter(x=>x.r.got).sort((a,b)=>b.r.d-a.r.d);
+  const missH=rows.filter(x=>!x.r.ok&&x.r.tier).sort((a,b)=>b.r.d-a.r.d);
+  const near=rows.filter(x=>x.r.ok&&!x.r.tier&&x.r.d>=REWARDS[0][0]*0.6).sort((a,b)=>b.r.d-a.r.d);
+  const sum=REWARDS.map(rw=>[rw,got.filter(x=>x.r.got===rw).length]).filter(x=>x[1]);
+  return head+`<div class="chips">${months.map(x=>`<button class="chip ${x===m?"on":""}" data-rwm="${x}">${esc(ymLabel(x))}</button>`).join("")}</div>
+  <div class="sec"><span>Bekommen eine Belohnung</span><small>${got.length}</small></div>
+  ${sum.length?`<div class="mini">${sum.map(([rw,n])=>`<span class="chip ok">${rw[2]} ${n}× ${esc(rw[1])}</span>`).join("")}</div>`:""}
+  <div class="list">${got.map(x=>`<div class="row rwli"><div class="head"><span class="rwwho">${who(x)}</span><span class="tag gold">${x.r.got[2]} ${esc(x.r.got[1])}</span></div>
+    <div class="mini"><span class="chip">💎 ${fmtN(x.r.d)}</span><span class="chip">${fmtH(x.r.h)} Std.</span></div></div>`).join("")||`<div class="panel"><p class="muted" style="margin:0">Diesen Monat niemand.</p></div>`}</div>
+  ${missH.length?`<div class="sec"><span>Diamanten geschafft, Live-Zeit fehlt</span><small>${missH.length}</small></div>
+  <div class="list">${missH.map(x=>`<div class="row rwli"><div class="head"><span class="rwwho">${who(x)}</span><span class="tag">${x.r.tier[2]} ${esc(x.r.tier[1])}</span></div>
+    <div class="mini"><span class="chip warn">${fmtH(x.r.h)} Std. · fehlen ${fmtH(x.r.missH)} Std.</span><span class="chip">💎 ${fmtN(x.r.d)}</span></div></div>`).join("")}</div>`:""}
+  ${near.length?`<div class="sec"><span>Knapp unter dem ersten Ziel</span><small>${near.length}</small></div>
+  <div class="list">${near.map(x=>`<div class="row rwli"><div class="head"><span class="rwwho">${who(x)}</span><span class="tag">fehlen ${fmtN(REWARDS[0][0]-x.r.d)} 💎</span></div>
+    <div class="mini"><span class="chip">💎 ${fmtN(x.r.d)}</span><span class="chip">${fmtH(x.r.h)} Std.</span></div></div>`).join("")}</div>`:""}
+  <button class="btn ghost small" data-rwall="${esc(m)}|0|0">Belohnungstabelle</button>`;
+}
 function mteamView(){
   if (S.noUpd19) return soonUpd16("Manager-","Rangliste");
   const staff=S.members.filter(m=>m.role==="manager" || (m.role==="lead" && (peopleOf(m.email).length || pendingOf(m.email).length)));
@@ -3015,6 +3073,8 @@ document.addEventListener("click", async e => {
   if (t.dataset.mtdel) return mtDel(t.dataset.mtdel);
   if (t.dataset.mtdone) return mtDone(t.dataset.mtdone);
   if (t.id==="mr-add") return mrAdd();
+  if (t.dataset.rwm){ S.rwm=t.dataset.rwm; return render(true); }
+  if (t.dataset.rwall){ const [,d,ok]=t.dataset.rwall.split("|"); return sheet(rwTable(Number(d),ok==="1")); }
   if (t.dataset.viewmgr){ const sel=$("#viewas"); if (sel){ sel.value=t.dataset.viewmgr; sel.dispatchEvent(new Event("change",{ bubbles:true })); } return; }
   if (t.id==="mp-new"){ S.mpForm=true; return render(true); }
   if (t.id==="mp-cancel"){ S.mpForm=false; return render(true); }
