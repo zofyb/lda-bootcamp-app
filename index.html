@@ -6,7 +6,12 @@
 <meta name="theme-color" content="#060208">
 <title>LIVEdream Academy</title>
 <link rel="icon" href="logo.png">
-<link rel="apple-touch-icon" href="logo.png">
+<link rel="apple-touch-icon" href="icons/apple-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LIVEdream">
 <link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -63,6 +68,7 @@
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
   <symbol id="i-out" viewBox="0 0 24 24"><path d="M14 4.5h4.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14"/><path d="M10 16.5 5.5 12 10 7.5M5.5 12H15"/></symbol>
 </svg>
+<div class="installbar" id="installbar" hidden><img src="icons/icon-192.png" alt=""><div class="it"><b>LIVEdream Academy als App</b><span>Mit Logo auf deinem Handy, ohne Browserleiste</span></div><button class="btn gold small" id="inst-go">Installieren</button><button class="ix" id="inst-x" aria-label="Später">✕</button></div>
 <nav class="bnav" id="bnav" hidden></nav>
 <div class="win" id="win" aria-live="polite"><div><div class="medal">✓</div><h2 id="win-t"></h2><p class="muted" id="win-p"></p></div></div>
 <canvas id="conf"></canvas>
@@ -77,5 +83,6 @@
 <script src="guide.js"></script>
 <script src="sparkles.js" defer></script>
 <script src="app.js"></script>
+<script src="install.js"></script>
 </body>
 </html>

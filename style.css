@@ -915,3 +915,12 @@ div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;
 .dsum small{color:var(--muted)}
 .dpop .btn{width:100%}
 @media (prefers-reduced-motion:reduce){.ddots .now{animation:none}}
+/* App installieren */
+.installbar{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:35;display:flex;align-items:center;gap:10px;padding:10px 10px 10px 12px;border-radius:18px;background:var(--panel2);border:1px solid rgba(214,64,159,.45);box-shadow:0 14px 34px rgba(0,0,0,.55),0 0 22px rgba(155,47,201,.25);max-width:520px;margin:0 auto}
+.installbar img{width:40px;height:40px;border-radius:11px;flex:none}
+.installbar .it{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.installbar .it b{font-size:13.5px}
+.installbar .it span{font-size:11.5px;color:var(--muted)}
+.installbar .btn.small{padding:9px 13px;flex:none}
+.installbar .ix{background:none;border:0;color:var(--muted);font-size:15px;padding:6px;cursor:pointer;flex:none}
+.inststeps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;color:var(--soft);line-height:1.45}
