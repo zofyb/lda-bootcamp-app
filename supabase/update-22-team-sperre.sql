@@ -133,6 +133,32 @@ select m.email, b.name from public.members m join public.blocked b on b.value = 
 where m.role <> 'lead'
 on conflict (value) do nothing;
 
+-- Gesperrte TikTok-Namen ganz von der Creator-Liste nehmen und beim Listen-Upload überspringen
+delete from public.roster where public.is_blocked('', handle);
+create or replace function public.import_roster(rows jsonb, replace_all boolean) returns int
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if not public.is_lead() then raise exception 'Keine Berechtigung'; end if;
+  create temp table _in on commit drop as
+  select distinct on (h) h as handle, nullif(trim(x->>'name'),'') as name,
+         nullif(lower(trim(x->>'manager_email')),'') as manager_email,
+         (x->>'bootcamp')::boolean as bootcamp
+  from jsonb_array_elements(rows) x,
+       lateral (select lower(regexp_replace(trim(coalesce(x->>'handle','')), '^@', '')) as h) hx
+  where h <> '';
+  delete from _in where public.is_blocked('', _in.handle);  -- Gesperrte nie wieder auf die Liste
+  update _in set manager_email = null where manager_email is not null and not exists (select 1 from public.members where email = _in.manager_email);
+  if replace_all then delete from public.roster where handle not in (select handle from _in); end if;
+  insert into public.roster (handle, name, manager_email, bootcamp)
+  select handle, name, manager_email, coalesce(bootcamp, false) from _in
+  on conflict (handle) do update set name = coalesce(excluded.name, roster.name), manager_email = coalesce(excluded.manager_email, roster.manager_email), bootcamp = coalesce((select i.bootcamp from _in i where i.handle = excluded.handle), roster.bootcamp);
+  update public.members m set manager_email = r.manager_email, bootcamp = r.bootcamp
+  from public.roster r where m.role = 'creator' and r.handle = lower(regexp_replace(trim(coalesce(m.handle,'')), '^@', ''));
+  select count(*) into n from _in;
+  return n;
+end $$;
+
 /* ---------- 2) Team ---------- */
 create table if not exists public.team (
   id         uuid primary key default gen_random_uuid(),
