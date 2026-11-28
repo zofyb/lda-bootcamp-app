@@ -292,6 +292,7 @@ async function refresh(){
   S.noUpd16=!!(mp.error||ml.error||wi.error||wr.error); S.mp=mp.data||[]; S.ml=ml.data||[]; S.wins=wi.data||[]; S.wr=wr.data||[];
   const [tk,mt,md]=await Promise.all([ sb.from("talks").select("*").order("day",{ ascending:false }), sb.from("mtasks").select("*").order("week",{ ascending:false }), sb.from("mtask_done").select("*") ]);
   S.noUpd19=!!(tk.error||mt.error||md.error); S.talks=tk.data||[]; S.mt=mt.data||[]; S.md=md.data||[];
+  const ba=await sb.from("boot_apps").select("*").order("created_at",{ ascending:false }); S.noUpd21=!!ba.error; S.bapps=ba.data||[];
   S.noUpd14=!!(av.error||ao.error||bk.error); S.av=av.data||[]; S.avOff=ao.data||[]; S.bk=bk.data||[];
   if (!S.noUpd14 && S.real?.role==="creator"){ const bz=await sb.rpc("busy_times"); S.busy=new Set(Array.isArray(bz.data)?bz.data.map(x=>+new Date(x)):[]); }
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
@@ -409,7 +410,7 @@ async function verifyCode(){
 
 /* ---------- Rahmen ---------- */
 const ic = (n, cls="") => `<svg class="ico ${cls}" aria-hidden="true"><use href="#${n}"/></svg>`;
-const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","match","erfolge","mteam","rw","reg"];
+const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","match","erfolge","mteam","rw","reg","bapps"];
 function navItems(){
   const me=S.me;
   if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],["anim","i-spark","Animation"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
@@ -467,7 +468,7 @@ function render(keepScroll){
   else if (S.tab==="kalender") html = calendarView();
   else if (S.tab==="termine") html = termView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
-  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView, mteam:mteamView, rw:rwView, reg:regView }[S.tab] || pendingView)();
+  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, bapps:bappsView, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView, mteam:mteamView, rw:rwView, reg:regView }[S.tab] || pendingView)();
   if (!S.openArea && !S.creator && !S.pend && !S.qz && !navItems().some(x=>x[0]===S.tab))
     html = `<button class="btn ghost small back" data-tab="${me.role==="creator"?"start":"uebersicht"}">← Zurück</button>`+html;
   view.innerHTML = html;
@@ -1161,6 +1162,7 @@ function nextCard(e){
     const w=weeks().find(w=>{ const o=weekOpens(w); return o && Date.now()<o.getTime(); });
     if (w && states.includes("time")) return card("i-lock",`Woche ${w} öffnet ${fmtD(weekOpens(w))}`,"Bis dahin: Akademie und Quizze",'data-tab="lernen" data-learn="akademie"');
   }
+  if (S.me.role==="creator" && !inBootcamp(S.me) && !S.noUpd21 && !bootApp()) return card("i-learn","Bewirb dich fürs Bootcamp","4 Wochen intensive Betreuung, nur kleine Gruppe",'data-tab="lernen" data-learn="bootcamp"');
   const q=QZ().find(q=>!qzRes(e,q.id));
   if (q) return card("i-quiz", q.title, "Finde heraus, was zu dir passt", `data-qz="${q.id}"`);
   return card("i-learn","Akademie","Schulungen und Infos ansehen",'data-tab="lernen" data-learn="akademie"');
@@ -1190,7 +1192,7 @@ function startView(){
   ${creatorMgrCards(e)}
   ${goalCard(e,true)}
   <div class="tiles">
-    ${boot?tile("i-learn","Bootcamp",'data-tab="lernen" data-learn="bootcamp"',`<span class="tbar"><i style="width:${fill}%"></i></span>`):""}
+    ${boot?tile("i-learn","Bootcamp",'data-tab="lernen" data-learn="bootcamp"',`<span class="tbar"><i style="width:${fill}%"></i></span>`):S.noUpd21?"":tile("i-learn","Bootcamp",'data-tab="lernen" data-learn="bootcamp"',`<small class="tl">${bootApp()?.status==="offen"?"beworben ✓":"bewerben"}</small>`)}
     ${tile("i-play","Akademie",'data-tab="lernen" data-learn="akademie"',dot(newAk))}
     ${tile("i-quiz","Quizze",'data-tab="lernen" data-learn="quiz"',dot(openQz))}
     ${tile("i-cal","Kalender",'data-tab="kalender"',dot(now.length))}
@@ -1210,10 +1212,11 @@ function startView(){
   ${boot?topBlock():""}`;
 }
 function learnView(){
-  const segs=[...(inBootcamp(S.me)?[["bootcamp","Bootcamp"]]:[]),["akademie","Akademie"],["quiz","Quizze"]];
+  const canApply=S.me.role==="creator" && !inBootcamp(S.me) && !S.noUpd21;
+  const segs=[...(inBootcamp(S.me)||canApply?[["bootcamp","Bootcamp"]]:[]),["akademie","Akademie"],["quiz","Quizze"]];
   if (!segs.some(x=>x[0]===S.learn)) S.learn=segs[0][0];
   const top=`<div class="seg seg3" role="group" aria-label="Bereich">${segs.map(([k,l])=>`<button data-learn="${k}" aria-pressed="${S.learn===k}">${l}</button>`).join("")}</div>`;
-  const body = S.learn==="bootcamp" ? (needIntro()?introView():creatorHome()) : S.learn==="akademie" ? academyView() : quizPage();
+  const body = S.learn==="bootcamp" ? (canApply?bootApplyView():needIntro()?introView():creatorHome()) : S.learn==="akademie" ? academyView() : quizPage();
   return top + body;
 }
 function quizPage(){
@@ -1239,7 +1242,7 @@ function profileView(email){
 }
 function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
-  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],...(S.real?.role==="lead"?[["reg","i-user","Registrierungen"]]:[]),["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd9?[]:[["rw","i-gift","Live-Belohnungen"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
+  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],...(S.real?.role==="lead"?[["reg","i-user","Registrierungen"],...(S.noUpd21?[]:[["bapps","i-learn","Bootcamp-Bewerbungen",S.bapps.filter(a=>a.status==="offen").length]])]:[]),["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd9?[]:[["rw","i-gift","Live-Belohnungen"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
   return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${waTile()}${partnerTiles()}</div>`;
 }
 function leadStart(){ if (S.me.role==="manager") return mgrStart(); return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
@@ -1343,6 +1346,7 @@ function leadDash(){
       ${k("i-check",open,"Bewerten","bewerten",1)}
       ${k("i-mail",qn,"Sag's uns","fragen",1)}
       ${k("i-rocket",rf,"Recruiting","recruit",1)}
+      ${lead&&!S.noUpd21?k("i-learn",S.bapps.filter(a=>a.status==="offen").length,"Bewerbungen","bapps",1):""}
       ${!S.noUpd7?k("i-cal",drafts,"Freigeben","kalender",1):""}
       ${lead&&!S.noUpd7?k("i-list",tasks,"Aufgaben fällig","fuehrung",1):""}
       ${!S.noUpd14?k("i-clock",upBk().filter(b=>b.owner_email===S.me.email).length,"1:1 gebucht","termine"):""}
@@ -3079,6 +3083,39 @@ function regRows(){
   return S.members.filter(m=>m.role==="creator").filter(m=>!q || [m.name,m.handle,m.email].some(x=>String(x||"").toLowerCase().includes(q)))
     .sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
 }
+/* ---------- Bootcamp-Bewerbung: Creator ohne Bootcamp bewerben sich, die Leitung entscheidet ---------- */
+const bootApp = (e=S.me?.email) => (S.bapps||[]).find(a=>a.creator_email===e);
+function bootApplyView(){
+  const a=bootApp(), perks=[["i-play","8 Themen in 4 Wochen","Video, kurzes Quiz und eine Aufgabe pro Thema"],["i-check","Feedback zu jeder Aufgabe","Dein Manager schaut sich jede Abgabe an"],["i-gift","Urkunde und Belohnungen","Ab 10 Punkten: Streamer-Rahmen, Overlay und mehr"],["i-people","Kleine Gruppe","Wir nehmen pro Runde nur ausgewählte Creator auf"]];
+  const form=`<div class="panel stack"><label class="f" for="ba-note">Warum willst du ins Bootcamp? Was möchtest du lernen?<textarea id="ba-note" rows="4" maxlength="1500" placeholder="z. B. Ich gehe 3× die Woche live und will mehr Zuschauer halten …">${esc(S.baDraft||"")}</textarea></label>
+    <button class="btn gold" id="ba-send" ${readOnly()||S.me.preview?"disabled":""}>Jetzt bewerben</button></div>`;
+  const st = a?.status==="offen" ? `<div class="panel bastat"><span class="baic">💜</span><div><b>Deine Bewerbung ist da</b><p class="muted">Abgeschickt ${esc(agoTxt(a.created_at))}. Wir melden uns bei dir. Sobald du angenommen bist, ist das Bootcamp hier freigeschaltet.</p></div></div>`
+    : a?.status==="nein" ? `<div class="panel bastat"><span class="baic">🌱</span><div><b>Diesmal hat es nicht geklappt</b><p class="muted">Bleib dran! Du kannst dich für die nächste Runde wieder bewerben.</p></div></div>`+form : form;
+  return `<div class="stack"><span class="eyebrow">LIVEdream Bootcamp</span><h1>Bootcamp: <em>intensiv betreut</em></h1>
+    <p class="muted">Das Bootcamp ist unser Programm für Creator, die richtig durchstarten wollen. Bewirb dich, wir schauen uns jede Bewerbung an.</p></div>
+    <div class="baperks">${perks.map(([i,t,d])=>`<div><span class="tic">${ic(i)}</span><b>${t}</b><small>${d}</small></div>`).join("")}</div>${st}`;
+}
+async function bootApply(){
+  const t=($("#ba-note")?.value||"").trim(); S.baDraft=t; if (t.length<5) return toast("Schreib bitte kurz, warum du dabei sein willst.");
+  const r=await sb.rpc("apply_bootcamp",{ msg:t }); if (r.error) return fail(r.error);
+  if (r.data==="schon") return toast("Du bist schon im Bootcamp.");
+  S.baDraft=""; await refresh(); render(true); confetti(); toast("Bewerbung abgeschickt! 💜");
+}
+function bappsView(){
+  const who=a=>{ const m=member(a.creator_email), mg=m&&member(m.manager_email); return `<b>${esc(m?.name||a.creator_email)}</b><small class="muted">${m?.handle?"@"+esc(String(m.handle).replace(/^@/,"")):""}${mg?` · ${esc(mg.name)}`:""} · ${esc(agoTxt(a.created_at))}</small>`; };
+  const open=S.bapps.filter(a=>a.status==="offen"), done=S.bapps.filter(a=>a.status!=="offen");
+  return `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1>Bootcamp-<em>Bewerbungen</em></h1>
+    <p class="muted">Creator ohne Bootcamp-Zugang bewerben sich hier. Annehmen schaltet das Bootcamp für sie sofort frei.</p></div>
+  <div class="sec"><span>Offen</span><small>${open.length}</small></div>
+  <div class="list">${open.map(a=>`<div class="row bapp"><div class="rwwho">${who(a)}</div><p class="banote">„${esc(a.note)}“</p>
+    <div class="actions"><button class="btn small" data-bdec="${esc(a.creator_email)}|1">✓ Annehmen</button><button class="btn ghost small" data-bdec="${esc(a.creator_email)}|0">Ablehnen</button></div></div>`).join("")||`<div class="panel"><p class="muted" style="margin:0">Gerade keine offenen Bewerbungen.</p></div>`}</div>
+  ${done.length?`<div class="sec"><span>Entschieden</span><small>${done.length}</small></div><div class="list">${done.map(a=>`<div class="row bapp"><div class="head"><span class="rwwho">${who(a)}</span><span class="tag ${a.status==="ja"?"gold":""}">${a.status==="ja"?"Angenommen":"Abgelehnt"}</span></div></div>`).join("")}</div>`:""}`;
+}
+async function bootDecide(e, ok){
+  const r=await sb.rpc("decide_bootcamp",{ c:e, ok }); if (r.error) return fail(r.error);
+  await refresh(); render(true); toast(ok?"Angenommen. Das Bootcamp ist jetzt freigeschaltet.":"Abgelehnt.");
+}
+
 function regView(){
   const all=S.members.filter(m=>m.role==="creator"), rows=regRows(), wk=Date.now()-7*864e5;
   const fresh=all.filter(m=>new Date(m.created_at)>=wk).length;
@@ -3224,6 +3261,8 @@ document.addEventListener("click", async e => {
   if (t.id==="reg-csv") return regCsv();
   if (t.id==="ak-wish-send") return sendWish();
   if (t.id==="daily-get") return dailyGet();
+  if (t.id==="ba-send") return bootApply();
+  if (t.dataset.bdec){ const [em,ok]=t.dataset.bdec.split("|"); return bootDecide(em, ok==="1"); }
   if (t.dataset.editReg){ S.editMember=t.dataset.editReg; S.tab="personen"; render(); return document.getElementById("pm-email")?.scrollIntoView({block:"center"}); }
   if (t.id==="wa-open") return openWa();
   if (t.id==="wa-save") return waSave();

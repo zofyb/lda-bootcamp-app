@@ -19,7 +19,8 @@ const db = {
     {email:"c3@demo", role:"creator", name:"Jenny Beispiel", handle:"jenny.mama", manager_email:"max@demo"},
     {email:"c4@demo", role:"creator", name:"Tim Beispiel", handle:"tim.talks", manager_email:"max@demo"},
     {email:"c5@demo", role:"creator", name:"Sofia Beispiel", handle:"sofia.sings", manager_email:"demo@demo"},
-    {email:"c6@demo", role:"creator", name:"Mia Beispiel", handle:"mia.vibes", manager_email:"max@demo", bootcamp:false}
+    {email:"c6@demo", role:"creator", name:"Mia Beispiel", handle:"mia.vibes", manager_email:"max@demo", bootcamp:false},
+    {email:"c7@demo", role:"creator", name:"Noah Beispiel", handle:"noah.nights", manager_email:"lena@demo", bootcamp:false}
   ],
   submissions: [
     {id:"s1", creator_email:"c1@demo", area:1, points:2, feedback:"Mega Bio, genau so!", note:"Profil komplett neu gemacht, Screenshots anbei.", files:[], submitted_at:iso(now-9*D), rated_by:"lena@demo", rated_at:iso(now-8*D)},
@@ -47,6 +48,7 @@ const db = {
   ],
   roster: ["luna.live","gamer_kevin","jenny.mama","tim.talks","sofia.sings","mia.vibes","neu.creator"].map(h=>({ handle:h, bootcamp:h!=="mia.vibes"&&h!=="neu.creator", manager_email:{"luna.live":"lena@demo","gamer_kevin":"lena@demo","jenny.mama":"max@demo","tim.talks":"max@demo","mia.vibes":"max@demo","neu.creator":"lena@demo"}[h]||null })),
   activity: ["c1@demo","c1@demo","c1@demo","c3@demo","c5@demo"].map((e,i)=>({creator_email:e, day:day(i<3?i:0)})),
+  boot_apps: [{creator_email:"c7@demo", note:"Ich gehe 4× die Woche live, aber meine Zuschauer bleiben nicht lange. Ich will lernen, wie ich sie halte.", status:"offen", created_at:iso(now-5*36e5)}],
   settings: [{key:"start", value:start}, {key:"anim_whatsapp", value:"0170 0000000"}, {key:"partner_papaya", value:JSON.stringify({ info:"Beispieltext: Was Papaya Given anbietet. Kontakt läuft über uns.", link:"", label:"" })}],
   questions: [
     {id:"q1", body:"Wie oft sollte ich pro Woche live gehen?", created_at:iso(now-3*D), published:true, answer:"Empfehlung: mindestens 3 Lives pro Woche, die du sicher schaffst."},
@@ -163,6 +165,8 @@ window.supabase = { createClient(){ return {
       return { data:out, error:null }; }
     if (n==="award_xp") return { data:a.k==="login"?5:a.k==="streak"?25:0, error:null };
     if (n==="report_referral"){ const h=String(a.rh||"").replace(/^@/,"").toLowerCase(); if (db.referrals.some(r=>r.recruit_handle===h)) return { data:"exists", error:null }; db.referrals.unshift({ recruit_handle:h, recruiter_email:"c1@demo", status:"offen", gun_sent:false, source:"creator", created_at:new Date().toISOString() }); return { data:"ok", error:null }; }
+    if (n==="apply_bootcamp"){ db.boot_apps=db.boot_apps||[]; const me="c6@demo"; let x=db.boot_apps.find(b=>b.creator_email===me); if(!x){ x={ creator_email:me }; db.boot_apps.unshift(x); } Object.assign(x,{ note:a.msg, status:"offen", created_at:new Date().toISOString() }); return { data:"ok", error:null }; }
+    if (n==="decide_bootcamp"){ const x=(db.boot_apps||[]).find(b=>b.creator_email===a.c); if(x){ x.status=a.ok?"ja":"nein"; x.decided_at=new Date().toISOString(); } if(a.ok){ const m=db.members.find(y=>y.email===a.c); if(m) m.bootcamp=true; } return { data:"ok", error:null }; }
     if (n==="goal_progress") return { data:null, error:null };
     return { data:true, error:null };
   }

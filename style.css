@@ -924,3 +924,14 @@ div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;
 .installbar .btn.small{padding:9px 13px;flex:none}
 .installbar .ix{background:none;border:0;color:var(--muted);font-size:15px;padding:6px;cursor:pointer;flex:none}
 .inststeps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;color:var(--soft);line-height:1.45}
+/* Bootcamp-Bewerbung */
+.baperks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.baperks>div{display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:16px;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line)}
+.baperks b{font-size:13.5px;line-height:1.25}
+.baperks small{color:var(--muted);font-size:12px;line-height:1.35}
+.bastat{display:flex;gap:12px;align-items:flex-start}
+.bastat .baic{font-size:26px;line-height:1}
+.bastat p{margin:4px 0 0}
+.bapp .banote{margin:8px 0 10px;color:var(--soft,#eadcf0);font-size:13.5px;line-height:1.45}
+.bapp .actions{display:flex;gap:8px}
+.bapp .rwwho{display:flex;flex-direction:column;gap:2px;min-width:0}
