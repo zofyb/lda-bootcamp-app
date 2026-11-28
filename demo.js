@@ -49,12 +49,12 @@ const db = {
   roster: ["luna.live","gamer_kevin","jenny.mama","tim.talks","sofia.sings","mia.vibes","neu.creator"].map(h=>({ handle:h, bootcamp:h!=="mia.vibes"&&h!=="neu.creator", manager_email:{"luna.live":"lena@demo","gamer_kevin":"lena@demo","jenny.mama":"max@demo","tim.talks":"max@demo","mia.vibes":"max@demo","neu.creator":"lena@demo"}[h]||null })),
   activity: ["c1@demo","c1@demo","c1@demo","c3@demo","c5@demo"].map((e,i)=>({creator_email:e, day:day(i<3?i:0)})),
   team: [
-    {id:"t1", grp:"lead", name:"Zofy", handle:"zofyb", title:"Agenturleitung", sort:1},
-    {id:"t2", grp:"lead", name:"Schlauchi", handle:"schlauchi.beispiel", title:"Agenturleitung", sort:2},
-    {id:"t3", grp:"lead", name:"Nik", handle:"nik.beispiel", title:"Assistenz der Leitung", sort:3},
-    {id:"t4", grp:"manager", name:"Lena", handle:"lena.beispiel", title:"Managerin", sort:1, photo:"demo-av-lena"},
-    {id:"t5", grp:"manager", name:"Max", handle:"max.beispiel", title:"Manager", sort:2},
-    {id:"t6", grp:"manager", name:"Tom", handle:null, title:"Manager", sort:3}
+    {id:"t1", email:null, grp:"lead", name:"Zofy", handle:"zofyb", title:"Agenturleitung", sort:1},
+    {id:"t2", email:null, grp:"lead", name:"Schlauchi", handle:"schlauchi.beispiel", title:"Agenturleitung", sort:2},
+    {id:"t3", email:null, grp:"lead", name:"Nik", handle:"nik.beispiel", title:"Assistenz der Leitung", sort:3},
+    {id:"t4", email:"lena@demo", grp:"manager", name:"Lena", handle:"lena.beispiel", title:"Managerin", sort:1, photo:"demo-av-lena"},
+    {id:"t5", email:null, grp:"manager", name:"Max", handle:"max.beispiel", title:"Manager", sort:2},
+    {id:"t6", email:null, grp:"manager", name:"Tom", handle:null, title:"Manager", sort:3}
   ],
   blocked: [{value:"alt.agent", name:"Beispiel-Agent", created_at:iso(now-36e5)},{value:"alt.agent@demo", name:"Beispiel-Agent", created_at:iso(now-36e5)}],
   boot_apps: [{creator_email:"c7@demo", note:"Ich gehe 4× die Woche live, aber meine Zuschauer bleiben nicht lange. Ich will lernen, wie ich sie halte.", status:"offen", created_at:iso(now-5*36e5)}],
@@ -176,6 +176,7 @@ window.supabase = { createClient(){ return {
     if (n==="report_referral"){ const h=String(a.rh||"").replace(/^@/,"").toLowerCase(); if (db.referrals.some(r=>r.recruit_handle===h)) return { data:"exists", error:null }; db.referrals.unshift({ recruit_handle:h, recruiter_email:"c1@demo", status:"offen", gun_sent:false, source:"creator", created_at:new Date().toISOString() }); return { data:"ok", error:null }; }
     if (n==="apply_bootcamp"){ db.boot_apps=db.boot_apps||[]; const me="c6@demo"; let x=db.boot_apps.find(b=>b.creator_email===me); if(!x){ x={ creator_email:me }; db.boot_apps.unshift(x); } Object.assign(x,{ note:a.msg, status:"offen", created_at:new Date().toISOString() }); return { data:"ok", error:null }; }
     if (n==="decide_bootcamp"){ const x=(db.boot_apps||[]).find(b=>b.creator_email===a.c); if(x){ x.status=a.ok?"ja":"nein"; x.decided_at=new Date().toISOString(); } if(a.ok){ const m=db.members.find(y=>y.email===a.c); if(m) m.bootcamp=true; } return { data:"ok", error:null }; }
+    if (n==="my_team_save"){ const me="demo@demo"; let x=db.team.find(t=>t.email===me); if(!x){ x={ id:"tme", email:me, grp:"lead", sort:9 }; db.team.push(x); } Object.assign(x,{ name:a.nm, handle:String(a.h||"").replace(/^@/,"")||null, title:a.t||null }); return { data:"ok", error:null }; }
     if (n==="goal_progress") return { data:null, error:null };
     return { data:true, error:null };
   }

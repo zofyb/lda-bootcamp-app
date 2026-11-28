@@ -294,7 +294,7 @@ async function refresh(){
   const [tk,mt,md]=await Promise.all([ sb.from("talks").select("*").order("day",{ ascending:false }), sb.from("mtasks").select("*").order("week",{ ascending:false }), sb.from("mtask_done").select("*") ]);
   S.noUpd19=!!(tk.error||mt.error||md.error); S.talks=tk.data||[]; S.mt=mt.data||[]; S.md=md.data||[];
   const ba=await sb.from("boot_apps").select("*").order("created_at",{ ascending:false }); S.noUpd21=!!ba.error; S.bapps=ba.data||[];
-  const tm=await sb.from("team").select("*").order("sort"); S.noUpd22=!!tm.error; S.team=tm.data||[];
+  const tm=await sb.from("team").select("*").order("sort"); S.noUpd22=!!tm.error; S.team=tm.data||[]; S.noUpd23=S.noUpd22 || !!(await sb.from("team").select("email").limit(1)).error;
   if (!S.noUpd22 && S.real?.role==="lead"){ const bl=await sb.from("blocked").select("*").order("created_at"); S.blocked=bl.data||[]; } else S.blocked=[];
   S.noUpd14=!!(av.error||ao.error||bk.error); S.av=av.data||[]; S.avOff=ao.data||[]; S.bk=bk.data||[];
   if (!S.noUpd14 && S.real?.role==="creator"){ const bz=await sb.rpc("busy_times"); S.busy=new Set(Array.isArray(bz.data)?bz.data.map(x=>+new Date(x)):[]); }
@@ -1249,7 +1249,7 @@ function moreTiles(){
   const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],...(S.noUpd22?[]:[["team","i-team","Unser Team"]]),...(S.real?.role==="lead"?[["reg","i-user","Registrierungen"],...(S.noUpd21?[]:[["bapps","i-learn","Bootcamp-Bewerbungen",S.bapps.filter(a=>a.status==="offen").length]])]:[]),["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd9?[]:[["rw","i-gift","Live-Belohnungen"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
   return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${waTile()}${partnerTiles()}</div>`;
 }
-function leadStart(){ if (S.me.role==="manager") return mgrStart(); return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
+function leadStart(){ if (S.me.role==="manager") return mgrStart(); return teamNudge() + leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
 
 
 
@@ -1566,6 +1566,7 @@ function mgrStart(){
   const ago=d=>{ const h=Math.round((Date.now()-new Date(d))/36e5); return h<1?"gerade eben":h<24?`vor ${h} Std.`:`vor ${Math.round(h/24)} Tg.`; };
   return `<div class="stack"><span class="eyebrow">Manager</span><h1>Hallo, <em>${esc(firstName(me))}</em></h1></div>
     ${remindRows(myReminders())}
+    ${teamNudge()}
     <div class="kpis">
       ${k("i-people",people.length,"Meine Creator","creator")}
       ${k("i-mail",pend.length,"Noch nicht in der App","creator",1)}
@@ -1585,8 +1586,9 @@ const tmHandle = x => String(x?.handle||"").trim().replace(/^@/,"").replace(/^ht
 const tmGroups = () => [["lead","Agenturleitung","i-crown"],["manager","Manager","i-people"]];
 const tmList = g => S.team.filter(x=>x.grp===g).sort((a,b)=>(a.sort??0)-(b.sort??0) || String(a.name).localeCompare(String(b.name)));
 function tmPhoto(x, big){
-  const m = S.members.find(y=>y.role!=="creator" && y.avatar && lc(y.name||"")===lc(x.name||""));
-  const img = x.photo ? `<img data-tcover="${esc(x.photo)}" alt="">` : m ? `<img class="avimg" data-avatar="${esc(m.avatar)}" ${AVURL[m.avatar]?`src="${esc(AVURL[m.avatar])}"`:""} alt="">` : "";
+  const own = x.email ? S.members.find(y=>y.email===x.email && y.avatar) : null;
+  const m = own || (x.photo ? null : S.members.find(y=>y.role!=="creator" && y.avatar && lc(y.name||"")===lc(x.name||"")));
+  const img = m ? `<img class="avimg" data-avatar="${esc(m.avatar)}" ${AVURL[m.avatar]?`src="${esc(AVURL[m.avatar])}"`:""} alt="">` : x.photo ? `<img data-tcover="${esc(x.photo)}" alt="">` : "";
   return `<span class="tmav${big?"":" sm"}"><span class="tml">${esc(String(x.name||"?").trim().charAt(0).toUpperCase())}</span>${img}</span>`;
 }
 function teamCard(x){
@@ -1603,6 +1605,7 @@ function teamView(){
     h+=`<div class="sec"><span>${ic(i)} ${l}</span><small>${xs.length}</small></div><div class="team">${xs.map(teamCard).join("")}</div>`;
   }
   if (!S.team.length) h+=`<p class="muted">Hier stellt sich bald unser Team vor.</p>`;
+  if (canSelfTeam()) h=h.replace(/(<\/div>)/,"$1"+myTeamPanel());
   if (lead) h+=`<div class="actions"><button class="btn small ${S.teamEdit?"":"ghost"}" id="tm-edit">${ic("i-grid")} ${S.teamEdit?"Fertig":"Team bearbeiten"}</button></div>${S.teamEdit?teamEditor():""}`;
   return h;
 }
@@ -1616,6 +1619,7 @@ function teamEditor(){
         <label class="f" for="tm-handle-${id}">TikTok-Name<input id="tm-handle-${id}" type="text" value="${esc(tmHandle(x)?"@"+tmHandle(x):"")}" placeholder="@name oder Profil-Link"></label>
         <label class="f" for="tm-title-${id}">Aufgabe (optional)<input id="tm-title-${id}" type="text" value="${esc(x?.title||"")}" placeholder="z. B. Manager"></label>
         <label class="f" for="tm-grp-${id}">Bereich<select id="tm-grp-${id}">${tmGroups().map(([g,l])=>`<option value="${g}" ${(x?.grp||"manager")===g?"selected":""}>${l}</option>`).join("")}</select></label>
+        ${S.noUpd23?"":`<label class="f" for="tm-email-${id}">Konto (füllt das Profil dann selbst aus)<select id="tm-email-${id}"><option value="">– kein Konto –</option>${S.members.filter(m=>m.role!=="creator").map(m=>`<option value="${esc(m.email)}" ${x?.email===m.email?"selected":""} ${S.team.some(y=>y!==x&&y.email===m.email)?"disabled":""}>${esc(m.name)}</option>`).join("")}</select></label>`}
       </div>
       <div class="actions"><button class="btn small" data-tmsave="${esc(id)}">${x?"Speichern":"Hinzufügen"}</button>
         ${x?`<label class="chip" for="tm-ph-${id}">${ic("i-cam")} Profilbild ${x.photo?"ändern":"hochladen"}<input id="tm-ph-${id}" data-tmphoto="${esc(id)}" type="file" accept="image/*" hidden></label>
@@ -1624,10 +1628,33 @@ function teamEditor(){
   for (const [g,l] of tmGroups()){ const xs=tmList(g); if (!xs.length) continue; h+=`<div class="grp">${l}</div>`+xs.map((x,i)=>row(x,i===0,i===xs.length-1)).join(""); }
   return h+`<div class="grp">Person hinzufügen</div>`+row(null);
 }
+const canSelfTeam = () => !S.noUpd23 && !S.viewAs && ["lead","manager"].includes(S.real?.role);
+const myTeam = () => S.team.find(x=>x.email && x.email===S.real?.email);
+const teamNudge = () => myTeamOpen() && S.me===S.real ? `<button class="next" data-tab="team"><span class="nic">${ic("i-team")}</span><span class="nt"><b>Füll dein Team-Profil aus</b><small>Profilbild und TikTok-Name, damit Creator dich finden</small></span><span class="ngo">${ic("i-chev")}</span></button>` : "";
+const myTeamOpen = () => { if (!canSelfTeam()) return false; const x=myTeam(); return !x || !tmHandle(x) || !S.real.avatar; };
+function myTeamPanel(){
+  const x=myTeam()||{ name:S.real.name, email:S.real.email }, me=S.real;
+  return `<div class="panel stack" id="myteam"><h2>${ic("i-user")} Dein Team-Profil</h2>
+    <p class="muted" style="margin:0">So sehen dich alle Creator unter „Unser Team“. Tippen auf deine Karte öffnet dein TikTok-Profil.</p>
+    <div class="tmedh">${tmPhoto({ ...x, email:me.email },false)}<label class="chip" for="av-file" style="cursor:pointer">${ic("i-cam")} Profilbild ${me.avatar?"ändern":"hochladen"}<input id="av-file" type="file" accept="image/*" hidden></label></div>
+    <div class="grid2">
+      <label class="f" for="mt-name">Name<input id="mt-name" type="text" value="${esc(x.name||me.name||"")}"></label>
+      <label class="f" for="mt-handle">Dein TikTok-Name<input id="mt-handle" type="text" value="${esc(tmHandle(x)?"@"+tmHandle(x):"")}" placeholder="@deinname oder Profil-Link"></label>
+      <label class="f" for="mt-title">Aufgabe (optional)<input id="mt-title" type="text" value="${esc(x.title||"")}" placeholder="${me.role==="lead"?"z. B. Agenturleitung":"z. B. Manager"}"></label>
+    </div>
+    <div class="actions"><button class="btn small" id="mt-save">Speichern</button></div></div>`;
+}
+async function myTeamSave(){
+  const { data, error }=await sb.rpc("my_team_save",{ nm:$("#mt-name").value, h:$("#mt-handle").value, t:$("#mt-title").value });
+  if (error) return fail(error);
+  if (data==="name") return toast("Bitte deinen Namen eingeben.");
+  await refresh(); render(true); toast("Dein Team-Profil ist gespeichert ✓");
+}
 async function teamSave(id){
   if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
   const v=k=>($(`#tm-${k}-${id}`)?.value||"").trim();
   const row={ name:v("name"), handle:tmHandle({ handle:v("handle") })||null, title:v("title")||null, grp:v("grp")||"manager" };
+  if (!S.noUpd23) row.email=v("email")||null;
   if (!row.name) return toast("Bitte einen Namen eingeben.");
   let r;
   if (id==="new"){ row.sort=Math.max(0,...tmList(row.grp).map(x=>x.sort??0))+1; r=await sb.from("team").insert(row); }
@@ -3473,6 +3500,7 @@ document.addEventListener("click", async e => {
   if (t.id==="pm-save") return saveMember();
   if (t.id==="bl-add") return blockAdd();
   if (t.dataset.unblock) return blockRemove(t.dataset.unblock);
+  if (t.id==="mt-save") return myTeamSave();
   if (t.id==="tm-edit"){ S.teamEdit=!S.teamEdit; S.confirmDelete=null; return render(true); }
   if (t.dataset.tmsave) return teamSave(t.dataset.tmsave);
   if (t.dataset.tmdel) return teamDelete(t.dataset.tmdel);
