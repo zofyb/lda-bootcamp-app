@@ -249,12 +249,13 @@ async function load(){
         const ref = md.ref || (reg.email===email ? reg.ref : "");
         if (res==="ok" && ref) { const rr=await sb.rpc("claim_referral",{ rh:ref }); if (rr.error) console.warn(rr.error); }
         if (res==="ok" || res==="exists") { ({ data: me } = await sb.from("members").select("*").eq("email", email).maybeSingle()); if (me) toast("Willkommen in der LIVEdream Academy! 💜"); }
-        else return noAccess(res==="taken" ? `Der TikTok-Name @${esc(handle)} ist schon mit einer anderen E-Mail-Adresse registriert. Bitte melde dich bei deinem Manager.` : `Der TikTok-Name @${esc(handle)} steht nicht auf unserer Liste. Bitte melde dich bei deinem Manager.`);
+        else return noAccess(res==="blocked" ? "Dieser Zugang ist gesperrt. Wenn das ein Fehler ist, melde dich bei der Agenturleitung." : res==="taken" ? `Der TikTok-Name @${esc(handle)} ist schon mit einer anderen E-Mail-Adresse registriert. Bitte melde dich bei deinem Manager.` : `Der TikTok-Name @${esc(handle)} steht nicht auf unserer Liste. Bitte melde dich bei deinem Manager.`);
       }
       if (!me) return noAccess(`Die Adresse ${esc(email)} ist noch nicht registriert. Melde dich ab und tippe auf „Neu hier? Registrieren“.`);
     }
-    if (me.role==="creator") {
+    {
       const { data: role } = await sb.rpc("my_role");
+      if (!role && me.role!=="creator") return noAccess("Dein Zugang zur LIVEdream Academy ist nicht mehr aktiv. Wenn das ein Fehler ist, melde dich bei der Agenturleitung.");
       if (!role) return noAccess("Dein Zugang zur LIVEdream Academy ist abgelaufen, weil du nicht mehr auf unserer Creator-Liste stehst. Wenn das ein Fehler ist, melde dich bei deinem Manager.");
     }
     S.real = me; S.me = me; S.viewAs = ""; S._bye=false; if (!window.__DEMO) storeSet("ldb-lastmail", email);
@@ -293,6 +294,8 @@ async function refresh(){
   const [tk,mt,md]=await Promise.all([ sb.from("talks").select("*").order("day",{ ascending:false }), sb.from("mtasks").select("*").order("week",{ ascending:false }), sb.from("mtask_done").select("*") ]);
   S.noUpd19=!!(tk.error||mt.error||md.error); S.talks=tk.data||[]; S.mt=mt.data||[]; S.md=md.data||[];
   const ba=await sb.from("boot_apps").select("*").order("created_at",{ ascending:false }); S.noUpd21=!!ba.error; S.bapps=ba.data||[];
+  const tm=await sb.from("team").select("*").order("sort"); S.noUpd22=!!tm.error; S.team=tm.data||[];
+  if (!S.noUpd22 && S.real?.role==="lead"){ const bl=await sb.from("blocked").select("*").order("created_at"); S.blocked=bl.data||[]; } else S.blocked=[];
   S.noUpd14=!!(av.error||ao.error||bk.error); S.av=av.data||[]; S.avOff=ao.data||[]; S.bk=bk.data||[];
   if (!S.noUpd14 && S.real?.role==="creator"){ const bz=await sb.rpc("busy_times"); S.busy=new Set(Array.isArray(bz.data)?bz.data.map(x=>+new Date(x)):[]); }
   const cl=await sb.from("calendar").select("*").order("starts"); S.noUpd7=!!cl.error; S.cal=cl.data||[];
@@ -410,7 +413,7 @@ async function verifyCode(){
 
 /* ---------- Rahmen ---------- */
 const ic = (n, cls="") => `<svg class="ico ${cls}" aria-hidden="true"><use href="#${n}"/></svg>`;
-const LEAD_MORE = ["fragen","personen","themenedit","akademie","recruit","anim","match","erfolge","mteam","rw","reg","bapps"];
+const LEAD_MORE = ["team","fragen","personen","themenedit","akademie","recruit","anim","match","erfolge","mteam","rw","reg","bapps"];
 function navItems(){
   const me=S.me;
   if (me.role==="creator") return [["start","i-home","Start"],["lernen","i-learn","Lernen"],["kalender","i-cal","Kalender"],["anim","i-spark","Animation"],...(S.noUpd5?[]:[["@kk","i-mail","Sag's uns"]]),["profil","i-user","Profil"]];
@@ -453,7 +456,7 @@ function render(keepScroll){
   if (me.role==="creator"){
     if (S.tab==="themen"){ S.tab="lernen"; S.learn="bootcamp"; }
     if (S.tab==="akademie"){ S.tab="lernen"; S.learn=S.learn==="quiz"?"quiz":"akademie"; }
-    if (!["start","lernen","kalender","profil","anim","termine","match","erfolge"].includes(S.tab)) S.tab="start";
+    if (!["start","lernen","kalender","profil","anim","termine","match","erfolge","team"].includes(S.tab)) S.tab="start";
   } else if (["start","lernen","profil","themen"].includes(S.tab) || (S.tab==="fuehrung" && S.real.role!=="lead") || S.tab==="mehr") S.tab = "uebersicht";
   if (me.role==="lead" && S.tab==="mehr") S.tab="uebersicht";
   { const tmp=document.createElement("div"); tmp.innerHTML=navHtml(); const old=bnav.querySelector(".bn"); if (old) old.replaceWith(tmp.firstElementChild); else bnav.appendChild(tmp.firstElementChild); }
@@ -461,14 +464,14 @@ function render(keepScroll){
   document.querySelector(".wrap").classList.toggle("wide", me.role !== "creator");
   let html;
   if (S.qz && !S.creator) html = quizView();
-  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : ({ lernen:learnView, kalender:calendarView, profil:()=>profileView(me.email), anim:animView, termine:termView, match:matchView, erfolge:winsView }[S.tab] || startView)();
+  else if (me.role==="creator") html = S.openArea ? topicView(S.areas.find(a=>a.n===S.openArea)) : ({ lernen:learnView, kalender:calendarView, profil:()=>profileView(me.email), anim:animView, termine:termView, match:matchView, erfolge:winsView, team:teamView }[S.tab] || startView)();
   else if (S.creator) html = creatorDetail(S.creator);
   else if (S.pend) html = pendingDetail(S.pend);
   else if (S.tab==="akademie") html = academyView();
   else if (S.tab==="kalender") html = calendarView();
   else if (S.tab==="termine") html = termView();
   else if (S.tab==="fuehrung" && S.real.role==="lead") html = leadView();
-  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, bapps:bappsView, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView, mteam:mteamView, rw:rwView, reg:regView }[S.tab] || pendingView)();
+  else html = ({ bewerten:pendingView, creator:managerList, uebersicht:leadStart, bootcamp:leadOverview, fragen:feedbackView, personen:peopleView, themenedit:areaEditor, bapps:bappsView, recruit:recruitView, anim:animView, match:matchView, erfolge:winsView, mteam:mteamView, rw:rwView, reg:regView, team:teamView }[S.tab] || pendingView)();
   if (!S.openArea && !S.creator && !S.pend && !S.qz && !navItems().some(x=>x[0]===S.tab))
     html = `<button class="btn ghost small back" data-tab="${me.role==="creator"?"start":"uebersicht"}">← Zurück</button>`+html;
   view.innerHTML = html;
@@ -1201,6 +1204,7 @@ function startView(){
     ${boot?tile("i-gift","Belohnungen",'id="rw-open"',ok?`<i class="dot">!</i>`:`<small class="tl">ab 10 P</small>`):""}
     ${tile("i-user","Profil",'data-tab="profil"')}
     ${tile("i-spark","Animationen",'data-tab="anim"')}
+    ${S.noUpd22?"":tile("i-team","Unser Team",'data-tab="team"')}
     <a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${waTile()}${partnerTiles()}
   </div>
   ${ttStrip(6)}
@@ -1242,7 +1246,7 @@ function profileView(email){
 }
 function moreTiles(){
   const qn=S.questions.filter(q=>!q.answer && !q.published).length;
-  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],...(S.real?.role==="lead"?[["reg","i-user","Registrierungen"],...(S.noUpd21?[]:[["bapps","i-learn","Bootcamp-Bewerbungen",S.bapps.filter(a=>a.status==="offen").length]])]:[]),["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd9?[]:[["rw","i-gift","Live-Belohnungen"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
+  const it=[["fragen","i-mail","Sag's uns & Umfrage",qn],["personen","i-people","Teilnehmer"],...(S.noUpd22?[]:[["team","i-team","Unser Team"]]),...(S.real?.role==="lead"?[["reg","i-user","Registrierungen"],...(S.noUpd21?[]:[["bapps","i-learn","Bootcamp-Bewerbungen",S.bapps.filter(a=>a.status==="offen").length]])]:[]),["recruit","i-rocket","Recruiting",S.refs.filter(r=>r.status==="offen").length],["themenedit","i-grid","Themen & Start"],["akademie","i-learn","Akademie & Inhalte"],["anim","i-spark","Animationen"],...(S.noUpd16?[]:[["match","i-sword","Match-Börse",matchDot()],["erfolge","i-trophy","Erfolge-Wand",winDot()]]),...(S.noUpd19?[]:[["mteam","i-crown","Manager-Rangliste"]]),...(S.noUpd9?[]:[["rw","i-gift","Live-Belohnungen"]]),...(S.noUpd14?[]:[["termine","i-clock","1:1-Termine",soonBooked()]])];
   return `<div class="tiles">${it.map(([k,i,l,n])=>`<button class="tile" data-tab="${k}"><span class="tic">${ic(i)}</span>${l}${n?`<i class="dot">${n}</i>`:""}</button>`).join("")}<a class="tile" href="${esc(MERCH_URL())}" target="_blank" rel="noopener"><span class="tic">${ic("i-heart")}</span>Merch-Shop</a>${waTile()}${partnerTiles()}</div>`;
 }
 function leadStart(){ if (S.me.role==="manager") return mgrStart(); return leadDash() + (S.me.role==="lead" ? `<div class="sec"><span>Bereiche</span></div>${moreTiles()}` : ""); }
@@ -1573,7 +1577,116 @@ function mgrStart(){
     <div class="sec"><span>Neuigkeiten</span><small>letzte 7 Tage</small></div>
     ${news.length?`<div class="news">${news.map(n=>`<button class="nrow" ${n.go}><span class="kic">${ic(n.ic)}</span><span>${n.t}</span><small>${ago(n.at)}</small></button>`).join("")}</div>`:`<p class="muted">Gerade nichts Neues von deinen Creatorn.</p>`}
     <div class="sec"><span>Bereiche</span></div>
-    <div class="tiles">${tile("creator","i-people","Betreuung")}${tile("bewerten","i-check","Bewerten",open)}${S.noUpd14?"":tile("termine","i-clock","1:1-Termine",soonBooked())}${tile("kalender","i-cal","Kalender")}${tile("akademie","i-learn","Akademie")}${tile("fragen","i-mail","Sag's uns")}${S.noUpd16?"":tile("match","i-sword","Match-Börse",matchDot())+tile("erfolge","i-trophy","Erfolge-Wand",winDot())}${waTile()}</div>`;
+    <div class="tiles">${tile("creator","i-people","Betreuung")}${tile("bewerten","i-check","Bewerten",open)}${S.noUpd14?"":tile("termine","i-clock","1:1-Termine",soonBooked())}${tile("kalender","i-cal","Kalender")}${tile("akademie","i-learn","Akademie")}${tile("fragen","i-mail","Sag's uns")}${S.noUpd16?"":tile("match","i-sword","Match-Börse",matchDot())+tile("erfolge","i-trophy","Erfolge-Wand",winDot())}${S.noUpd22?"":tile("team","i-team","Unser Team")}${waTile()}</div>`;
+}
+
+/* ---------- Unser Team: Manager + Agenturleitung mit Bild, Name, @TikTok (Tippen öffnet das Profil). Leitung pflegt alles. ---------- */
+const tmHandle = x => String(x?.handle||"").trim().replace(/^@/,"").replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i,"").replace(/[/?#].*$/,"");
+const tmGroups = () => [["lead","Agenturleitung","i-crown"],["manager","Manager","i-people"]];
+const tmList = g => S.team.filter(x=>x.grp===g).sort((a,b)=>(a.sort??0)-(b.sort??0) || String(a.name).localeCompare(String(b.name)));
+function tmPhoto(x, big){
+  const m = S.members.find(y=>y.role!=="creator" && y.avatar && lc(y.name||"")===lc(x.name||""));
+  const img = x.photo ? `<img data-tcover="${esc(x.photo)}" alt="">` : m ? `<img class="avimg" data-avatar="${esc(m.avatar)}" ${AVURL[m.avatar]?`src="${esc(AVURL[m.avatar])}"`:""} alt="">` : "";
+  return `<span class="tmav${big?"":" sm"}"><span class="tml">${esc(String(x.name||"?").trim().charAt(0).toUpperCase())}</span>${img}</span>`;
+}
+function teamCard(x){
+  const h=tmHandle(x), url=h?`https://www.tiktok.com/@${encodeURIComponent(h)}`:"";
+  const inner=`${tmPhoto(x,true)}<b>${esc(x.name)}</b><small>${h?"@"+esc(h):"&nbsp;"}</small>${x.title?`<em>${esc(x.title)}</em>`:""}<span class="tmgo">${ic("i-tiktok")}${h?"Profil öffnen":"bald hier"}</span>`;
+  return url ? `<a class="tmc" href="${esc(url)}" target="_blank" rel="noopener" aria-label="TikTok-Profil von ${esc(x.name)} öffnen">${inner}</a>` : `<div class="tmc off">${inner}</div>`;
+}
+function teamView(){
+  const lead=S.me.role==="lead" && !S.viewAs;
+  let h=`<div class="stack"><span class="eyebrow">LIVEdream Agency</span><h1>Unser <em>Team</em></h1><p class="muted" style="margin:0">Tippe auf eine Person, um ihr TikTok-Profil zu öffnen. Folgen ausdrücklich erwünscht 💜</p></div>`;
+  if (S.noUpd22) return h+`<p class="err">Zuerst update-22-team-sperre.sql in Supabase ausführen.</p>`;
+  for (const [g,l,i] of tmGroups()){
+    const xs=tmList(g); if (!xs.length) continue;
+    h+=`<div class="sec"><span>${ic(i)} ${l}</span><small>${xs.length}</small></div><div class="team">${xs.map(teamCard).join("")}</div>`;
+  }
+  if (!S.team.length) h+=`<p class="muted">Hier stellt sich bald unser Team vor.</p>`;
+  if (lead) h+=`<div class="actions"><button class="btn small ${S.teamEdit?"":"ghost"}" id="tm-edit">${ic("i-grid")} ${S.teamEdit?"Fertig":"Team bearbeiten"}</button></div>${S.teamEdit?teamEditor():""}`;
+  return h;
+}
+function teamEditor(){
+  const row=(x,first,last)=>{ const id=x?.id||"new";
+    return `<div class="panel tmed">
+      <div class="tmedh">${x?tmPhoto(x,false):`<span class="tmav sm"><span class="tml">+</span></span>`}<b>${x?esc(x.name):"Neue Person"}</b>
+        ${x?`<span class="actions"><button class="chip" data-tmmove="${esc(id)}" data-dir="-1" ${first?"disabled":""} aria-label="Nach vorne">▲</button><button class="chip" data-tmmove="${esc(id)}" data-dir="1" ${last?"disabled":""} aria-label="Nach hinten">▼</button></span>`:""}</div>
+      <div class="grid2">
+        <label class="f" for="tm-name-${id}">Name<input id="tm-name-${id}" type="text" value="${esc(x?.name||"")}" placeholder="z. B. Parec"></label>
+        <label class="f" for="tm-handle-${id}">TikTok-Name<input id="tm-handle-${id}" type="text" value="${esc(tmHandle(x)?"@"+tmHandle(x):"")}" placeholder="@name oder Profil-Link"></label>
+        <label class="f" for="tm-title-${id}">Aufgabe (optional)<input id="tm-title-${id}" type="text" value="${esc(x?.title||"")}" placeholder="z. B. Manager"></label>
+        <label class="f" for="tm-grp-${id}">Bereich<select id="tm-grp-${id}">${tmGroups().map(([g,l])=>`<option value="${g}" ${(x?.grp||"manager")===g?"selected":""}>${l}</option>`).join("")}</select></label>
+      </div>
+      <div class="actions"><button class="btn small" data-tmsave="${esc(id)}">${x?"Speichern":"Hinzufügen"}</button>
+        ${x?`<label class="chip" for="tm-ph-${id}">${ic("i-cam")} Profilbild ${x.photo?"ändern":"hochladen"}<input id="tm-ph-${id}" data-tmphoto="${esc(id)}" type="file" accept="image/*" hidden></label>
+        <button class="chip" data-tmdel="${esc(id)}">${S.confirmDelete==="tm"+id?"Wirklich entfernen?":"Entfernen"}</button>`:""}</div></div>`; };
+  let h=`<div class="panel stack"><h2>Team bearbeiten</h2><p class="muted" style="margin:0">Profilbild: am besten ein Screenshot vom TikTok-Profilbild. Die App schneidet es rund zu.</p></div>`;
+  for (const [g,l] of tmGroups()){ const xs=tmList(g); if (!xs.length) continue; h+=`<div class="grp">${l}</div>`+xs.map((x,i)=>row(x,i===0,i===xs.length-1)).join(""); }
+  return h+`<div class="grp">Person hinzufügen</div>`+row(null);
+}
+async function teamSave(id){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const v=k=>($(`#tm-${k}-${id}`)?.value||"").trim();
+  const row={ name:v("name"), handle:tmHandle({ handle:v("handle") })||null, title:v("title")||null, grp:v("grp")||"manager" };
+  if (!row.name) return toast("Bitte einen Namen eingeben.");
+  let r;
+  if (id==="new"){ row.sort=Math.max(0,...tmList(row.grp).map(x=>x.sort??0))+1; r=await sb.from("team").insert(row); }
+  else { const old=S.team.find(x=>x.id===id); if (old && old.grp!==row.grp) row.sort=Math.max(0,...tmList(row.grp).map(x=>x.sort??0))+1; r=await sb.from("team").update(row).eq("id",id); }
+  if (r.error) return fail(r.error);
+  await refresh(); render(true); toast(id==="new"?"Person hinzugefügt ✓":"Gespeichert ✓");
+}
+async function teamDelete(id){
+  if (S.confirmDelete!=="tm"+id){ S.confirmDelete="tm"+id; return render(true); }
+  S.confirmDelete=null; const x=S.team.find(y=>y.id===id);
+  const r=await sb.from("team").delete().eq("id",id); if (r.error) return fail(r.error);
+  if (x?.photo) sb.storage.from("unterlagen").remove([x.photo]).catch(()=>{});
+  await refresh(); render(true); toast("Entfernt.");
+}
+async function teamMove(id, dir){
+  const x=S.team.find(y=>y.id===id); if (!x) return;
+  const xs=tmList(x.grp), i=xs.indexOf(x), j=i+dir; if (j<0 || j>=xs.length) return;
+  [xs[i],xs[j]]=[xs[j],xs[i]];
+  const rs=await Promise.all(xs.map((y,k)=>(y.sort??0)!==k+1 ? sb.from("team").update({ sort:k+1 }).eq("id",y.id) : null).filter(Boolean));
+  const bad=rs.find(r=>r.error); if (bad) return fail(bad.error);
+  await refresh(); render(true);
+}
+async function teamPhoto(id, f){
+  if (!f) return; if (!/^image\//.test(f.type)) return toast("Bitte ein Bild auswählen.");
+  const x=S.team.find(y=>y.id===id); if (!x) return;
+  try{
+    toast("Profilbild wird hochgeladen …");
+    const blob=await shrinkImage(f, 400), path=`team-${Date.now()}.jpg`;
+    const u=await sb.storage.from("unterlagen").upload(path, blob, { contentType:"image/jpeg" }); if (u.error) throw u.error;
+    const r=await sb.from("team").update({ photo:path }).eq("id",id); if (r.error) throw r.error;
+    if (x.photo) sb.storage.from("unterlagen").remove([x.photo]).catch(()=>{});
+    await refresh(); render(true); toast("Profilbild gespeichert ✓");
+  } catch(e){ fail(e); }
+}
+
+/* ---------- Sperrliste (nur Agenturleitung): kein Login, keine Registrierung; Daten bleiben ---------- */
+const isBlocked = m => (S.blocked||[]).some(b=>b.value===lc(m.email||"") || (m.handle && b.value===lc(String(m.handle).replace(/^@/,""))));
+function blockPanel(){
+  if (S.noUpd22 || S.real?.role!=="lead") return "";
+  const by={}; (S.blocked||[]).forEach(b=>{ const k=b.name||b.value; (by[k]=by[k]||[]).push(b); });
+  return `<div class="panel stack"><h2>${ic("i-lock")} Gesperrt</h2>
+    <p class="muted" style="margin:0">Wer hier steht, kommt nicht mehr in die App: kein Login, keine Registrierung, auch nicht mit neuer Liste. Abgaben und Creator-Zuordnungen bleiben gespeichert.</p>
+    ${Object.keys(by).length?`<div class="list">${Object.entries(by).map(([k,bs])=>`<div class="row"><div class="head"><b>${esc(k)}</b><button class="chip" data-unblock="${esc(bs[0].value)}">Entsperren</button></div><span class="muted">${bs.map(b=>esc(b.value.includes("@")?b.value:"@"+b.value)).join(" · ")}</span></div>`).join("")}</div>`:`<p class="muted" style="margin:0">Niemand gesperrt.</p>`}
+    <div class="grid2"><label class="f" for="bl-val">E-Mail oder TikTok-Name<input id="bl-val" type="text" placeholder="@name oder name@mail.de"></label>
+    <label class="f" for="bl-name">Name (zum Wiederfinden)<input id="bl-name" type="text" placeholder="z. B. Booster"></label></div>
+    <div class="actions"><button class="btn small danger" id="bl-add">Sperren</button></div></div>`;
+}
+async function blockAdd(){
+  if (S.viewAs) return toast("In der Vorschau wird nichts gespeichert.");
+  const v=$("#bl-val").value.trim(), nm=$("#bl-name").value.trim();
+  if (!v) return toast("Bitte E-Mail oder TikTok-Namen eingeben.");
+  const { data, error }=await sb.rpc("block_person",{ v, nm }); if (error) return fail(error);
+  if (data==="leitung") return toast("Die Agenturleitung kann nicht gesperrt werden.");
+  await refresh(); render(true); toast("Gesperrt. Diese Person kommt nicht mehr in die App.");
+}
+async function blockRemove(v){
+  if (S.confirmDelete!=="bl"+v){ S.confirmDelete="bl"+v; toast("Nochmal tippen zum Entsperren."); return; }
+  S.confirmDelete=null; const { error }=await sb.rpc("unblock_person",{ v }); if (error) return fail(error);
+  await refresh(); render(true); toast("Entsperrt.");
 }
 
 /* ---------- Partner (Kooperationen): Kachel + Infoblatt, Leitung pflegt Text und Link ---------- */
@@ -2559,7 +2672,7 @@ function rosterPanel(){
 function peopleView(){
   const m = S.editMember ? member(S.editMember) : null;
   const managers = S.members.filter(x=>x.role!=="creator");
-  let h = `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1><em>Teilnehmer</em></h1></div>${backstagePanel()}${rosterPanel()}
+  let h = `<div class="stack"><span class="eyebrow">Agenturleitung</span><h1><em>Teilnehmer</em></h1></div>${blockPanel()}${backstagePanel()}${rosterPanel()}
   <div class="panel stack"><h2>${m?"Person bearbeiten":"Person hinzufügen"}</h2>
   <div class="grid2">
     <label class="f" for="pm-email">E-Mail-Adresse<input id="pm-email" type="email" value="${esc(m?.email||"")}"></label>
@@ -2571,7 +2684,7 @@ function peopleView(){
   <div class="actions"><button class="btn small" id="pm-save">${m?"Speichern":"Hinzufügen"}</button>${m?`<button class="btn small ghost" id="pm-cancel">Abbrechen</button><button class="btn small danger" id="pm-del">${S.confirmDelete===m.email?"Wirklich löschen? Auch alle Abgaben":"Löschen"}</button>`:""}</div></div>`;
   for (const r of ["lead","manager","creator"]){
     const ps=S.members.filter(x=>x.role===r); if(!ps.length) continue;
-    h += `<div class="grp">${ROLE_NAME[r]} (${ps.length})</div><div class="list">${ps.map(p=>`<button class="row" data-edit="${esc(p.email)}"><div class="head"><b>${esc(r==="creator"?label(p):p.name)}</b><span class="muted">${r==="creator"?esc(member(p.manager_email)?.name||"ohne Manager"):""}</span></div><span class="muted">${esc(p.email)}</span></button>`).join("")}</div>`;
+    h += `<div class="grp">${ROLE_NAME[r]} (${ps.length})</div><div class="list">${ps.map(p=>`<button class="row" data-edit="${esc(p.email)}"><div class="head"><b>${esc(r==="creator"?label(p):p.name)}${isBlocked(p)?` <span class="blk">${ic("i-lock")} gesperrt</span>`:""}</b><span class="muted">${r==="creator"?esc(member(p.manager_email)?.name||"ohne Manager"):""}</span></div><span class="muted">${esc(p.email)}</span></button>`).join("")}</div>`;
   }
   return h;
 }
@@ -3358,6 +3471,12 @@ document.addEventListener("click", async e => {
   if (t.id==="csv") return exportCsv();
   if (t.dataset.edit){ S.editMember=t.dataset.edit; S.confirmDelete=null; return render(); }
   if (t.id==="pm-save") return saveMember();
+  if (t.id==="bl-add") return blockAdd();
+  if (t.dataset.unblock) return blockRemove(t.dataset.unblock);
+  if (t.id==="tm-edit"){ S.teamEdit=!S.teamEdit; S.confirmDelete=null; return render(true); }
+  if (t.dataset.tmsave) return teamSave(t.dataset.tmsave);
+  if (t.dataset.tmdel) return teamDelete(t.dataset.tmdel);
+  if (t.dataset.tmmove) return teamMove(t.dataset.tmmove, +t.dataset.dir);
   if (t.id==="pm-cancel"){ S.editMember=null; S.confirmDelete=null; return render(); }
   if (t.id==="pm-del"){
     if (S.confirmDelete!==S.editMember){ S.confirmDelete=S.editMember; return render(true); }
@@ -3378,6 +3497,7 @@ document.addEventListener("click", async e => {
 document.addEventListener("change", e => {
   if (e.target.dataset.vcover) return setVideoCover(e.target.dataset.vcover, e.target.files[0]);
   if (e.target.dataset.ttcover) return ttSetCover(e.target.dataset.ttcover, e.target.files[0]);
+  if (e.target.dataset.tmphoto){ const f=e.target.files[0]; e.target.value=""; return teamPhoto(e.target.dataset.tmphoto, f); }
   if (e.target.dataset.up){
     const n=+e.target.dataset.up, fs=[...e.target.files], big=fs.filter(f=>f.size>MAX_FILE);
     if (big.length) toast(`${big.map(f=>f.name).join(", ")} ist größer als 50 MB. Bitte kürzer aufnehmen.`);

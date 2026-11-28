@@ -48,6 +48,15 @@ const db = {
   ],
   roster: ["luna.live","gamer_kevin","jenny.mama","tim.talks","sofia.sings","mia.vibes","neu.creator"].map(h=>({ handle:h, bootcamp:h!=="mia.vibes"&&h!=="neu.creator", manager_email:{"luna.live":"lena@demo","gamer_kevin":"lena@demo","jenny.mama":"max@demo","tim.talks":"max@demo","mia.vibes":"max@demo","neu.creator":"lena@demo"}[h]||null })),
   activity: ["c1@demo","c1@demo","c1@demo","c3@demo","c5@demo"].map((e,i)=>({creator_email:e, day:day(i<3?i:0)})),
+  team: [
+    {id:"t1", grp:"lead", name:"Zofy", handle:"zofyb", title:"Agenturleitung", sort:1},
+    {id:"t2", grp:"lead", name:"Schlauchi", handle:"schlauchi.beispiel", title:"Agenturleitung", sort:2},
+    {id:"t3", grp:"lead", name:"Nik", handle:"nik.beispiel", title:"Assistenz der Leitung", sort:3},
+    {id:"t4", grp:"manager", name:"Lena", handle:"lena.beispiel", title:"Managerin", sort:1, photo:"demo-av-lena"},
+    {id:"t5", grp:"manager", name:"Max", handle:"max.beispiel", title:"Manager", sort:2},
+    {id:"t6", grp:"manager", name:"Tom", handle:null, title:"Manager", sort:3}
+  ],
+  blocked: [{value:"alt.agent", name:"Beispiel-Agent", created_at:iso(now-36e5)},{value:"alt.agent@demo", name:"Beispiel-Agent", created_at:iso(now-36e5)}],
   boot_apps: [{creator_email:"c7@demo", note:"Ich gehe 4× die Woche live, aber meine Zuschauer bleiben nicht lange. Ich will lernen, wie ich sie halte.", status:"offen", created_at:iso(now-5*36e5)}],
   settings: [{key:"start", value:start}, {key:"anim_whatsapp", value:"0170 0000000"}, {key:"partner_papaya", value:JSON.stringify({ info:"Beispieltext: Was Papaya Given anbietet. Kontakt läuft über uns.", link:"", label:"" })}],
   questions: [
